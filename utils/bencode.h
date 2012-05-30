@@ -8,6 +8,8 @@
 #pragma once
 #include <stdio.h>
 #include <stdint.h>
+#include <errno.h>
+#include <limits.h>
 #include <iostream>
 #include <sys/types.h>
 #include <stdint.h>
@@ -60,7 +62,7 @@ struct be_node
 };
 
 be_node * decode(const char * data, uint64_t len, bool torrent);
-void encode(be_node * node, char ** buf, uint64_t * len);
+int encode(be_node * node, char ** buf, uint32_t buf_length, uint32_t * out_len);
 int get_node(be_node * node, const char * key, be_node ** val);
 int get_int(be_node * node, const char * key, uint64_t * val);
 int get_str(be_node * node, const char * key, be_str ** val);

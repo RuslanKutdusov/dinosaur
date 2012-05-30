@@ -19,6 +19,8 @@ int decode_str(const char ** data, uint64_t * len, be_str * s)
 		return -1;
 
 	*data = ++endptr;
+	if (str_len > *len - (*data - st))
+		return -1;
 	s->len = str_len;
 	if (str_len == 0)
 	{
@@ -59,8 +61,8 @@ be_node * decode(const char ** data, uint64_t * len, bool torrent)
 			}
 
 			char * endptr;
-			uint64_t val = strtoll(*data, &endptr, 10);
-			if (endptr == *data || *endptr != 'e')
+			long long int val = strtoll(*data, &endptr, 10);
+			if (endptr == *data || *endptr != 'e' || ((val == LONG_LONG_MAX || val == LONG_LONG_MIN) && errno == ERANGE))
 			{
 				//std::cout<<"bad int2\n";
 				return NULL;
@@ -214,25 +216,26 @@ be_node * decode(const char * data, uint64_t len, bool torrent)
 	return t;
 }
 
-void encode(be_node * node, char ** buf, uint64_t * len)
+int encode_recursive(be_node * node, char ** buf, uint32_t buf_length, uint32_t * out_len)
 {
-	if (node == NULL)
-		return;
-	char * ret = NULL;// = (char*)malloc(sizeof(be_node));
-	uint64_t ret_len;
+	if (node == NULL || buf == NULL || *buf == NULL || out_len == NULL)
+		return -1;
+	//char * ret = NULL;// = (char*)malloc(sizeof(be_node));
 
 	switch (node->type) {
 		case BE_STR:
 		{
-			char len[22];
-			uint64_t str_length = node->val.s.len;
-			sprintf(len,"%lli:",str_length);
-			int len_len = strlen(len);
-			//ret = (char*)malloc(len_len + str_length);
-			ret = new char[len_len + str_length];
-			memcpy(ret, len, len_len);
-			memcpy(ret + len_len, node->val.s.ptr, str_length);
-			ret_len = len_len + str_length;
+			uint32_t str_length = node->val.s.len;
+			char bencode_str_param[22];
+			sprintf(bencode_str_param,"%u:",str_length);
+			size_t bencode_str_param_len = strlen(bencode_str_param);
+			if (buf_length - *out_len < bencode_str_param_len + str_length)
+				return -1;
+			memcpy(*buf, bencode_str_param, bencode_str_param_len);
+			*buf = *buf + bencode_str_param_len;
+			memcpy(*buf, node->val.s.ptr, str_length);
+			*buf = *buf + str_length;
+			*out_len += bencode_str_param_len + str_length;
 			break;
 		}
 
@@ -240,78 +243,81 @@ void encode(be_node * node, char ** buf, uint64_t * len)
 		{
 			char i[23];
 			sprintf(i, "i%llie",node->val.i);
-			ret_len = strlen(i);
-			//ret = (char*)malloc(ret_len);
-			ret = new char[ret_len];
-			memcpy(ret, i, ret_len);
+			size_t int_len = strlen(i);
+			if (buf_length - *out_len < int_len)
+				return -1;
+			memcpy(*buf, i, int_len);
+			*buf = *buf + int_len;
+			*out_len += int_len;
 			break;
 		}
 
 		case BE_LIST:
 		{
 			//ret = (char*)malloc(1);
-			ret = new char[1];
-			ret[0]='l';
-			ret_len = 1;
+			if (buf_length - *out_len < 1)
+				return -1;
+			**buf = 'l';
+			*buf += 1;
+			*out_len += 1;
 
 			for (int i = 0; i < node->val.l.count; i++)
-				encode(&node->val.l.elements[i], &ret, &ret_len);
+				if (encode_recursive(&node->val.l.elements[i], buf, buf_length, out_len) == -1)
+					return -1;
 
-			//ret = (char*)realloc(ret,ret_len + 1);
-			char * old_ret = ret;
-			ret = new char[ret_len + 1];
-			memcpy(ret, old_ret, ret_len);
-			ret[ret_len++] = 'e';
-			delete[] old_ret;
+			if (buf_length - *out_len < 1)
+				return -1;
+			**buf = 'e';
+			*buf += 1;
+			*out_len += 1;
 			break;
 		}
 		case BE_DICT:
 			//ret = (char*)malloc(1);
-			ret = new char[1];
-			ret[0]='d';
-			ret_len = 1;
+			if (buf_length - *out_len < 1)
+				return -1;
+			**buf = 'd';
+			*buf += 1;
+			*out_len += 1;
 			for (int i = 0; i < node->val.d.count; i++) {
 				//printf("%s => ", node->val.d[i].key);
 				//_dump(node->val.d[i].val, -(indent + 1));
 
-				char len[22];
-				uint64_t str_length = node->val.d.keys[i].len;
-				sprintf(len,"%lli:",str_length);
-				int len_len = strlen(len);
-				//ret = (char*)realloc(ret, len_len + str_length + ret_len);
-				char * old_ret = ret;
-				ret = new char[len_len + str_length + ret_len];
-				memcpy(ret, old_ret, ret_len);
-				delete[] old_ret;
-				memcpy(ret + ret_len, len, len_len);
-				memcpy(ret + ret_len + len_len, node->val.d.keys[i].ptr, str_length);
-				ret_len += len_len + str_length;
+				uint32_t str_length = node->val.d.keys[i].len;
+				char bencode_str_param[22];
+				sprintf(bencode_str_param,"%u:",str_length);
+				size_t bencode_str_param_len = strlen(bencode_str_param);
+				if (buf_length - *out_len < bencode_str_param_len + str_length)
+						return -1;
+				memcpy(*buf, bencode_str_param, bencode_str_param_len);
+				*buf = *buf + bencode_str_param_len;
+				memcpy(*buf, node->val.d.keys[i].ptr, str_length);
+				*buf = *buf + str_length;
+				*out_len += bencode_str_param_len + str_length;
 
-				encode(&node->val.d.vals[i], &ret, &ret_len);
+				if (encode_recursive(&node->val.d.vals[i], buf, buf_length, out_len) == -1)
+					return -1;
 			}
 
 			//ret = (char*)realloc(ret,ret_len + 1);
-			char * old_ret = ret;
-			ret = new char[ret_len + 1];
-			memcpy(ret, old_ret, ret_len);
-			delete[] old_ret;
-			ret[ret_len++] = 'e';
+			if (buf_length - *out_len < 1)
+				return -1;
+			**buf = 'e';
+			*buf += 1;
+			*out_len += 1;
 			break;
 	}
 
-	char * old_buf = *buf;
-	*buf = new char[*len + ret_len];
-	if (*len > 0)
-	{
-		memcpy(*buf, old_buf, *len);
-		delete[] old_buf;
-	}
-	memcpy(*buf + *len, ret, ret_len);
+	return 0;
+}
 
-	//*buf = (char*)realloc(*buf, *len + ret_len);
-	//memcpy(*buf + *len, ret, ret_len);
-	*len += ret_len;
-	delete[] ret;
+int encode(be_node * node, char ** buf, uint32_t buf_length, uint32_t * out_len)
+{
+	if (node == NULL || buf == NULL || *buf == NULL || out_len == NULL)
+			return -1;
+	char * changable_ref = *buf;
+	*out_len = 0;
+	return encode_recursive(node, &changable_ref, buf_length, out_len);
 }
 
 int get_node(be_node * node, const char * key, be_node ** val)
@@ -573,7 +579,11 @@ void dump_indent(ssize_t indent)
 }
 void _dump(be_node *node, ssize_t indent)
 {
-
+	if (node == NULL)
+	{
+		printf("Nothing to dump, node==null\n");
+		return;
+	}
 	dump_indent(indent);
 	indent = abs(indent);
 
@@ -664,7 +674,7 @@ void get_hash_hex(be_node * node, char * sha1)
 {
 	char * bencoded = NULL;
 	uint64_t len = 0;
-	encode(node, &bencoded, &len);
+	//encode(node, &bencoded, &len);
 	CSHA1 csha1;
 	csha1.Update((unsigned char*)bencoded,len);
 	csha1.Final();
@@ -676,7 +686,7 @@ void get_hash_bin(be_node * node, unsigned char * sha1)
 {
 	char * bencoded = NULL;
 	uint64_t len = 0;
-	encode(node, &bencoded, &len);
+	//encode(node, &bencoded, &len);
 	CSHA1 csha1;
 	csha1.Update((unsigned char*)bencoded,len);
 	csha1.Final();

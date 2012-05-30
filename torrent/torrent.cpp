@@ -161,14 +161,14 @@ int Torrent::Init(std::string metafile, network::NetworkManager * nm, cfg::Glob_
 	m_download_directory = "";
 	m_state = TORRENT_STATE_NONE;
 	m_error = TORRENT_ERROR_NO_ERROR;
-	uint64_t len = 0;
-	char * buf = read_file(metafile.c_str(), &len);
+	uint64_t metafile_len = 0;
+	char * buf = read_file(metafile.c_str(), &metafile_len);
 	if (buf == NULL)
 	{
 		m_error = TORRENT_ERROR_IO_ERROR;
 		return ERR_NULL_REF; //throw FileException(errno);
 	}
-	m_metafile = bencode::decode(buf, len, true);
+	m_metafile = bencode::decode(buf, metafile_len, true);
 	free(buf);
 	if (!m_metafile)
 	{
@@ -339,9 +339,16 @@ int Torrent::Init(std::string metafile, network::NetworkManager * nm, cfg::Glob_
 		bencode::get_int(info,"private",&m_private);
 
 	memset(m_info_hash_bin,0,20);
-	bencode::get_hash_bin(info,m_info_hash_bin);
 	memset(m_info_hash_hex,0,41);
-	bencode::get_hash_hex(info,m_info_hash_hex);
+	char * bencoded_info = new char[metafile_len];
+	uint32_t bencoded_info_len = 0;
+	bencode::encode(info, &bencoded_info, metafile_len, &bencoded_info_len);
+	CSHA1 csha1;
+	csha1.Update((unsigned char*)bencoded_info,bencoded_info_len);
+	csha1.Final();
+	csha1.ReportHash(m_info_hash_hex,CSHA1::REPORT_HEX);
+	csha1.GetHash(m_info_hash_bin);
+	delete[] bencoded_info;
 
 
 	m_bitfield_len = ceil(m_piece_count / 8.0f);
@@ -629,7 +636,7 @@ int Torrent::clock()
 				{
 					if ((*iter).second == NULL)//если блок не помечен
 					{
-						printf("Unmarked piece %u %d block2download.size=%d\n", piece, (*iter).first, m_torrent_file.m_piece_info[piece].blocks2download.size());
+						//printf("Unmarked piece %u %d block2download.size=%d\n", piece, (*iter).first, m_torrent_file.m_piece_info[piece].blocks2download.size());
 						if (peer->request_limit())
 							break;
 						uint32_t block_length;
@@ -755,7 +762,7 @@ int Torrent::event_piece_hash(uint32_t piece_index, bool ok, bool error)
 		m_downloaded +=m_torrent_file.m_piece_info[piece_index].length;
 		set_bitfield(piece_index, m_piece_count, m_bitfield);
 		save_state();
-		printf("Piece %d OK\n", piece_index);
+		//printf("Piece %d OK\n", piece_index);
 		//printf("rx=%f tx=%f done=%d downloaded=%llu\n", m_rx_speed, m_tx_speed, m_pieces_to_download.size(), m_downloaded);
 	}
 	if (!ok || error)
@@ -764,7 +771,7 @@ int Torrent::event_piece_hash(uint32_t piece_index, bool ok, bool error)
 		m_pieces_to_download.insert(piece_index);
 		reset_bitfield(piece_index, m_piece_count, m_bitfield);
 		save_state();
-		printf("Piece %d BAD\n", piece_index);
+		//printf("Piece %d BAD\n", piece_index);
 		//printf("rx=%f tx=%f done=%d downloaded=%llu\n", m_rx_speed, m_tx_speed, m_pieces_to_download.size(), m_downloaded);
 	}
 	return ERR_NO_ERROR;

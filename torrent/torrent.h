@@ -363,8 +363,8 @@ private:
 	uint64_t m_piece_length;
 	uint32_t m_piece_count;
 	char * m_pieces;
-	unsigned char m_info_hash_bin[20];
-	char m_info_hash_hex[40];
+	unsigned char m_info_hash_bin[SHA1_LENGTH];
+	char m_info_hash_hex[SHA1_LENGTH * 2 + 1];
 	tracker_map m_trackers;
 	socket_map m_sockets;//по сокету ассоциируемся с объектом sock_event(Peer, Tracker)
 	//TorrentFile m_torrent_file;
