@@ -83,8 +83,6 @@ bool is_list(be_node * node);
 bool is_dict(be_node * node);
 void dump(be_node *node);
 void _free(be_node * data);
-void get_hash_hex(be_node * node, char * sha1);
-void get_hash_bin(be_node * node, unsigned char * sha1);
 
 }
 

@@ -670,28 +670,4 @@ void _free(be_node * data)
 	delete data;
 }
 
-void get_hash_hex(be_node * node, char * sha1)
-{
-	char * bencoded = NULL;
-	uint64_t len = 0;
-	//encode(node, &bencoded, &len);
-	CSHA1 csha1;
-	csha1.Update((unsigned char*)bencoded,len);
-	csha1.Final();
-	csha1.ReportHash(sha1,CSHA1::REPORT_HEX);
-	delete[] bencoded;
-}
-
-void get_hash_bin(be_node * node, unsigned char * sha1)
-{
-	char * bencoded = NULL;
-	uint64_t len = 0;
-	//encode(node, &bencoded, &len);
-	CSHA1 csha1;
-	csha1.Update((unsigned char*)bencoded,len);
-	csha1.Final();
-	csha1.GetHash(sha1);
-	delete[] bencoded;
-}
-
 }
