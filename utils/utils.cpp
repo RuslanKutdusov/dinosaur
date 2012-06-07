@@ -23,4 +23,27 @@ uint32_t get_block_from_id(uint64_t id)
 	return (id & (uint32_t)4294967295);
 }
 
+char *read_file(const char *file, uint64_t *len)
+{
+	struct stat st;
+	char *ret = NULL;
+	FILE *fp;
 
+	if (stat(file, &st))
+		return ret;
+	*len = st.st_size;
+
+	fp = fopen(file, "r");
+	if (!fp)
+		return ret;
+
+	ret = (char*)malloc(*len);
+	if (!ret)
+		return ret;
+
+	fread(ret, 1, *len, fp);
+
+	fclose(fp);
+
+	return ret;
+}

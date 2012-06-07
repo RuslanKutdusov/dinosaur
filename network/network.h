@@ -185,7 +185,7 @@ private:
 			pthread_mutex_unlock(&nm->m_mutex_sockets);
 			//pthread_mutex_unlock(&m_mutex_timeout_sockets);
 			//sleep(TIMEOUT);
-			usleep(100);
+			usleep(200);
 		}
 		//std::cout<<"TIMEOUT_THREAD stopped\n";
 		return (void*)ret;

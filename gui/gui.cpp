@@ -278,6 +278,7 @@ gboolean foreach_tracker_list (GtkTreeModel *model,
 
 gboolean on_timer(gpointer data)
 {
+	//return FALSE;
 	gtk_tree_model_foreach(GTK_TREE_MODEL(torrent_list), foreach_torrent_list, NULL);
 
 	GtkTreeSelection *selection;

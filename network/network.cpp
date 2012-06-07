@@ -270,7 +270,7 @@ int NetworkManager::Wait()
 		std::cout<<"Sockets: "<<(*iter).first<<std::endl;
 	}
 	std::cout<<"epoll_wait\n";*/
-	int nfds = epoll_wait(m_epoll_fd, events, MAX_EPOLL_EVENT, 10);
+	int nfds = epoll_wait(m_epoll_fd, events, MAX_EPOLL_EVENT, 80);
 	if (nfds == -1)
 	{
 		return ERR_SYSCALL_ERROR;

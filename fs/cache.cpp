@@ -87,7 +87,7 @@ int cache::push(int file, const char * buf, uint32_t length, uint64_t offset, ui
 	if (m_count == 0)
 		m_front = m_back;
 	m_back->ce.file = file;
-	m_back->ce.id = id;
+	m_back->ce.block_id = id;
 	m_back->ce.length = length;
 	m_back->ce.offset = offset;
 	memcpy(m_back->ce.block, buf, length);

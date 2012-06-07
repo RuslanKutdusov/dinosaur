@@ -17,15 +17,14 @@
 #include <sys/stat.h>
 #include "../network/network.h"
 #include "../utils/bencode.h"
+#include "../utils/dir_tree.h"
 #include "../cfg/glob_cfg.h"
 #include "../fs/fs.h"
 #include <pcre.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <netdb.h>
 #include "../consts.h"
 #include "../utils/sha1.h"
-#include "../hash_checker/hash_checker.h"
 #include "../block_cache/Block_cache.h"
 #include <unistd.h>
 #include <fcntl.h>
@@ -339,14 +338,13 @@ public:
 	file_list file_list_;
 };
 
-class Torrent : public network::sock_event, public fs::file_event, public HashChecker::HashChecker_event
+class Torrent : public network::sock_event, public fs::file_event
 {
 private:
 	network::NetworkManager * m_nm;
 	bencode::be_node * m_metafile;
 	cfg::Glob_cfg * m_g_cfg;
 	fs::FileManager * m_fm;
-	HashChecker::HashChecker * m_hc;
 	block_cache::Block_cache * m_bc;
 	std::string m_work_directory;
 	std::string m_download_directory;
@@ -359,6 +357,7 @@ private:
 	uint64_t m_length;
 	file_info * m_files;
 	int m_files_count;
+	dir_tree::DirTree * m_dir_tree;
 	std::string m_name;
 	uint64_t m_piece_length;
 	uint32_t m_piece_count;
@@ -381,6 +380,13 @@ private:
 	double m_tx_speed;
 	TORRENT_STATE m_state;
 	std::string m_error;
+	void init_members(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc, std::string & work_directory);
+	int get_announces_from_metafile();
+	void get_additional_info_from_metafile();
+	int get_files_info_from_metafile(bencode::be_node * info);
+	int get_main_info_from_metafile( uint64_t metafile_len);
+	int calculate_info_hash(bencode::be_node * info, uint64_t metafile_len);
+	void init_bitfield();
 	void release();
 	int read_state_file(state_file * sf);
 	int save_state_file(state_file * sf);
@@ -395,7 +401,7 @@ public:
 	void delete_peer(Peer * peer);
 public:
 	Torrent();
-	int Init(std::string metafile, network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, HashChecker::HashChecker * hc, block_cache::Block_cache * bc,
+	int Init(std::string metafile, network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc,
 			std::string & work_directory);
 	std::string get_error()
 	{

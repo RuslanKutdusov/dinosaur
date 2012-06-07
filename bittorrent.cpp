@@ -15,7 +15,6 @@
 #include "utils/bencode.h"
 #include "torrent/torrent.h"
 #include "cfg/glob_cfg.h"
-#include "hash_checker/hash_checker.h"
 #include "bittorrent/Bittorrent.h"
 #include <sys/epoll.h>
 #include <set>
@@ -36,6 +35,9 @@ using namespace std;
 #include "block_cache/Block_cache.h"
 #include <assert.h>
 #include "gui/gui.h"
+#include "lru_cache/lru_cache.h"
+#include "utils/dir_tree.h"
+#include "fs/fs_tests.h"
 
 void network_test1()
 {
@@ -110,118 +112,6 @@ void network_test2()
 		}
 		//nm.clear_events();
 		sleep(1);
-	}
-}
-
-void peer_test(const char * fn)
-{
-	network::NetworkManager nm;
-	nm.Init();
-	cfg::Glob_cfg g_cfg;
-	fs::FileManager fm;
-	fm.Init(&g_cfg);
-	HashChecker::HashChecker hc;
-	hc.Init(10000, &fm);
-	torrent::Torrent t;
-	try
-	{
-	//	t.Init(fn,&nm,&g_cfg, &fm, &hc, "/home/ruslan/.dinosaur/");
-	}
-	catch(FileException & e)
-	{
-		cout<<"ex\n";
-		e.print();
-		return;
-	}
-	catch(Exception & e)
-	{
-		e.print();
-		return;
-	}
-	//t.start();
-	//t.check();
-	//return;
-	/*sockaddr_in m_addr;
-	m_addr.sin_family = AF_INET;
-	m_addr.sin_port = htons (6881);
-	inet_pton(AF_INET, "127.0.0.1", &m_addr.sin_addr);
-	t.take_peers(1,&m_addr);*/
-	while(1)
-	{
-		//cout<<"================================================================================\n";
-
-		nm.Wait();
-		//nm.test_view_socks();
-
-		network::socket_ * sock = NULL;
-		while(nm.event_connected_sock(&sock))
-		{
-			cout<<"CONNECTED: "<<sock->get_fd()<<endl;
-			network::sock_event * t = (network::sock_event *)nm.Socket_get_assoc(sock);
-			if (t != NULL)
-				t->event_sock_connected(sock);
-		}
-		while(nm.event_ready2read_sock(&sock))
-		{
-			cout<<"READY2READ: "<<sock->get_fd()<<endl;
-			network::sock_event * t = (network::sock_event *)nm.Socket_get_assoc(sock);
-			if (t != NULL)
-				t->event_sock_ready2read(sock);
-
-		}
-		while(nm.event_closed_sock(&sock))
-		{
-			cout<<"CLOSED: "<<sock->get_fd()<<endl;
-			network::sock_event * t = (network::sock_event *)nm.Socket_get_assoc(sock);
-			if (t != NULL)
-				t->event_sock_closed(sock);
-		}
-		while(nm.event_sended_socks(&sock))
-		{
-			cout<<"SENDED "<<sock->get_fd()<<endl;
-			network::sock_event * t = (network::sock_event *)nm.Socket_get_assoc(sock);
-			if (t != NULL)
-				t->event_sock_sended(sock);
-		}
-
-		while(nm.event_timeout_on(&sock))
-		{
-			cout<<"TIMEOUT "<<sock->get_fd()<<endl;
-			network::sock_event * t = (network::sock_event *)nm.Socket_get_assoc(sock);
-			if (t != NULL)
-				t->event_sock_timeout(sock);
-		}
-		fs::write_event eo;
-		eo.assoc = NULL;
-		if (fm.get_write_event(&eo))
-		{
-			fs::file_event * f = (fs::file_event *)eo.assoc;
-			if (f != NULL)
-			{
-				f->event_file_write(&eo);
-			}
-			else
-				cout<<"f == NULL\n";
-		}
-		/*if (fm.get_write_error_event(&eo))
-		{
-			fs::file_event * f = (fs::file_event *)eo.assoc;
-			if (f != NULL)
-			{
-				f->event_file_write_error(&eo);
-			}
-			else
-				cout<<"f == NULL\n";
-		}*/
-		HashChecker::event_on hc_eo;
-		hc_eo.hc_e = NULL;
-		if (hc.get_event(&hc_eo))
-		{
-			HashChecker::HashChecker_event * hc_e = hc_eo.hc_e;
-			if (hc_e != NULL)
-				hc_e->event_piece_hash(hc_eo.piece_index, hc_eo.ok, hc_eo.error);
-		}
-		t.clock();
 	}
 }
 
@@ -385,40 +275,121 @@ void bimap_test()
 		sprintf(data[i], "Data index %u", i);
 	}
 	for(uint16_t i = 0; i < count; i++)
-		bc.put(data[i], i, data[i]);
+	{
+		block_cache::cache_key key(data[i], i);
+		bc.put(key, (block_cache::cache_element*)data[i]);
+	}
 	bc.dump_all();
 	cout<<"||||||||||||||||||||||||||||||||||||\n";
 
 	char r0[16384];
-	assert(bc.get(data[2], 2, r0) == ERR_NO_ERROR);
+	block_cache::cache_key key(data[2], 2);
+	assert(bc.get(key, (block_cache::cache_element*)r0) == ERR_NO_ERROR);
 	cout<<r0<<endl;
 	bc.dump_all();
 	cout<<"||||||||||||||||||||||||||||||||||||\n";
 
-	bc.put(data[data_count - 2], data_count - 2, data[data_count -2]);
-	bc.put(data[data_count - 1], data_count - 1, data[data_count -1]);
+	block_cache::cache_key key1(data[data_count - 2], data_count - 2);
+	bc.put(key1, (block_cache::cache_element*)data[data_count -2]);
+	block_cache::cache_key key2(data[data_count - 1], data_count - 1);
+	bc.put(key2, (block_cache::cache_element*)data[data_count -1]);
 	bc.dump_all();
 	cout<<"||||||||||||||||||||||||||||||||||||\n";
-	for(uint16_t i = 0; i < data_count; i++)\
 
-iop
+	for(uint16_t i = 0; i < data_count; i++)
+	{
+		delete[] data[i];
+	}
+
 	delete[] data;
+}
+
+void test_lru_cache()
+{
+	lru_cache::LRU_Cache <int,int> lc;
+	lc.Init(10);
+	for(int i = 0; i < 10; i++)
+	{
+		int d = i + 10;
+		lc.put(i, &d);
+	}
+	lc.dump_all();
+	while(1)
+	{
+		int k,d;
+		cin>>k;
+		if (k == -1)
+		{
+			cin>>k;
+			lc.get(k, &d);
+			cout<<d<<endl;
+			lc.dump_all();
+			continue;
+		}
+		cin>>d;
+		lc.put(k,&d);
+		lc.dump_all();
+	}
 }*/
 
+void bencode_test()
+{
+	string metafile;
+	cin>>metafile;
+	uint64_t len;
+	char * buf = read_file(metafile.c_str(), &len);
+	if (buf == NULL)
+	{
+		return;
+	}
+	bencode::be_node * node  = bencode::decode(buf, len, true);
+	if (node == NULL)
+		return;
+	free(buf);
+	bencode::dump(node);
+	bencode::be_node * info;// = bencode::get_info_dict(m_metafile);
+	if (bencode::get_node(node, "info", &info) == -1)
+		return;
+	buf = new char[len];
+	uint32_t out_len = 0;
+	int ret = bencode::encode(info, &buf, len, &out_len);
+	cout<<"RET = "<<ret<<"out_len="<<out_len<<endl;
+	char hash_hex1[41];
+	char hash_hex2[41];
+	memset(hash_hex1, 0, 41);
+	memset(hash_hex2, 0, 41);
+
+	CSHA1 csha1;
+	csha1.Update((unsigned char*)buf,out_len);
+	csha1.Final();
+	csha1.ReportHash(hash_hex1,CSHA1::REPORT_HEX);
+	csha1.Reset();
+	delete[] buf;
+
+	//uint64_t out_len64 = 0;
+	buf = NULL;
+	//bencode::encode_old(info,&buf,&out_len64);
+
+	csha1.Update((unsigned char*)buf,out_len);
+	csha1.Final();
+	csha1.ReportHash(hash_hex2,CSHA1::REPORT_HEX);
+	csha1.Reset();
+	delete[] buf;
+
+	cout<<hash_hex1<<endl;
+	cout<<hash_hex2<<endl;
+}
 
 int main(int argc,char* argv[]) {
-	//bittorrent_test();
-	//create_window();
+	//block_cache_test();
+	//dir_tree::DirTreeTest drt;
+	//drt.test_DirTree();
+	//test_fd_cache_test();
+	//return 0;
+
 	try
 	{
-		//bittorrent::Bittorrent bt;
-		std::string hash;
-		//bt.AddTorrent("/home/ruslan/opt.torrent",&hash);
 		init_gui();
-		/*while(1)
-		{
-			sleep(1);
-		}*/
 
 	}
 	catch(Exception e)

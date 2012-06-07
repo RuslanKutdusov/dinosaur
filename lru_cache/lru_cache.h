@@ -23,7 +23,7 @@ namespace lru_cache
 
 template <class cache_key, class cache_element>
 class LRU_Cache {
-public:
+protected:
 	typedef std::map<cache_key, cache_element *> hash_table;
 	typedef typename hash_table::iterator hash_table_iterator;
 
@@ -41,7 +41,7 @@ public:
 	uint64_t get_time();
 public:
 	LRU_Cache();
-	~LRU_Cache();
+	virtual ~LRU_Cache();
 	int Init(uint16_t size);
 	int put(cache_key key, cache_element * value);
 	int get(cache_key key, cache_element * value);
@@ -97,7 +97,7 @@ int LRU_Cache<cache_key, cache_element>::put(cache_key key, cache_element * valu
 		if (m_free_elements.empty())
 		{
 			typename time_queue::right_iterator time_queue_iter_to_element = m_time_queue.right.find(key);
-			//обновляемся если есть элемент с таким ключом обновляемся
+			//обновляемся если есть элемент с таким ключом
 			if (time_queue_iter_to_element != m_time_queue.right.end() || m_time_queue.right.count(key) != 0)
 			{
 				memcpy(m_hash_table[key], value, sizeof(cache_element));

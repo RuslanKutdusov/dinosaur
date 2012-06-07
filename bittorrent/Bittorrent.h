@@ -17,7 +17,6 @@
 #include "../utils/bencode.h"
 #include "../torrent/torrent.h"
 #include "../cfg/glob_cfg.h"
-#include "../hash_checker/hash_checker.h"
 #include "../fs/fs.h"
 #include "../block_cache/Block_cache.h"
 #include <set>
@@ -34,7 +33,6 @@ private:
 	network::NetworkManager m_nm;
 	cfg::Glob_cfg m_gcfg;
 	fs::FileManager m_fm;
-	HashChecker::HashChecker m_hc;
 	block_cache::Block_cache m_bc;
 	network::socket_ * m_sock;
 	torrent_map m_torrents;
@@ -128,19 +126,11 @@ private:
 				else
 					std::cout<<"f == NULL\n";
 			}
-			HashChecker::event_on hc_eo;
-			hc_eo.hc_e = NULL;
-			if (bt->m_hc.get_event(&hc_eo))
-			{
-				HashChecker::HashChecker_event * hc_e = hc_eo.hc_e;
-				if (hc_e != NULL)
-					hc_e->event_piece_hash(hc_eo.piece_index, hc_eo.ok, hc_eo.error);
-			}
 			for(torrent_map_iter iter = bt->m_torrents.begin(); iter != bt->m_torrents.end(); ++iter)
 			{
 				(*iter).second->clock();
 			}
-			usleep(10);
+			//usleep(50);
 			pthread_mutex_unlock(&bt->m_mutex);
 		}
 		//printf("MAIN_THREAD stopped\n");

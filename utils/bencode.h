@@ -62,7 +62,7 @@ struct be_node
 };
 
 be_node * decode(const char * data, uint64_t len, bool torrent);
-int encode(be_node * node, char ** buf, uint32_t buf_length, uint32_t * out_len);
+int encode(be_node * node, char ** buf, uint32_t buf_length, uint32_t * encoded_len);
 int get_node(be_node * node, const char * key, be_node ** val);
 int get_int(be_node * node, const char * key, uint64_t * val);
 int get_str(be_node * node, const char * key, be_str ** val);

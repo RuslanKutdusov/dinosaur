@@ -36,6 +36,7 @@
 #define TORRENT_ERROR_NOT_EXISTS "Torrent is not exists"
 
 #define GENERAL_ERROR_NO_MEMORY_AVAILABLE "No memory available"
+#define GENERAL_ERROR_UNDEF_ERROR "Something wrong"
 
 
 #endif /* CONSTS_H_ */

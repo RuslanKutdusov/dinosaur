@@ -56,6 +56,8 @@ Torrent::Torrent()
 	:network::sock_event(), fs::file_event()
 {
 	// TODO Auto-generated constructor stub
+	std::string t = "";
+	init_members(NULL, NULL, NULL, NULL, t);
 	m_nm = NULL;
 	m_metafile = NULL;
 	m_creation_date = 0;
@@ -71,7 +73,6 @@ Torrent::Torrent()
 	m_uploaded = 0;
 	m_bitfield = NULL;
 	m_fm = NULL;
-	m_hc = NULL;
 	m_bc = NULL;
 	m_rx_speed = 0.0f;
 	m_tx_speed = 0.0f;
@@ -111,78 +112,42 @@ void Torrent::release()
 	//std::cout<<"Torrent released\n";
 }
 
-char *read_file(const char *file, uint64_t *len)
+void Torrent::init_members(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc, std::string & work_directory)
 {
-	struct stat st;
-	char *ret = NULL;
-	FILE *fp;
-
-	if (stat(file, &st))
-		return ret;
-	*len = st.st_size;
-
-	fp = fopen(file, "r");
-	if (!fp)
-		return ret;
-
-	ret = (char*)malloc(*len);
-	if (!ret)
-		return ret;
-
-	fread(ret, 1, *len, fp);
-
-	fclose(fp);
-
-	return ret;
-}
-
-int Torrent::Init(std::string metafile, network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, HashChecker::HashChecker * hc, block_cache::Block_cache * bc,
-		std::string & work_directory)
-{
-	//if (!nm)
-	//	throw Exception("");//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 	m_nm = nm;
-    m_metafile = NULL;
+	m_metafile = NULL;
+	m_g_cfg = g_cfg;
+	m_fm = fm;
+	m_bc = bc;
+	m_work_directory = work_directory;
 	m_creation_date = 0;
 	m_private = 0;
 	m_length = 0;
 	m_files = NULL;
 	m_files_count = 0;
+	m_dir_tree = NULL;
 	m_piece_length = 0;
 	m_piece_count = 0;
 	m_pieces = NULL;
-	m_g_cfg = g_cfg;
-	m_downloaded = 0;
+	m_downloaded  = 0;
 	m_uploaded = 0;
-	m_fm = fm;
-	m_hc = hc;
-	m_bc = bc;
-	m_work_directory = work_directory;
-	m_download_directory = "";
+	m_bitfield = NULL;
+	m_bitfield_len = 0;
+	m_rx_speed = 0;
+	m_tx_speed = 0;
 	m_state = TORRENT_STATE_NONE;
-	m_error = TORRENT_ERROR_NO_ERROR;
-	uint64_t metafile_len = 0;
-	char * buf = read_file(metafile.c_str(), &metafile_len);
-	if (buf == NULL)
-	{
-		m_error = TORRENT_ERROR_IO_ERROR;
-		return ERR_NULL_REF; //throw FileException(errno);
-	}
-	m_metafile = bencode::decode(buf, metafile_len, true);
-	free(buf);
-	if (!m_metafile)
-	{
-		m_error = TORRENT_ERROR_INVALID_METAFILE;
-		return ERR_INTERNAL; //throw Exception("Invalid metafile, parse error");
-	}
-	//bencode::dump(m_metafile);
+}
 
-	bencode::be_node * temp;
+int Torrent::get_announces_from_metafile()
+{
+	if (m_metafile == NULL)
+		return ERR_NULL_REF;
+	bencode::be_node * node;
 
-	if (bencode::get_node(m_metafile,"announce-list",&temp) == 0 && bencode::is_list(temp))
+	if (bencode::get_node(m_metafile,"announce-list",&node) == 0 && bencode::is_list(node))
 	{
 		bencode::be_node * l;
-		for(int i = 0; bencode::get_node(temp, i, &l) == 0; i++)
+		for(int i = 0; bencode::get_node(node, i, &l) == 0; i++)
 		{
 			if (!bencode::is_list(l))
 			{
@@ -201,6 +166,7 @@ int Torrent::Init(std::string metafile, network::NetworkManager * nm, cfg::Glob_
 	else
 	{
 		bencode::be_str * str;
+		//отсутствие трекеров не ошибка
 		if (bencode::get_str(m_metafile,"announce",&str) == ERR_NO_ERROR)
 		{
 			char *c_str = bencode::str2c_str(str);
@@ -208,7 +174,13 @@ int Torrent::Init(std::string metafile, network::NetworkManager * nm, cfg::Glob_
 			delete[] c_str;
 		}
 	}
+	return ERR_NO_ERROR;
+}
 
+void Torrent::get_additional_info_from_metafile()
+{
+	if (m_metafile == NULL)
+		return;
 	bencode::be_str * str;
 	char * c_str;
 	if (bencode::get_str(m_metafile,"comment",&str) == 0)
@@ -226,25 +198,15 @@ int Torrent::Init(std::string metafile, network::NetworkManager * nm, cfg::Glob_
 	}
 
 	bencode::get_int(m_metafile,"creation date",&m_creation_date);
+}
 
-	bencode::be_node * info;// = bencode::get_info_dict(m_metafile);
-	if (bencode::get_node(m_metafile, "info", &info) == -1)
-	{
-		m_error = TORRENT_ERROR_INVALID_METAFILE;
-		return ERR_INTERNAL; //throw Exception("Invalid metafile, can not get info dictionary");
-	}
-
-
-	if (bencode::get_str(info,"name",&str) == -1)
-	{
-		m_error = TORRENT_ERROR_INVALID_METAFILE;
-		return ERR_INTERNAL; //throw Exception("Invalid metafile, can not get key name");
-	}
-	c_str = bencode::str2c_str(str);
-	m_name        = c_str;
-	delete[] c_str;
-
-	if (bencode::get_node(info,"files",&temp) == -1 || !bencode::is_list(temp))
+int Torrent::get_files_info_from_metafile(bencode::be_node * info)
+{
+	if (m_metafile == NULL || info == NULL)
+		return ERR_NULL_REF;
+	m_dir_tree = new dir_tree::DirTree(m_name);
+	bencode::be_node * files_node;
+	if (bencode::get_node(info,"files",&files_node) == -1 || !bencode::is_list(files_node))
 	{
 		if (bencode::get_int(info,"length",&m_length) == -1 || m_length <= 0)
 		{
@@ -265,7 +227,7 @@ int Torrent::Init(std::string metafile, network::NetworkManager * nm, cfg::Glob_
 	}
 	else
 	{//определяем кол-во файлов
-		m_files_count = get_list_size(temp);
+		m_files_count = get_list_size(files_node);
 		//std::cout<<m_files_count<<std::endl;
 		if (m_files_count <= 0)
 		{
@@ -274,52 +236,98 @@ int Torrent::Init(std::string metafile, network::NetworkManager * nm, cfg::Glob_
 		}
 		//выделяем память
 		m_files = new file_info[m_files_count];
-		memset(m_files, 0, sizeof(file_info) * m_files_count);
+		//memset(m_files, 0, sizeof(file_info) * m_files_count);
 		m_length = 0;
 		for(int i = 0; i < m_files_count; i++)
 		{
-			bencode::be_node * file;// = temp.val.l[i];
-			if ( bencode::get_node(temp, i, &file) == -1 || !bencode::is_dict(file))
+			bencode::be_node * file_node;// = temp.val.l[i];
+			if ( bencode::get_node(files_node, i, &file_node) == -1 || !bencode::is_dict(file_node))
 			{
 				m_error = TORRENT_ERROR_INVALID_METAFILE;
 				return ERR_INTERNAL; //throw Exception("Invalid metafile, can not get files dictionary");
 			}
-			bencode::be_node * path;
-			uint64_t  len = 0;
-			if (bencode::get_node(file, "path", &path) == -1 || !bencode::is_list(path))
+
+			bencode::be_node * path_node;
+			if (bencode::get_node(file_node, "path", &path_node) == -1 || !bencode::is_list(path_node))
 			{
 				m_error = TORRENT_ERROR_INVALID_METAFILE;
 				return ERR_INTERNAL; //throw Exception("Invalid metafile, can not get files dictionary");
 			}
-			if (bencode::get_int(file, "length", &len) == -1)
+			if (bencode::get_int(file_node, "length", &m_files[i].length) == -1)
 			{
 				m_error = TORRENT_ERROR_INVALID_METAFILE;
 				return ERR_INTERNAL; //throw Exception("Invalid metafile, can not get files dictionary");
 			}
-			std::string temp_str("");
-			for(int j = 0; j < bencode::get_list_size(path); j++)
+
+			m_dir_tree->reset();
+			int path_length = 0;
+			int path_list_size = bencode::get_list_size(path_node);
+			for(int j = 0; j < path_list_size; j++)
 			{
 				bencode::be_str * str;
-				if (bencode::get_str(path, j, &str) == -1)
+				if (bencode::get_str(path_node, j, &str) == -1)
 				{
 					m_error = TORRENT_ERROR_INVALID_METAFILE;
 					return ERR_INTERNAL; //throw Exception("Invalid metafile, can not get files dictionary");
 				}
-				char * c_str = bencode::str2c_str(str);
-				temp_str.append(c_str);
-				temp_str.append("/");
-				delete[] c_str;
+				path_length += str->len + 1;// 1 for slash and \0 at the end;
 			}
-			m_files[i].name = new char[temp_str.length()];
-			strncpy(m_files[i].name, temp_str.c_str(), temp_str.length() - 1); //в конце стоит слэш, вместо него \0
-			m_files[i].name[temp_str.length() - 1] = '\0';
-			m_files[i].length = len;
+			m_files[i].name = new char[path_length];
+			int substring_offset = 0;
+			for(int j = 0; j < path_list_size; j++)
+			{
+				bencode::be_str * str;
+				if (bencode::get_str(path_node, j, &str) == -1)
+				{
+					m_error = TORRENT_ERROR_INVALID_METAFILE;
+					return ERR_INTERNAL; //throw Exception("Invalid metafile, can not get files dictionary");
+				}
+				strncpy(&m_files[i].name[substring_offset], str->ptr, str->len);
+				if (j < path_list_size - 1)
+				{
+					m_files[i].name[substring_offset + str->len] = '\0';
+					if (m_dir_tree->put(&m_files[i].name[substring_offset]) != ERR_NO_ERROR)
+					{
+						m_error = GENERAL_ERROR_UNDEF_ERROR;
+						return ERR_INTERNAL;
+					}
+				}
+
+				substring_offset += str->len;
+				m_files[i].name[substring_offset++] = '/';
+			}
+			m_files[i].name[path_length - 1] = '\0';
 			m_files[i].download = true;
 			m_length += m_files[i].length;
-		//	std::cout<<m_files[i].name<<" "<<m_files[i].length<<std::endl;
 		}
 		m_multifile = true;
 	}
+	return ERR_NO_ERROR;
+}
+
+int Torrent::get_main_info_from_metafile( uint64_t metafile_len)
+{
+	if (m_metafile == NULL)
+		return ERR_NULL_REF;
+
+	bencode::be_node * info;// = bencode::get_info_dict(m_metafile);
+	bencode::be_str * str;
+	if (bencode::get_node(m_metafile, "info", &info) == -1)
+	{
+		m_error = TORRENT_ERROR_INVALID_METAFILE;
+		return ERR_INTERNAL; //throw Exception("Invalid metafile, can not get info dictionary");
+	}
+
+	if (bencode::get_str(info,"name",&str) == -1)
+	{
+		m_error = TORRENT_ERROR_INVALID_METAFILE;
+		return ERR_INTERNAL; //throw Exception("Invalid metafile, can not get key name");
+	}
+	char * c_str = bencode::str2c_str(str);
+	m_name        = c_str;
+	delete[] c_str;
+
+	get_files_info_from_metafile(info);
 
 	if (bencode::get_int(info,"piece length",&m_piece_length) == -1 || m_piece_length == 0)
 	{
@@ -338,39 +346,97 @@ int Torrent::Init(std::string metafile, network::NetworkManager * nm, cfg::Glob_
 	if (bencode::get_int(m_metafile,"private",&m_private) == -1)
 		bencode::get_int(info,"private",&m_private);
 
+	return calculate_info_hash(info, metafile_len);
+}
+
+int Torrent::calculate_info_hash(bencode::be_node * info, uint64_t metafile_len)
+{
+	if (info == NULL || metafile_len == 0)
+		return ERR_BAD_ARG;
 	memset(m_info_hash_bin,0,20);
 	memset(m_info_hash_hex,0,41);
 	char * bencoded_info = new char[metafile_len];
 	uint32_t bencoded_info_len = 0;
-	bencode::encode(info, &bencoded_info, metafile_len, &bencoded_info_len);
+	if (bencode::encode(info, &bencoded_info, metafile_len, &bencoded_info_len) != ERR_NO_ERROR)
+	{
+		delete[] bencoded_info;
+		m_error = TORRENT_ERROR_INVALID_METAFILE;
+		return ERR_INTERNAL;
+	}
 	CSHA1 csha1;
 	csha1.Update((unsigned char*)bencoded_info,bencoded_info_len);
 	csha1.Final();
 	csha1.ReportHash(m_info_hash_hex,CSHA1::REPORT_HEX);
 	csha1.GetHash(m_info_hash_bin);
 	delete[] bencoded_info;
+	return ERR_NO_ERROR;
+}
 
-
+void Torrent::init_bitfield()
+{
 	m_bitfield_len = ceil(m_piece_count / 8.0f);
 	m_bitfield = new unsigned char[m_bitfield_len];
 	memset(m_bitfield, 0, m_bitfield_len);
-	//формируем путь к файлу вида $HOME/.dinosaur/$INFOHASH_HEX
-	m_state_file_name = m_work_directory;
-	m_state_file_name.append(m_info_hash_hex);
-	if (get_state() != ERR_NO_ERROR)
+}
+
+int Torrent::Init(std::string metafile, network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc,
+		std::string & work_directory)
+{
+	if (nm == NULL || g_cfg == NULL || fm == NULL || bc == NULL || work_directory.length() == 0)
 	{
-		m_error = TORRENT_ERROR_IO_ERROR;
-		return ERR_INTERNAL;
+		m_error = GENERAL_ERROR_UNDEF_ERROR;
+		return ERR_BAD_ARG;
 	}
-	for(uint32_t i = 0; i < m_piece_count; i++)
-	{
-		if (!bit_in_bitfield(i, m_piece_count, m_bitfield))
-			m_pieces_to_download.insert(i);
-		else
+	init_members(nm, g_cfg, fm, bc, work_directory);
+	try{
+		uint64_t metafile_len;
+		char * buf = read_file(metafile.c_str(), &metafile_len);
+		if (buf == NULL)
 		{
-			uint32_t piece_length = (i == m_piece_count - 1) ? m_length - m_piece_length * i : m_piece_length;
-			m_downloaded += piece_length;
+			m_error = TORRENT_ERROR_IO_ERROR;
+			return ERR_NULL_REF; //throw FileException(errno);
 		}
+		m_metafile = bencode::decode(buf, metafile_len, true);
+		free(buf);
+		if (!m_metafile)
+		{
+			m_error = TORRENT_ERROR_INVALID_METAFILE;
+			return ERR_INTERNAL; //throw Exception("Invalid metafile, parse error");
+		}
+
+		if (get_announces_from_metafile() != ERR_NO_ERROR)
+			return ERR_INTERNAL;
+
+		get_additional_info_from_metafile();
+
+		if (get_main_info_from_metafile(metafile_len) != ERR_NO_ERROR)
+			return ERR_INTERNAL;
+
+		init_bitfield();
+
+		//формируем путь к файлу вида $HOME/.dinosaur/$INFOHASH_HEX
+		m_state_file_name = m_work_directory;
+		m_state_file_name.append(m_info_hash_hex);
+		if (get_state() != ERR_NO_ERROR)
+		{
+			m_error = TORRENT_ERROR_IO_ERROR;
+			return ERR_INTERNAL;
+		}
+		for(uint32_t i = 0; i < m_piece_count; i++)
+		{
+			if (!bit_in_bitfield(i, m_piece_count, m_bitfield))
+				m_pieces_to_download.insert(i);
+			else
+			{
+				uint32_t piece_length = (i == m_piece_count - 1) ? m_length - m_piece_length * i : m_piece_length;
+				m_downloaded += piece_length;
+			}
+		}
+	}
+	catch( std::bad_alloc )
+	{
+		m_error = GENERAL_ERROR_NO_MEMORY_AVAILABLE;
+		return ERR_INTERNAL;
 	}
 	return ERR_NO_ERROR;
 }
@@ -534,8 +600,8 @@ int Torrent::start(std::string & download_directory)
 			save_state();
 		}
 		std::string dir = m_download_directory;
-		if (m_multifile)
-			dir.append(m_name);
+		//if (m_multifile)
+		//	dir.append(m_name);
 		std::cout<<dir<<std::endl;
 		if (m_torrent_file.Init(this, dir, m_new) != ERR_NO_ERROR)
 			return ERR_FILE_ERROR;

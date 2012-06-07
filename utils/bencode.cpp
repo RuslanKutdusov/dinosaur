@@ -311,13 +311,13 @@ int encode_recursive(be_node * node, char ** buf, uint32_t buf_length, uint32_t 
 	return 0;
 }
 
-int encode(be_node * node, char ** buf, uint32_t buf_length, uint32_t * out_len)
+int encode(be_node * node, char ** buf, uint32_t buf_length, uint32_t * encoded_len)
 {
-	if (node == NULL || buf == NULL || *buf == NULL || out_len == NULL)
+	if (node == NULL || buf == NULL || *buf == NULL || encoded_len == NULL)
 			return -1;
 	char * changable_ref = *buf;
-	*out_len = 0;
-	return encode_recursive(node, &changable_ref, buf_length, out_len);
+	*encoded_len = 0;
+	return encode_recursive(node, &changable_ref, buf_length, encoded_len);
 }
 
 int get_node(be_node * node, const char * key, be_node ** val)

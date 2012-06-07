@@ -25,14 +25,11 @@ Bittorrent::Bittorrent()
 	mkdir(m_directory.c_str(), S_IRWXU);
 
 	m_error = TORRENT_ERROR_NO_ERROR;
-
 	//инициализация всего и вся
 	m_gcfg = cfg::Glob_cfg(m_directory);
 	if (m_nm.Init() != ERR_NO_ERROR)
 		throw Exception();
 	if (m_fm.Init(&m_gcfg) != ERR_NO_ERROR)
-		throw Exception();
-	if (m_hc.Init(10000, &m_fm) != ERR_NO_ERROR)
 		throw Exception();
 	if (m_bc.Init(4) != ERR_NO_ERROR)
 		throw Exception();
@@ -51,7 +48,6 @@ Bittorrent::Bittorrent()
 	if (pthread_create(&m_thread, &attr, Bittorrent::thread, (void *)this))
 		throw Exception();
 	pthread_attr_destroy(&attr);
-
 	load_our_torrents();
 }
 
@@ -119,7 +115,7 @@ int Bittorrent::init_torrent(const  char * filename, std::string * hash)
 	*hash = "";
 	torrent::Torrent * t = new torrent::Torrent();
 	std::string err = "";
-	if (t->Init(filename,&m_nm,&m_gcfg, &m_fm, &m_hc, &m_bc, m_directory) != ERR_NO_ERROR)
+	if (t->Init(filename,&m_nm,&m_gcfg, &m_fm, &m_bc, m_directory) != ERR_NO_ERROR)
 	{
 		err = t->get_error();
 		delete t;
