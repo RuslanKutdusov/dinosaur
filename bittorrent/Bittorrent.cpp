@@ -31,7 +31,7 @@ Bittorrent::Bittorrent()
 		throw Exception();
 	if (m_fm.Init(&m_gcfg) != ERR_NO_ERROR)
 		throw Exception();
-	if (m_bc.Init(4) != ERR_NO_ERROR)
+	if (m_bc.Init(m_gcfg.get_cache_size()) != ERR_NO_ERROR)
 		throw Exception();
 
 	m_sock = m_nm.ListenSocket_add(m_gcfg.get_port(), this);
@@ -44,7 +44,6 @@ Bittorrent::Bittorrent()
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 	pthread_mutex_init(&m_mutex, NULL);
 	pthread_mutex_unlock(&m_mutex);
-	//pthread_mutex_init(&m_mutex_timeout_sockets, NULL);
 	if (pthread_create(&m_thread, &attr, Bittorrent::thread, (void *)this))
 		throw Exception();
 	pthread_attr_destroy(&attr);
@@ -77,8 +76,9 @@ int Bittorrent::load_our_torrents()
 	{
 		std::string full_path2torrent_file = m_directory + fname;
 		std::cout<<full_path2torrent_file<<std::endl;
-		init_torrent(full_path2torrent_file, &hash);
+		init_torrent(full_path2torrent_file, &hash, false);
 		std::string temp = "";
+		m_gcfg.get_download_directory(&temp);
 		StartTorrent(hash, temp);
 	}
 	fin.close();
@@ -103,31 +103,34 @@ void Bittorrent::bin2hex(unsigned char * bin, char * hex, int len)
 }
 
 
-int Bittorrent::init_torrent(std::string & filename, std::string * hash)
+int Bittorrent::init_torrent(std::string & filename, std::string * hash, bool is_new)
 {
-	return init_torrent(filename.c_str(), hash);
+	return init_torrent(filename.c_str(), hash, is_new);
 }
 
-int Bittorrent::init_torrent(const  char * filename, std::string * hash)
+int Bittorrent::init_torrent(const  char * filename, std::string * hash, bool is_new)
 {
 	if (hash == NULL)
 		return ERR_NULL_REF;
 	*hash = "";
-	torrent::Torrent * t = new torrent::Torrent();
+	torrent::Torrent * torrent = NULL;
+	torrent = new torrent::Torrent();
 	std::string err = "";
-	if (t->Init(filename,&m_nm,&m_gcfg, &m_fm, &m_bc, m_directory) != ERR_NO_ERROR)
+	if (torrent->Init(filename,&m_nm,&m_gcfg, &m_fm, &m_bc, m_directory, is_new) != ERR_NO_ERROR)
 	{
-		err = t->get_error();
-		delete t;
+		err = torrent->get_error();
+		delete torrent;
 		add_error_mes(err);
 		return ERR_SEE_ERROR;
 	}
 	//ключ infohash в hex-e
-	unsigned char infohash[SHA1_LENGTH];
-	t->get_info_hash(infohash);
-	char infohash_hex[SHA1_LENGTH * 2 + 1];
-	bin2hex(infohash, infohash_hex, SHA1_LENGTH);
-	std::string infohash_str = infohash_hex;
+	//unsigned char infohash[SHA1_LENGTH];
+	torrent::torrent_info t_info;
+	torrent->get_info(&t_info);
+	//torrent->get_info_hash(infohash);
+	//char infohash_hex[SHA1_LENGTH * 2 + 1];
+	//bin2hex(infohash, infohash_hex, SHA1_LENGTH);
+	std::string infohash_str = t_info.info_hash_hex;
 
 	m_thread_pause = true;
 	if (m_torrents.count(infohash_str) !=0)
@@ -137,29 +140,73 @@ int Bittorrent::init_torrent(const  char * filename, std::string * hash)
 		m_thread_pause = false;
 		return ERR_SEE_ERROR;
 	}
-	m_torrents[infohash_str] = t;
+	m_torrents[infohash_str] = torrent;
 	m_thread_pause = false;
 	*hash = infohash_str;
 	return ERR_NO_ERROR;
 }
 
-int Bittorrent::AddTorrent(char * filename, std::string * hash)
+torrent::Torrent * Bittorrent::OpenTorrent(char * filename)
 {
-	if (init_torrent(filename, hash) == ERR_NO_ERROR)
+	torrent::Torrent * torrent = NULL;
+	torrent = new torrent::Torrent();
+	std::string err = "";
+	if (torrent->Init(filename,&m_nm,&m_gcfg, &m_fm, &m_bc, m_directory, true) != ERR_NO_ERROR)
 	{
-		std::ofstream fout;
-		std::string state_file = m_directory;
-		state_file.append("our_torrents");
-		fout.open(state_file.c_str(), std::ios_base::app);
-		fout<<*hash<<".torrent"<<std::endl;
-		fout.close();
-		std::string fname = filename;
-		std::string copy = "cp \"" + fname + "\" \"" + m_directory + *hash + ".torrent\"";
-		system(copy.c_str());
-		return ERR_NO_ERROR;
+		err = torrent->get_error();
+		delete torrent;
+		add_error_mes(err);
+		return NULL;
 	}
-	else
+	return torrent;
+}
+
+int Bittorrent::AddTorrent(torrent::Torrent * torrent, std::string * hash)
+{
+	if (torrent == NULL)
+	{
+		std::string err = GENERAL_ERROR_UNDEF_ERROR;
+		add_error_mes(err);
+		return ERR_NULL_REF;
+	}
+	//unsigned char infohash[SHA1_LENGTH];
+	//torrent->get_info_hash(infohash);
+	//char infohash_hex[SHA1_LENGTH * 2 + 1];
+	//bin2hex(infohash, infohash_hex, SHA1_LENGTH);
+
+	torrent::torrent_info t_info;
+	torrent->get_info(&t_info);
+	std::string infohash_str = t_info.info_hash_hex;
+
+	m_thread_pause = true;
+	if (m_torrents.count(infohash_str) !=0)
+	{
+		std::string err = TORRENT_ERROR_EXISTS;
+		add_error_mes(err);
+		m_thread_pause = false;
 		return ERR_SEE_ERROR;
+	}
+	std::ofstream fout;
+	std::string state_file = m_directory;
+	state_file.append("our_torrents");
+	fout.open(state_file.c_str(), std::ios_base::app);
+	fout<<infohash_str<<".torrent"<<std::endl;
+	fout.close();
+	std::string fname =  m_directory + infohash_str + ".torrent";
+	if (torrent->save_meta2file(fname.c_str()) != ERR_NO_ERROR)
+	{
+		std::string err = TORRENT_ERROR_EXISTS;
+		add_error_mes(err);
+		m_thread_pause = false;
+		return ERR_SEE_ERROR;
+	}
+
+
+	m_torrents[infohash_str] = torrent;
+	m_thread_pause = false;
+	*hash = infohash_str;
+
+	return ERR_NO_ERROR;
 }
 
 int Bittorrent::StartTorrent(std::string & hash, std::string & download_directory)
@@ -171,12 +218,18 @@ int Bittorrent::StartTorrent(std::string & hash, std::string & download_director
 		return ERR_SEE_ERROR;
 	}
 	m_thread_pause = true;
-	struct sockaddr_in sockaddr;
+	/*struct sockaddr_in sockaddr;
 	sockaddr.sin_family = AF_INET;
 	sockaddr.sin_port = htons (6881);
 	inet_pton(AF_INET, "127.0.0.1", &sockaddr.sin_addr) ;
-	m_torrents[hash]->take_peers(1,&sockaddr);
-	m_torrents[hash]->start(download_directory);
+	m_torrents[hash]->take_peers(1,&sockaddr);*/
+	if (m_torrents[hash]->start(download_directory) != ERR_NO_ERROR)
+	{
+		std::string err = TORRENT_ERROR_CAN_NOT_START;
+		add_error_mes(err);
+		m_thread_pause = false;
+		return ERR_SEE_ERROR;
+	}
 	m_thread_pause = false;
 	return ERR_NO_ERROR;
 }

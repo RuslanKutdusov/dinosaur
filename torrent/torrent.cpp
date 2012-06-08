@@ -53,7 +53,7 @@ void get_peer_key(sockaddr_in * addr, std::string * key)
 }
 
 Torrent::Torrent()
-	:network::sock_event(), fs::file_event()
+	//:network::sock_event(), fs::file_event()
 {
 	// TODO Auto-generated constructor stub
 	std::string t = "";
@@ -82,9 +82,7 @@ Torrent::Torrent()
 
 Torrent::~Torrent()
 {
-	// TODO Auto-generated destructor stub
 	release();
-	//std::cout<<"Torrent deleted\n";
 }
 
 void Torrent::release()
@@ -380,7 +378,7 @@ void Torrent::init_bitfield()
 }
 
 int Torrent::Init(std::string metafile, network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc,
-		std::string & work_directory)
+		std::string & work_directory, bool is_new)
 {
 	if (nm == NULL || g_cfg == NULL || fm == NULL || bc == NULL || work_directory.length() == 0)
 	{
@@ -388,15 +386,15 @@ int Torrent::Init(std::string metafile, network::NetworkManager * nm, cfg::Glob_
 		return ERR_BAD_ARG;
 	}
 	init_members(nm, g_cfg, fm, bc, work_directory);
+	m_new = is_new;
 	try{
-		uint64_t metafile_len;
-		char * buf = read_file(metafile.c_str(), &metafile_len);
+		char * buf = read_file(metafile.c_str(), &m_metafile_len);
 		if (buf == NULL)
 		{
 			m_error = TORRENT_ERROR_IO_ERROR;
 			return ERR_NULL_REF; //throw FileException(errno);
 		}
-		m_metafile = bencode::decode(buf, metafile_len, true);
+		m_metafile = bencode::decode(buf, m_metafile_len, true);
 		free(buf);
 		if (!m_metafile)
 		{
@@ -409,7 +407,7 @@ int Torrent::Init(std::string metafile, network::NetworkManager * nm, cfg::Glob_
 
 		get_additional_info_from_metafile();
 
-		if (get_main_info_from_metafile(metafile_len) != ERR_NO_ERROR)
+		if (get_main_info_from_metafile(m_metafile_len) != ERR_NO_ERROR)
 			return ERR_INTERNAL;
 
 		init_bitfield();
@@ -417,11 +415,12 @@ int Torrent::Init(std::string metafile, network::NetworkManager * nm, cfg::Glob_
 		//формируем путь к файлу вида $HOME/.dinosaur/$INFOHASH_HEX
 		m_state_file_name = m_work_directory;
 		m_state_file_name.append(m_info_hash_hex);
-		if (get_state() != ERR_NO_ERROR)
-		{
-			m_error = TORRENT_ERROR_IO_ERROR;
-			return ERR_INTERNAL;
-		}
+		if (!is_new)
+			if (get_state() != ERR_NO_ERROR)
+			{
+				m_error = TORRENT_ERROR_NO_STATE_FILE;
+				return ERR_INTERNAL;
+			}
 		for(uint32_t i = 0; i < m_piece_count; i++)
 		{
 			if (!bit_in_bitfield(i, m_piece_count, m_bitfield))
@@ -436,6 +435,10 @@ int Torrent::Init(std::string metafile, network::NetworkManager * nm, cfg::Glob_
 	catch( std::bad_alloc )
 	{
 		m_error = GENERAL_ERROR_NO_MEMORY_AVAILABLE;
+		return ERR_INTERNAL;
+	}
+	catch( Exception & e)
+	{
 		return ERR_INTERNAL;
 	}
 	return ERR_NO_ERROR;
@@ -481,22 +484,15 @@ int Torrent::save_state_file(state_file * sf)
 int Torrent::get_state()
 {
 	state_file sf;
-	m_new = read_state_file(&sf) != ERR_NO_ERROR;
-	if (m_new)
-	{
-		//printf("New state\n");
-		memset(&sf, 0, sizeof(state_file));
-		sf.version = STATE_FILE_VERSION;
-		strncpy(sf.download_directory, m_download_directory.c_str(), m_download_directory.length());
-		return save_state_file(&sf);
-	}
-	else
+	if (read_state_file(&sf) == ERR_NO_ERROR)
 	{
 		memcpy(m_bitfield, sf.bitfield, m_bitfield_len);
 		m_download_directory = sf.download_directory;
 		m_uploaded = sf.uploaded;
+		return ERR_NO_ERROR;
 	}
-	return ERR_NO_ERROR;
+	else
+		return ERR_FILE_ERROR;
 }
 
 
@@ -592,18 +588,14 @@ int Torrent::start(std::string & download_directory)
 {
 	if (m_state == TORRENT_STATE_NONE)
 	{
-		if (m_download_directory == "")//если торрент новый, эта строка будет пустой, иначе прочтется из файла состояния
+		if (m_new)
 		{
 			m_download_directory = download_directory;
 			if (m_download_directory[m_download_directory.length() - 1] != '/')
 				m_download_directory.append("/");
 			save_state();
 		}
-		std::string dir = m_download_directory;
-		//if (m_multifile)
-		//	dir.append(m_name);
-		std::cout<<dir<<std::endl;
-		if (m_torrent_file.Init(this, dir, m_new) != ERR_NO_ERROR)
+		if (m_torrent_file.Init(this, m_download_directory, m_new) != ERR_NO_ERROR)
 			return ERR_FILE_ERROR;
 		for (std::vector<std::string>::iterator iter = m_announces.begin(); iter != m_announces.end(); ++iter)
 		{
@@ -843,22 +835,6 @@ int Torrent::event_piece_hash(uint32_t piece_index, bool ok, bool error)
 	return ERR_NO_ERROR;
 }
 
-void Torrent::get_info_hash(unsigned char * info_hash)
-{
-	if (info_hash == NULL)
-		return;
-	memcpy(info_hash, m_info_hash_bin, SHA1_LENGTH);
-	return;
-}
-
-int Torrent::set_download_file(int index, bool download)
-{
-	if (index >= m_files_count || index < 0)
-		return ERR_BAD_ARG;
-	m_files[index].download = download;
-	return ERR_NO_ERROR;
-}
-
 void Torrent::delete_socket(network::socket_ * sock, network::sock_event * se)
 {
 	socket_map_iter iter = m_sockets.find(sock);
@@ -895,6 +871,7 @@ int Torrent::get_info(torrent_info * info)
 	info->rx_speed = m_rx_speed;
 	info->tx_speed = m_tx_speed;
 	info->uploaded = m_uploaded;
+	memcpy(info->info_hash_hex, m_info_hash_hex, SHA1_LENGTH * 2 + 1);
 	for(peer_map_iter iter = m_peers.begin(); iter != m_peers.end(); ++iter)
 	{
 		Peer * peer = (*iter).second;
@@ -919,6 +896,54 @@ int Torrent::get_info(torrent_info * info)
 		f.second = m_files[i].length;
 		info->file_list_.push_back(f);
 	}
+	return ERR_NO_ERROR;
+}
+
+int Torrent::save_meta2file(const char * filepath)
+{
+	if (filepath == NULL)
+	{
+		m_error = GENERAL_ERROR_UNDEF_ERROR;
+		return ERR_BAD_ARG;
+	}
+
+	if (m_metafile == NULL)
+	{
+		m_error = GENERAL_ERROR_UNDEF_ERROR;
+		return ERR_NULL_REF;
+	}
+
+	char * bencoded_metafile = new(std::nothrow) char[m_metafile_len];
+	if (bencoded_metafile == NULL)
+	{
+		m_error = GENERAL_ERROR_NO_MEMORY_AVAILABLE;
+		return ERR_INTERNAL;
+	}
+	uint32_t bencoded_metafile_len = 0;
+	if (bencode::encode(m_metafile, &bencoded_metafile, m_metafile_len, &bencoded_metafile_len) != ERR_NO_ERROR)
+	{
+		delete[] bencoded_metafile;
+		m_error = TORRENT_ERROR_INVALID_METAFILE;
+		return ERR_INTERNAL;
+	}
+	int fd = open(filepath, O_RDWR | O_CREAT, S_IRWXU);
+	if (fd == -1)
+	{
+		delete[] bencoded_metafile;
+		m_error = TORRENT_ERROR_IO_ERROR;
+		return ERR_SYSCALL_ERROR;
+	}
+	ssize_t ret = write(fd, bencoded_metafile, bencoded_metafile_len);
+	if (ret == -1)
+	{
+		delete[] bencoded_metafile;
+		m_error = TORRENT_ERROR_IO_ERROR;
+		return ERR_SYSCALL_ERROR;
+		close(fd);
+		return ERR_SYSCALL_ERROR;
+	}
+	close(fd);
+	delete[] bencoded_metafile;
 	return ERR_NO_ERROR;
 }
 

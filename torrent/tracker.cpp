@@ -259,6 +259,8 @@ int Tracker::event_sock_closed(network::socket_ * sock)
 		event_sock_ready2read(sock);
 	delete_socket();
 	m_nm->Socket_delete(sock);
+	if (m_status == TRACKER_STATUS_UPDATING)
+		m_status = TRACKER_STATUS_ERROR;
 	return ERR_NO_ERROR;
 }
 

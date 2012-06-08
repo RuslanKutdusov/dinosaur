@@ -156,54 +156,6 @@ void fm_test()
 	}*/
 }
 
-int bittorrent_test()
-{
-	try
-	{
-		bittorrent::Bittorrent bt;
-		char fn[256];
-		cin>>fn;
-		if (strncmp(fn,"exit", 4)==0)
-			return 0;
-		std::string hash;
-		bt.AddTorrent(fn, &hash);
-		while(1)
-		{
-			torrent::torrent_info info;
-			bt.Torrent_info(hash, &info);
-			system("clear");
-			cout<<"Name "<<info.name<<endl;
-			cout<<"Comment "<<info.comment<<endl;
-			cout<<"Created by "<<info.created_by<<endl;
-			cout<<"Creation date "<<info.creation_date<<endl;
-			cout<<"Downloaded "<<info.downloaded<<endl;
-			cout<<"Uploaded "<<info.uploaded<<endl;
-			cout<<"Length "<<info.length<<endl;
-			cout<<"Piece count "<<info.piece_count<<endl;
-			cout<<"Piece length "<<info.piece_length<<endl;
-			cout<<"Private "<<info.private_<<endl;
-			cout<<"Download speed "<<info.rx_speed<<endl;
-			cout<<"Uploade speed "<<info.tx_speed<<endl;
-			cout<<"Trackers:"<<endl;
-			for(torrent::torrent_info::tracker_info_iter iter = info.trackers.begin(); iter != info.trackers.end(); ++iter)
-			{
-				printf("  %s %s %u %llu %llu\n", (*iter).announce.c_str(), (*iter).status.c_str(), (uint32_t)(*iter).update_in, (*iter).seeders, (*iter).leechers);
-			}
-			cout<<"Peers:"<<endl;
-			for(torrent::torrent_info::peer_info_iter iter= info.peers.begin(); iter != info.peers.end(); ++iter)
-			{
-				if ((*iter).downSpeed > 0 || (*iter).upSpeed > 0)
-					printf("  %s %f %llu %f %llu %f\n", (*iter).ip, (*iter).available, (*iter).downloaded, (*iter).downSpeed, (*iter).uploaded, (*iter).upSpeed);
-			}
-			sleep(1);
-		}
-	}
-	catch(Exception e)
-	{
-		cout<<"EXCEPTION\n";
-	}
-	return 0;
-}
 
 void bimap_test()
 {
@@ -390,7 +342,6 @@ int main(int argc,char* argv[]) {
 	try
 	{
 		init_gui();
-
 	}
 	catch(Exception e)
 	{

@@ -336,6 +336,7 @@ public:
 	peer_info_list peers;
 	tracker_info_list trackers;
 	file_list file_list_;
+	char info_hash_hex[SHA1_LENGTH * 2 + 1];
 };
 
 class Torrent : public network::sock_event, public fs::file_event
@@ -343,6 +344,7 @@ class Torrent : public network::sock_event, public fs::file_event
 private:
 	network::NetworkManager * m_nm;
 	bencode::be_node * m_metafile;
+	uint64_t m_metafile_len;
 	cfg::Glob_cfg * m_g_cfg;
 	fs::FileManager * m_fm;
 	block_cache::Block_cache * m_bc;
@@ -402,7 +404,7 @@ public:
 public:
 	Torrent();
 	int Init(std::string metafile, network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc,
-			std::string & work_directory);
+			std::string & work_directory, bool is_new);
 	std::string get_error()
 	{
 		return m_error;
@@ -419,16 +421,14 @@ public:
 	int event_sock_unresolved(network::socket_* sock);
 	int event_file_write(fs::write_event * eo);
 	int event_piece_hash(uint32_t piece_index, bool ok, bool error);
-	void get_info_hash(unsigned char * info_hash);
-	int set_download_file(int index, bool download);
 	int clock();
 	bool check();
 	//добавляет пира либо от пользователя, либо от входящего соединения
 	//если от пользователя то требуемое состояние PEER_STATE_WAIT_HANDSHAKE
 	//если вх. соединение
 	int add_incoming_peer(network::socket_ * sock);
-	//int get_peers_info(peer_info ** info, uint16_t * count);
 	int get_info(torrent_info * info);
+	int save_meta2file(const char * filepath);
 	virtual ~Torrent();
 	friend class Tracker;
 	friend class Peer;

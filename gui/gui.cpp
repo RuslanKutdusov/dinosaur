@@ -10,12 +10,12 @@
 GtkWidget *window;
 GtkDialog* open_dialog;
 GtkFileChooserWidget * open_dialog_dir_chooser;
-std::string open_dialog_hash;
 GtkTreeView* torrent_view;
 GtkListStore* torrent_list;
 GtkListStore* tracker_list;
 GtkListStore* peer_list;
 bittorrent::Bittorrent * bt;
+torrent::Torrent * torrent2add = NULL;
 
 enum
 {
@@ -50,6 +50,17 @@ enum
 	PEER_LIST_COLS
 };
 
+void messagebox(const char * message)
+{
+	GtkWidget * dialog = gtk_message_dialog_new ((GtkWindow*)window,
+				GTK_DIALOG_DESTROY_WITH_PARENT,
+				GTK_MESSAGE_ERROR,
+				GTK_BUTTONS_CLOSE,
+				"%s", message);
+	gtk_dialog_run (GTK_DIALOG (dialog));
+	gtk_widget_destroy (dialog);
+}
+
 extern "C" void on_button_open_clicked (GtkWidget *object, gpointer user_data)
 {
 	if (open_dialog != NULL)
@@ -65,18 +76,16 @@ extern "C" void on_button_open_clicked (GtkWidget *object, gpointer user_data)
 	{
 		char *filename;
 		filename = gtk_file_chooser_get_filename (GTK_FILE_CHOOSER (dialog));
-		//open_file (filename);
-		std::string hash;
-		if (bt->AddTorrent(filename,&hash) == ERR_NO_ERROR)
+		torrent2add = bt->OpenTorrent(filename);
+		if (torrent2add != NULL)
 		{
 			gtk_widget_destroy (dialog);
-			open_dialog_hash = hash;
 			show_open_dialog();
 		}
 		else
 		{
 			gtk_widget_destroy (dialog);
-			open_dialog_hash = "";
+			messagebox(bt->get_error().c_str());
 		}
 		g_free (filename);
 	}
@@ -110,6 +119,8 @@ extern "C" void on_window1_destroy (GtkWidget *object, gpointer user_data)
 extern "C" void on_open_dialog_close (GtkWidget *object, gpointer user_data)
 {
 	open_dialog = NULL;
+	if (torrent2add != NULL)
+		delete torrent2add;
 	printf("dialog close\n");
 }
 
@@ -118,11 +129,25 @@ extern "C" void on_open_dialog_button_ok_clicked (GtkWidget *object, gpointer us
 	char *dir = gtk_file_chooser_get_filename (GTK_FILE_CHOOSER(open_dialog_dir_chooser));
 	if (dir == NULL)
 	{
-		printf("choose directory\n");
+		messagebox("Choose directory for saving");
 		return;
 	}
 	std::string dir_str = dir;
-	bt->StartTorrent(open_dialog_hash, dir_str);
+	std::string hash;
+	if (bt->AddTorrent(torrent2add, &hash) != ERR_NO_ERROR)
+	{
+		gtk_object_destroy(GTK_OBJECT(open_dialog));
+		messagebox(bt->get_error().c_str());
+		open_dialog = NULL;
+		return;
+	}
+	if (bt->StartTorrent(hash, dir_str) != ERR_NO_ERROR)
+	{
+		gtk_object_destroy(GTK_OBJECT(open_dialog));
+		messagebox(bt->get_error().c_str());
+		open_dialog = NULL;
+		return;
+	}
 	g_free(dir);
 	//commit
 	gtk_object_destroy(GTK_OBJECT(open_dialog));
@@ -464,7 +489,7 @@ void show_open_dialog()
 	g_object_unref (builder);
 
 	torrent::torrent_info info;
-	bt->Torrent_info(open_dialog_hash, &info);
+	torrent2add->get_info(&info);
 
 	GtkTreeIter   iter;
 	for(torrent::torrent_info::file_list_iter i = info.file_list_.begin(); i != info.file_list_.end(); ++i)
@@ -478,4 +503,3 @@ void show_open_dialog()
 	gtk_widget_show_all (GTK_WIDGET(open_dialog));
 
 }
-

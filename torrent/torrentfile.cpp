@@ -39,10 +39,20 @@ int TorrentFile::Init(Torrent * t, std::string & path,bool _new)
 	m_piece_length = t->m_piece_length;
 	m_files_count  = t->m_files_count;
 	m_length = t->m_length;
-	m_pieces = new unsigned char*[m_pieces_count];
+	m_pieces = new(std::nothrow) unsigned char*[m_pieces_count];
+	if (m_pieces == NULL)
+	{
+		t->m_error = GENERAL_ERROR_NO_MEMORY_AVAILABLE;
+		return ERR_SYSCALL_ERROR;
+	}
 	for(uint32_t i = 0; i < m_pieces_count; i++)
 	{
-		m_pieces[i]=new unsigned char[20];
+		m_pieces[i]=new(std::nothrow) unsigned char[20];
+		if (m_pieces[i] == NULL)
+		{
+			t->m_error = GENERAL_ERROR_NO_MEMORY_AVAILABLE;
+			return ERR_SYSCALL_ERROR;
+		}
 		memcpy(m_pieces[i], &t->m_pieces[i*20], 20);
 	}
 
@@ -61,7 +71,12 @@ int TorrentFile::Init(Torrent * t, std::string & path,bool _new)
 	{
 		m_files[i].length = t->m_files[i].length;
 		int l = strlen(t->m_files[i].name) + i_path.length();
-		m_files[i].name = new char[l + 1];// + \0
+		m_files[i].name = new(std::nothrow) char[l + 1];// + \0
+		if (m_files[i].name  == NULL)
+		{
+			t->m_error = GENERAL_ERROR_NO_MEMORY_AVAILABLE;
+			return ERR_SYSCALL_ERROR;
+		}
 		memset(m_files[i].name, 0, l + 1);
 		strncat(m_files[i].name, i_path.c_str(), i_path.length());
 		strncat(m_files[i].name, t->m_files[i].name, strlen(t->m_files[i].name));

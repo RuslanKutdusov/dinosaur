@@ -139,11 +139,12 @@ private:
 	void bin2hex(unsigned char * bin, char * hex, int len);
 	void add_error_mes(std::string & mes);
 	int load_our_torrents();
-	int init_torrent(std::string & filename, std::string * hash);
-	int init_torrent(const char * filename, std::string * hash);
+	int init_torrent(std::string & filename, std::string * hash, bool is_new);
+	int init_torrent(const char * filename, std::string * hash, bool is_new);
 public:
 	Bittorrent();
-	int AddTorrent(char * filename, std::string * hash);
+	torrent::Torrent * OpenTorrent(char * filename);
+	int AddTorrent(torrent::Torrent * torrent, std::string * hash);
 	int StartTorrent(std::string & hash, std::string & download_directory);
 	int StopTorrent(std::string & hash);
 	int Torrent_info(std::string & hash, torrent::torrent_info * info);
@@ -157,6 +158,10 @@ public:
 	int event_sock_accepted(network::socket_ * sock);
 	int event_sock_timeout(network::socket_ * sock);
 	int event_sock_unresolved(network::socket_ * sock);
+	std::string get_error()
+	{
+		return m_error;
+	}
 	~Bittorrent();
 };
 

@@ -34,6 +34,8 @@
 #define TORRENT_ERROR_NO_ERROR "No error"
 #define TORRENT_ERROR_EXISTS "Torrent is already exists"
 #define TORRENT_ERROR_NOT_EXISTS "Torrent is not exists"
+#define TORRENT_ERROR_CAN_NOT_START "Can not start torrent"
+#define TORRENT_ERROR_NO_STATE_FILE "Can not find state file"
 
 #define GENERAL_ERROR_NO_MEMORY_AVAILABLE "No memory available"
 #define GENERAL_ERROR_UNDEF_ERROR "Something wrong"
