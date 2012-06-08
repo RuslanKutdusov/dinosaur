@@ -64,9 +64,23 @@ enum TORRENT_STATE
 {
 	TORRENT_STATE_NONE,
 	TORRENT_STATE_STARTED,
-	TORRENT_STATE_GOTO_STOP,
-	TORRENT_STATE_STOPPED
+	TORRENT_STATE_STOPPED,
+	TORRENT_STATE_PAUSED,
+	TORRENT_STATE_CHECKING
 };
+
+enum TORRENT_TASKS
+{
+		TORRENT_TASK_DOWNLOAD_PIECE,
+		TORRENT_TASK_CHECK_HASH
+};
+
+struct TORRENT_TASK
+{
+		TORRENT_TASKS task;
+		uint64_t task_data;//здесь будем хранить например номер куска для проверки
+};
+
 //так выглядит файл состояний
 struct state_file
 {
@@ -287,7 +301,6 @@ public:
 	int read_block(uint32_t piece, uint32_t block_index, char * block, uint32_t * block_length);
 	int read_piece(uint32_t piece_index);
 	bool check_piece_hash(uint32_t piece_index);
-	bool check_all_pieces();
 	bool piece_is_done(uint32_t piece_index);
 	int blocks_in_progress(uint32_t piece_index);
 	int event_file_write(fs::write_event * eo);
@@ -378,6 +391,7 @@ private:
 	size_t m_bitfield_len;
 	std::set<uint32_t> m_pieces_to_download;//куски, которые надо загрузить
 	std::list<uint32_t> m_have_list;//список кусков, которые мы только загрузили, и о которых надо известить всех участников раздачи(сообщение have)
+	std::list<TORRENT_TASK> m_task_queue;
 	double m_rx_speed;
 	double m_tx_speed;
 	TORRENT_STATE m_state;
@@ -397,6 +411,7 @@ private:
 	void delete_socket(network::socket_ * sock, network::sock_event * se);
 	void add_socket(network::socket_ * sock, network::sock_event * se);
 	network::sock_event * get_sock_event(network::socket_ * sock);
+	int handle_download_task();
 public:
 	TorrentFile m_torrent_file;
 	void take_peers(int count, sockaddr_in * addrs);
@@ -411,6 +426,9 @@ public:
 	}
 	int start(std::string & download_directory);
 	int stop();
+	int pause();
+	int continue_();
+	int check();
 	bool is_downloaded();
 	int event_sock_ready2read(network::socket_ * sock);
 	int event_sock_closed(network::socket_ * sock);
@@ -422,7 +440,6 @@ public:
 	int event_file_write(fs::write_event * eo);
 	int event_piece_hash(uint32_t piece_index, bool ok, bool error);
 	int clock();
-	bool check();
 	//добавляет пира либо от пользователя, либо от входящего соединения
 	//если от пользователя то требуемое состояние PEER_STATE_WAIT_HANDSHAKE
 	//если вх. соединение

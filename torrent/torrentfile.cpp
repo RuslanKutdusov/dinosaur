@@ -275,16 +275,6 @@ int TorrentFile::read_piece(uint32_t piece_index)
 	return ERR_NO_ERROR;
 }
 
-bool TorrentFile::check_all_pieces()
-{
-	for(uint32_t i = 0; i < m_pieces_count; i++)
-	{
-		if (!check_piece_hash(i))
-			return false;
-	}
-	return true;
-}
-
 bool TorrentFile::piece_is_done(uint32_t piece_index)
 {
 	if (piece_index >= m_pieces_count)

@@ -615,25 +615,47 @@ int Torrent::start(std::string & download_directory)
 			if (sock != NULL)
 				m_sockets[sock] = temp;
 		}
-		m_state = TORRENT_STATE_STARTED;
-	}
-	if (m_state == TORRENT_STATE_STOPPED)
-	{
-		for(peer_map_iter p = m_peers.begin(); p != m_peers.end(); ++p)
+		for(std::set<uint32_t>::iterator i = m_pieces_to_download.begin();
+					i != m_pieces_to_download.end(); ++i)
 		{
-			Peer * peer = (*p).second;
-			peer->wake_up(NULL, PEER_ADD_TRACKER);
-		}
-		for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
-		{
-			(*iter).second->send_started();
+			TORRENT_TASK task;
+			task.task = TORRENT_TASK_DOWNLOAD_PIECE;
+			task.task_data = *i;
+			m_task_queue.push_back(task);
 		}
 		m_state = TORRENT_STATE_STARTED;
 	}
+	else
+		return ERR_INTERNAL;
 	return ERR_NO_ERROR;
 }
 
 int Torrent::stop()
+{
+	if (m_state == TORRENT_STATE_NONE)
+		return ERR_INTERNAL;
+	for(peer_map_iter p = m_peers.begin(); p != m_peers.end(); ++p)
+	{
+		Peer * peer = (*p).second;
+		peer->goto_sleep();
+		while(!peer->no_requested_blocks())
+		{
+			uint64_t id = peer->get_requested_block();
+			uint32_t block_index = get_block_from_id(id);//(id & (uint32_t)4294967295);
+			uint32_t piece = get_piece_from_id(id);//(id - block_index)>>32;
+			m_torrent_file.unmark_if_match(piece,block_index, peer);
+		}
+	}
+	for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
+	{
+		(*iter).second->send_stopped();
+	}
+	m_task_queue.clear();
+	m_state = TORRENT_STATE_STOPPED;
+	return 0;
+}
+
+int Torrent::pause()
 {
 	if (m_state != TORRENT_STATE_STARTED)
 		return ERR_INTERNAL;
@@ -641,13 +663,47 @@ int Torrent::stop()
 	{
 		Peer * peer = (*p).second;
 		peer->goto_sleep();
+		while(!peer->no_requested_blocks())
+		{
+			uint64_t id = peer->get_requested_block();
+			uint32_t block_index = get_block_from_id(id);//(id & (uint32_t)4294967295);
+			uint32_t piece = get_piece_from_id(id);//(id - block_index)>>32;
+			m_torrent_file.unmark_if_match(piece,block_index, peer);
+		}
 	}
 	for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
 	{
 		(*iter).second->send_stopped();
 	}
-	m_state = TORRENT_STATE_STOPPED;
-	return 0;
+	m_task_queue.clear();
+	m_state = TORRENT_STATE_PAUSED;
+	return ERR_NO_ERROR;
+}
+
+int Torrent::continue_()
+{
+	if (m_state != TORRENT_STATE_PAUSED && m_state != TORRENT_STATE_CHECKING)
+		return ERR_INTERNAL;
+	for(peer_map_iter p = m_peers.begin(); p != m_peers.end(); ++p)
+	{
+		Peer * peer = (*p).second;
+		peer->wake_up(NULL, PEER_ADD_TRACKER);
+	}
+	for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
+	{
+		(*iter).second->send_started();
+	}
+	m_task_queue.clear();
+	for(std::set<uint32_t>::iterator i = m_pieces_to_download.begin();
+						i != m_pieces_to_download.end(); ++i)
+	{
+		TORRENT_TASK task;
+		task.task = TORRENT_TASK_DOWNLOAD_PIECE;
+		task.task_data = *i;
+		m_task_queue.push_back(task);
+	}
+	m_state = TORRENT_STATE_STARTED;
+	return ERR_NO_ERROR;
 }
 
 
@@ -656,38 +712,67 @@ bool Torrent::is_downloaded()
 	return m_downloaded == m_length;
 }
 
-int Torrent::clock()
+int Torrent::check()
 {
-	//printf("CLOCK\n");
-	m_rx_speed = 0.0f;
-	m_tx_speed = 0.0f;
+	if (m_state == TORRENT_STATE_NONE)
+		return ERR_INTERNAL;
 	for(peer_map_iter p = m_peers.begin(); p != m_peers.end(); ++p)
 	{
 		Peer * peer = (*p).second;
-		m_rx_speed += peer->get_rx_speed();
-		m_tx_speed += peer->get_tx_speed();
-		for(std::list<uint32_t>::iterator iter = m_have_list.begin();
-				iter != m_have_list.end();
-				++iter)
+		peer->goto_sleep();
+		while(!peer->no_requested_blocks())
 		{
-			//printf("Send have %u\n", *iter);
-			peer->send_have(*iter);
+			uint64_t id = peer->get_requested_block();
+			uint32_t block_index = get_block_from_id(id);//(id & (uint32_t)4294967295);
+			uint32_t piece = get_piece_from_id(id);//(id - block_index)>>32;
+			m_torrent_file.unmark_if_match(piece,block_index, peer);
 		}
-		peer->clock();
+	}
+	for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
+	{
+		(*iter).second->send_stopped();
+	}
+	m_task_queue.clear();
+	m_downloaded = 0;
+	memset(m_bitfield, 0, m_bitfield_len);
+	for(uint32_t i = 0; i < m_piece_count; i++)
+	{
+		TORRENT_TASK task;
+		task.task = TORRENT_TASK_CHECK_HASH;
+		task.task_data = i;
+		m_task_queue.push_back(task);
+	}
+	m_state = TORRENT_STATE_CHECKING;
+	return ERR_NO_ERROR;
+}
+
+
+int Torrent::handle_download_task()
+{
+	for(peer_map_iter p = m_peers.begin(); p != m_peers.end(); ++p)
+	{
+		Peer * peer = (*p).second;
 		if(peer->may_request() && !peer->request_limit() && m_state == TORRENT_STATE_STARTED)
 		{
-			for(std::set<uint32_t>::iterator i = m_pieces_to_download.begin();
-						i != m_pieces_to_download.end(); ++i)
+			for(std::list<TORRENT_TASK>::iterator task_iter = m_task_queue.begin(), task_iter_;
+													task_iter != m_task_queue.end();
+													task_iter = task_iter_)
 			{
-				uint32_t piece = *i;
+				uint32_t piece = (*task_iter).task_data;
 				if (!peer->have_piece(piece))
-					continue;
+				{
+					task_iter_ = task_iter;
+					++task_iter_;
+				}
 				if (peer->request_limit())
 					break;
 
 				uint32_t blocks_count = m_torrent_file.get_blocks_count_in_piece(piece);
 				if (blocks_count == 0)
-					continue;
+				{
+					task_iter_ = task_iter;
+					++task_iter_;
+				}
 
 				for(std::map<uint32_t, Peer*>::iterator iter = m_torrent_file.m_piece_info[piece].blocks2download.begin();
 					iter != m_torrent_file.m_piece_info[piece].blocks2download.end(); ++iter)
@@ -703,9 +788,14 @@ int Torrent::clock()
 							m_torrent_file.mark_block(piece, (*iter).first, peer);
 					}
 				}
+
+				task_iter_ = task_iter;
+				++task_iter_;
+
 				if (m_torrent_file.blocks_in_progress(piece) == 0)
 				{
-					m_pieces_to_download.erase(i);
+					m_pieces_to_download.erase(piece);
+					m_task_queue.erase(task_iter);
 				}
 			}
 		}
@@ -721,7 +811,43 @@ int Torrent::clock()
 			}
 		}
 	}
+	return ERR_NO_ERROR;
+}
+
+int Torrent::clock()
+{
+	//printf("CLOCK\n");
+	m_rx_speed = 0.0f;
+	m_tx_speed = 0.0f;
+	if (m_state != TORRENT_STATE_STARTED && m_state != TORRENT_STATE_CHECKING)
+		return ERR_NO_ERROR;
+	for(peer_map_iter p = m_peers.begin(); p != m_peers.end(); ++p)
+	{
+		Peer * peer = (*p).second;
+		m_rx_speed += peer->get_rx_speed();
+		m_tx_speed += peer->get_tx_speed();
+		for(std::list<uint32_t>::iterator iter = m_have_list.begin();
+				iter != m_have_list.end();
+				++iter)
+		{
+			//printf("Send have %u\n", *iter);
+			peer->send_have(*iter);
+		}
+		peer->clock();
+	}
 	m_have_list.clear();
+
+	if (m_task_queue.front().task == TORRENT_TASK_DOWNLOAD_PIECE)
+		handle_download_task();
+
+	if (m_task_queue.front().task == TORRENT_TASK_CHECK_HASH)
+	{
+		m_torrent_file.check_piece_hash(m_task_queue.front().task_data);
+		m_task_queue.pop_front();
+		if (m_task_queue.empty())
+			continue_();
+	}
+
 	if (m_state == TORRENT_STATE_STARTED)
 		for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
 		{
@@ -827,6 +953,13 @@ int Torrent::event_piece_hash(uint32_t piece_index, bool ok, bool error)
 	{
 		m_torrent_file.restore_piece2download(piece_index);
 		m_pieces_to_download.insert(piece_index);
+		if (m_state == TORRENT_STATE_STARTED)
+		{
+			TORRENT_TASK task;
+			task.task = TORRENT_TASK_DOWNLOAD_PIECE;
+			task.task_data = piece_index;
+			m_task_queue.push_back(task);
+		}
 		reset_bitfield(piece_index, m_piece_count, m_bitfield);
 		save_state();
 		//printf("Piece %d BAD\n", piece_index);
@@ -848,11 +981,6 @@ void Torrent::add_socket(network::socket_ * sock, network::sock_event * se)
 {
 	if (sock != NULL)
 		m_sockets[sock] = se;
-}
-
-bool Torrent::check()
-{
-	return m_torrent_file.check_all_pieces();
 }
 
 int Torrent::get_info(torrent_info * info)
