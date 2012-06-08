@@ -121,7 +121,6 @@ extern "C" void on_open_dialog_close (GtkWidget *object, gpointer user_data)
 	open_dialog = NULL;
 	if (torrent2add != NULL)
 		delete torrent2add;
-	printf("dialog close\n");
 }
 
 extern "C" void on_open_dialog_button_ok_clicked (GtkWidget *object, gpointer user_data)
