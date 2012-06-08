@@ -17,6 +17,7 @@ TorrentFile::TorrentFile()
 	m_pieces_count = 0;
 	m_piece_length = 0;
 	m_pieces = NULL;
+	m_piece_for_check_hash = NULL;
 	//std::cout<<"TorrentFile created(default)\n";
 }
 
