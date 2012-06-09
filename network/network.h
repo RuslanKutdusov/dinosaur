@@ -52,9 +52,7 @@ struct buffer
 
 class NetworkManager;
 class socket_;
-//typedef std::map<int, socket_ *> socket_map;
-//typedef socket_map::iterator socket_map_iter;
-typedef std::set<socket_*> 		 socket_set;
+typedef std::set<int> 		 socket_set;
 typedef socket_set::iterator socket_set_iter;
 
 class DomainNameResolver
@@ -107,7 +105,10 @@ public:
 	{
 		return m_socket;
 	}
-
+	void print_ip()
+	{
+		printf("%s\n", inet_ntoa(m_peer.sin_addr));
+	}
 	friend class NetworkManager;
 };
 
@@ -138,58 +139,7 @@ private:
 	pthread_mutex_t m_mutex_sockets;
 	//pthread_mutex_t m_mutex_timeout_sockets;
 	bool m_thread_stop;
-	static void * timeout_thread(void * arg)
-	{
-		int ret = 1;
-		NetworkManager * nm = (NetworkManager*)arg;
-		//pthread_exit((void *)st);
-		//std::cout<<"TIMEOUT_THREAD started\n";
-		while(!nm->m_thread_stop)
-		{
-			pthread_mutex_lock(&nm->m_mutex_sockets);
-			//pthread_mutex_lock(&m_mutex_timeout_sockets);
-			for(socket_set_iter iter = nm->m_sockets.begin(); iter != nm->m_sockets.end(); ++iter)
-			{
-				socket_ * sock = (*iter);
-				if (sock->m_need2resolved)
-				{
-					std::string domain_name = sock->m_domain;
-					struct sockaddr_in addr;
-					memcpy(&addr, &sock->m_peer, sizeof(addr));
-					pthread_mutex_unlock(&nm->m_mutex_sockets);
-					try
-					{
-						DomainNameResolver dnr(domain_name, &addr);
-						pthread_mutex_lock(&nm->m_mutex_sockets);
-						memcpy(&sock->m_peer, &addr, sizeof(addr));
-						if (nm->ConnectResolvedSocket(sock) != ERR_NO_ERROR)
-							nm->m_unresolved_sockets.insert(sock);
-					}
-					catch (Exception e)
-					{
-						pthread_mutex_lock(&nm->m_mutex_sockets);
-						nm->m_unresolved_sockets.insert(sock);
-					}
-					sock->m_need2resolved = false;
-					continue;
-				}
-				if (sock->m_timer == 0)
-					continue;
-				if (time(NULL) - sock->m_timer >= TIMEOUT && (sock->m_state == STATE_CONNECTION || (sock->m_epoll_events & EPOLLIN) != 0) && !sock->m_closed)
-				{
-					nm->m_timeout_sockets.insert(sock);
-					//std::cout<<"THREAD: Timeout on "<<inet_ntoa(sock->m_peer.sin_addr)<<std::endl;
-					continue;
-				}
-			}
-			pthread_mutex_unlock(&nm->m_mutex_sockets);
-			//pthread_mutex_unlock(&m_mutex_timeout_sockets);
-			//sleep(TIMEOUT);
-			usleep(200);
-		}
-		//std::cout<<"TIMEOUT_THREAD stopped\n";
-		return (void*)ret;
-	}
+	static void * timeout_thread(void * arg);
 	int ConnectResolvedSocket(socket_ * sock);
 public:
 	NetworkManager();
@@ -212,6 +162,8 @@ public:
 	void * Socket_get_assoc(socket_ * sock);
 	double Socket_get_rx_speed(socket_ *sock);
 	double Socket_get_tx_speed(socket_ *sock);
+	void lock_mutex();
+	void unlock_mutex();
 	bool event_ready2read_sock(network::socket_** sock);
 	bool event_closed_sock(network::socket_** sock);
 	bool event_sended_socks(network::socket_** sock);
@@ -249,7 +201,7 @@ public:
 	{
 		for(socket_set_iter iter = m_sockets.begin(); iter != m_sockets.end(); ++iter)
 		{
-			socket_ * sock= (*iter);
+			socket_ * sock= (socket_*)(*iter);
 			std::cout<<"Socket fd = "<<sock->m_socket<<std::endl;
 			std::cout<<"       cl = "<<sock->m_closed<<std::endl;
 			std::cout<<"       cn = "<<sock->m_connected<<std::endl;

@@ -634,7 +634,12 @@ Peer::~Peer()
 {
 	if (m_bitfield != NULL)
 		delete[] m_bitfield;
-	m_nm->Socket_delete(m_sock);
+	if (m_sock != NULL)
+	{
+		m_torrent->delete_socket(m_sock, this);
+		m_nm->Socket_close(m_sock);
+		m_nm->Socket_delete(m_sock);
+	}
 	//std::cout<<"Peer destroyed "<<std::endl;
 }
 

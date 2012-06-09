@@ -95,18 +95,68 @@ extern "C" void on_button_open_clicked (GtkWidget *object, gpointer user_data)
 
 extern "C" void on_button_start_clicked (GtkWidget *object, gpointer user_data)
 {
-
-	printf("on_button_start_clicked\n");
+	GtkTreeSelection *selection;
+	GtkTreeModel     *model;
+	GtkTreeIter       selected_iter;
+	selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(torrent_view));
+	if (gtk_tree_selection_get_selected(selection, &model, &selected_iter))
+	{
+		gchar *g_hash;
+		gtk_tree_model_get (model, &selected_iter, TORRENT_LIST_COL_HASH, &g_hash, -1);
+		std::string hash = g_hash;
+		g_free(g_hash);
+		bt->ContinueTorrent(hash);
+	}
 }
 
 extern "C" void on_button_stop_clicked (GtkWidget *object, gpointer user_data)
 {
-	printf("on_button_stop_clicked\n");
+	GtkTreeSelection *selection;
+	GtkTreeModel     *model;
+	GtkTreeIter       selected_iter;
+	selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(torrent_view));
+	if (gtk_tree_selection_get_selected(selection, &model, &selected_iter))
+	{
+		gchar *g_hash;
+		gtk_tree_model_get (model, &selected_iter, TORRENT_LIST_COL_HASH, &g_hash, -1);
+		std::string hash = g_hash;
+		g_free(g_hash);
+		bt->PauseTorrent(hash);
+	}
 }
 
 extern "C" void on_button_delete_clicked (GtkWidget *object, gpointer user_data)
 {
-	printf("on_button_delete_clicked\n");
+	/*GtkTreeSelection *selection;
+	GtkTreeModel     *model;
+	GtkTreeIter       selected_iter;
+	selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(torrent_view));
+	if (gtk_tree_selection_get_selected(selection, &model, &selected_iter))
+	{
+		gchar *g_hash;
+		gtk_tree_model_get (model, &selected_iter, TORRENT_LIST_COL_HASH, &g_hash, -1);
+		std::string hash = g_hash;
+		g_free(g_hash);
+		bt->DeleteTorrent(hash);
+		on_window1_show(NULL,NULL);
+	}*/
+}
+
+extern "C" void on_button_check_clicked(GtkWidget *object, gpointer user_data)
+{
+	GtkTreeSelection *selection;
+	GtkTreeModel     *model;
+	GtkTreeIter       selected_iter;
+	selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(torrent_view));
+	if (gtk_tree_selection_get_selected(selection, &model, &selected_iter))
+	{
+		gchar *g_hash;
+		gtk_tree_model_get (model, &selected_iter, TORRENT_LIST_COL_HASH, &g_hash, -1);
+		std::string hash = g_hash;
+		g_free(g_hash);
+		bt->CheckTorrent(hash);
+	}
+
 }
 
 extern "C" void on_window1_destroy (GtkWidget *object, gpointer user_data)
@@ -174,14 +224,13 @@ extern "C" void on_window1_show (GtkWidget *object, gpointer user_data)
 		gtk_list_store_append(torrent_list, &iter);
 		torrent::torrent_info info;
 		bt->Torrent_info(*i, &info);
-		int progress = (info.downloaded * 100) / info.length;
 		float downloaded = info.downloaded / 1048576;
 		float uploaded = info.uploaded / 1048576;
 		float up_speed = info.tx_speed;
 		float down_speed = info.rx_speed;
 		gtk_list_store_set (torrent_list, &iter,
 										TORRENT_LIST_COL_NAME, info.name.c_str(),
-										TORRENT_LIST_COL_PROGRESS, (gint)progress,
+										TORRENT_LIST_COL_PROGRESS, (gint)info.progress,
 										TORRENT_LIST_COL_DOWNLOADED, (gfloat)downloaded,
 										TORRENT_LIST_COL_UPLOADED, (gfloat)uploaded,
 										TORRENT_LIST_COL_DOWN_SPEED, (gfloat)down_speed,
@@ -255,14 +304,13 @@ gboolean foreach_torrent_list (GtkTreeModel *model,
 	torrent::torrent_info info;
 	std::string hash = g_hash;
 	bt->Torrent_info(hash, &info);
-	int progress = (info.downloaded * 100) / info.length;
 	float downloaded = info.downloaded / 1048576;
 	float uploaded = info.uploaded / 1048576;
 	float up_speed = info.tx_speed;
 	float down_speed = info.rx_speed;
 	gtk_list_store_set (torrent_list, iter,
 						TORRENT_LIST_COL_NAME, info.name.c_str(),
-						TORRENT_LIST_COL_PROGRESS, (gint)progress,
+						TORRENT_LIST_COL_PROGRESS, (gint)info.progress,
 						TORRENT_LIST_COL_DOWNLOADED, (gfloat)downloaded,
 						TORRENT_LIST_COL_UPLOADED, (gfloat)uploaded,
 						TORRENT_LIST_COL_DOWN_SPEED, (gfloat)down_speed,

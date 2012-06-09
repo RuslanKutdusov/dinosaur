@@ -56,7 +56,8 @@ NetworkManager::~NetworkManager()
 	}
 	for(socket_set_iter iter = m_sockets.begin(); iter != m_sockets.end(); ++iter)
 	{
-		delete (*iter);
+		socket_* sock = (socket_*)(*iter);
+		delete sock;
 	}
 	std::cout<<"DONE\n";
 	std::cout<<"NetworkManager destroyed\n";
@@ -97,7 +98,7 @@ socket_ * NetworkManager::Socket_add_domain(const char *domain_name, uint16_t po
 	sock->m_timer = 0;
 	if (lock_mutex)
 		pthread_mutex_lock(&m_mutex_sockets);
-	m_sockets.insert(sock);
+	m_sockets.insert((int)sock);
 	if (lock_mutex)
 		pthread_mutex_unlock(&m_mutex_sockets);
 	return sock;
@@ -149,13 +150,13 @@ socket_ * NetworkManager::Socket_add(struct sockaddr_in * addr, void * assoc, bo
 		return NULL;
 	}
 	sock->m_state = STATE_TRANSMISSION;
-	m_connected_sockets.insert(sock);
+	m_connected_sockets.insert((int)sock);
 	sock->m_connected = true;
 end:
 	sock->m_timer = time(NULL);
 	if (lock_mutex)
 		pthread_mutex_lock(&m_mutex_sockets);
-	m_sockets.insert(sock);
+	m_sockets.insert((int)sock);
 	if (lock_mutex)
 		pthread_mutex_unlock(&m_mutex_sockets);
 	return sock;
@@ -190,7 +191,7 @@ socket_ * NetworkManager::Socket_add(int sock_fd, void * assoc, struct sockaddr_
 	sock->m_timer = time(NULL);
 	if (lock_mutex)
 		pthread_mutex_lock(&m_mutex_sockets);
-	m_sockets.insert(sock);
+	m_sockets.insert((int)sock);
 	if (lock_mutex)
 		pthread_mutex_unlock(&m_mutex_sockets);
 	return sock;
@@ -256,7 +257,7 @@ socket_ * NetworkManager::ListenSocket_add(uint16_t port, void * assoc, bool loc
 	sock->m_timer = time(NULL);
 	if (lock_mutex)
 		pthread_mutex_lock(&m_mutex_sockets);
-	m_sockets.insert(sock);
+	m_sockets.insert((int)sock);
 	if (lock_mutex)
 		pthread_mutex_unlock(&m_mutex_sockets);
 	return sock;
@@ -292,18 +293,18 @@ int NetworkManager::Wait()
 			sock->m_errno = errno;
 
 		if (buffer_remain(&sock->m_recv_buffer) > 0)
-			m_ready2read_sockets.insert(sock);
+			m_ready2read_sockets.insert((int)sock);
 		//else
 		//	m_ready2read_sockets.erase(sock->m_id);
 
 		if (need2send && buffer_remain(&sock->m_send_buffer) == 0)
-			m_sended_sockets.insert(sock);
+			m_sended_sockets.insert((int)sock);
 
 		if (!connected && sock->m_connected)
-			m_connected_sockets.insert(sock);
+			m_connected_sockets.insert((int)sock);
 
 		if (sock->m_closed)
-			m_closed_sockets.insert(sock);
+			m_closed_sockets.insert((int)sock);
 	}
 	pthread_mutex_unlock(&m_mutex_sockets);
 	return 0;
@@ -319,7 +320,7 @@ int NetworkManager::Socket_send(socket_ * sock, const void * data, size_t len, b
 		return ERR_BAD_ARG;
 	if (sock->m_closed)
 	{
-		m_closed_sockets.insert(sock);
+		m_closed_sockets.insert((int)sock);
 		//std::cout<<"SOCKET CLOSED\n";
 		return ERR_BAD_ARG;
 	}
@@ -337,11 +338,11 @@ int NetworkManager::Socket_recv(socket_ * sock, void * data, size_t len)
 		return ERR_INTERNAL;
 	}
 	if (buffer_remain(&sock->m_recv_buffer) > 0)
-		m_ready2read_sockets.insert(sock);
+		m_ready2read_sockets.insert((int)sock);
 	else
-		m_ready2read_sockets.erase(sock);
+		m_ready2read_sockets.erase((int)sock);
 	if (sock->m_closed)
-		m_closed_sockets.insert(sock);
+		m_closed_sockets.insert((int)sock);
 	return ret;
 }
 
@@ -351,11 +352,11 @@ ssize_t NetworkManager::Socket_datalen(socket_ * sock)
 		return ERR_BAD_ARG;
 	int len = buffer_remain(&sock->m_recv_buffer);
 	if (len > 0)
-		m_ready2read_sockets.insert(sock);
+		m_ready2read_sockets.insert((int)sock);
 	else
-		m_ready2read_sockets.erase(sock);
+		m_ready2read_sockets.erase((int)sock);
 	if (sock->m_closed)
-		m_closed_sockets.insert(sock);
+		m_closed_sockets.insert((int)sock);
 	return len;
 }
 
@@ -378,7 +379,7 @@ int NetworkManager::Socket_close(socket_ * sock)
 	}
 	_close(sock);
 	if (sock->m_closed)
-		m_closed_sockets.insert(sock);
+		m_closed_sockets.insert((int)sock);
 	return ERR_NO_ERROR;
 }
 
@@ -391,12 +392,12 @@ int NetworkManager::Socket_delete(socket_ * sock)
 		pthread_mutex_unlock(&m_mutex_sockets);
 		return ERR_BAD_ARG;
 	}
-	m_ready2read_sockets.erase(sock);
-	m_sended_sockets.erase(sock);
-	m_closed_sockets.erase(sock);
-	m_timeout_sockets.erase(sock);
-	m_unresolved_sockets.erase(sock);
-	m_sockets.erase(sock);
+	m_ready2read_sockets.erase((int)sock);
+	m_sended_sockets.erase((int)sock);
+	m_closed_sockets.erase((int)sock);
+	m_timeout_sockets.erase((int)sock);
+	m_unresolved_sockets.erase((int)sock);
+	m_sockets.erase((int)sock);
 	delete sock;
 	pthread_mutex_unlock(&m_mutex_sockets);
 	return ERR_NO_ERROR;
@@ -509,7 +510,7 @@ int NetworkManager::handle_event(socket_ * sock, uint32_t events)
 			socket_ * new_sock = Socket_add(client_sock, NULL, &client_addr, false);
 			if (new_sock == NULL)
 				return ERR_INTERNAL;
-			sock->m_accepted_sockets.insert(new_sock);
+			sock->m_accepted_sockets.insert((int)new_sock);
 			return ERR_NO_ERROR;
 		}
 	}
@@ -703,7 +704,7 @@ bool NetworkManager::event_ready2read_sock(network::socket_** sock)
 	if (m_ready2read_sockets.empty())
 		return false;
 	socket_set_iter iter = m_ready2read_sockets.begin();
-	*sock = *iter;
+	*sock = (socket_*)(*iter);
 	m_ready2read_sockets.erase(iter);
 	return true;
 }
@@ -713,7 +714,7 @@ bool NetworkManager::event_closed_sock(network::socket_** sock)
 	if (m_closed_sockets.empty())
 		return false;
 	socket_set_iter iter = m_closed_sockets.begin();
-	*sock = *iter;
+	*sock = (socket_*)(*iter);
 	m_closed_sockets.erase(iter);
 	return true;
 }
@@ -723,53 +724,53 @@ bool NetworkManager::event_sended_socks(network::socket_** sock)
 	if (m_sended_sockets.empty())
 		return false;
 	socket_set_iter iter = m_sended_sockets.begin();
-	*sock = *iter;
+	*sock = (socket_*)(*iter);
 	m_sended_sockets.erase(iter);
 	return true;
 }
 
 bool NetworkManager::event_timeout_on(network::socket_** sock)
 {
-	pthread_mutex_lock(&m_mutex_sockets);
+	//pthread_mutex_lock(&m_mutex_sockets);
 	if (m_timeout_sockets.empty())
 	{
-		pthread_mutex_unlock(&m_mutex_sockets);
+		//pthread_mutex_unlock(&m_mutex_sockets);
 		return false;
 	}
 	socket_set_iter iter = m_timeout_sockets.begin();
-	*sock = *iter;
+	*sock = (socket_*)(*iter);
 	m_timeout_sockets.erase(iter);
-	pthread_mutex_unlock(&m_mutex_sockets);
+	//pthread_mutex_unlock(&m_mutex_sockets);
 	return true;
 }
 
 bool NetworkManager::event_unresolved_sock(network::socket_** sock)
 {
-	pthread_mutex_lock(&m_mutex_sockets);
+	//pthread_mutex_lock(&m_mutex_sockets);
 	if (m_unresolved_sockets.empty())
 	{
-		pthread_mutex_unlock(&m_mutex_sockets);
+		//pthread_mutex_unlock(&m_mutex_sockets);
 		return false;
 	}
 	socket_set_iter iter = m_unresolved_sockets.begin();
-	*sock = *iter;
+	*sock = (socket_*)(*iter);
 	m_unresolved_sockets.erase(iter);
-	pthread_mutex_unlock(&m_mutex_sockets);
+	//pthread_mutex_unlock(&m_mutex_sockets);
 	return true;
 }
 
 bool NetworkManager::event_accepted_sock(network::socket_* serv, network::socket_ ** sock)
 {
-	pthread_mutex_lock(&m_mutex_sockets);
+	//pthread_mutex_lock(&m_mutex_sockets);
 	if (serv->m_accepted_sockets.empty())
 	{
-		pthread_mutex_unlock(&m_mutex_sockets);
+		//pthread_mutex_unlock(&m_mutex_sockets);
 		return false;
 	}
 	socket_set_iter iter = serv->m_accepted_sockets.begin();
-	*sock = *iter;
+	*sock = (socket_*)(*iter);
 	serv->m_accepted_sockets.erase(iter);
-	pthread_mutex_unlock(&m_mutex_sockets);
+	//pthread_mutex_unlock(&m_mutex_sockets);
 	return true;
 }
 
@@ -778,7 +779,7 @@ bool NetworkManager::event_connected_sock(network::socket_** sock)
 	if (m_connected_sockets.empty())
 		return false;
 	socket_set_iter iter = m_connected_sockets.begin();
-	*sock = *iter;
+	*sock = (socket_*)(*iter);
 	m_connected_sockets.erase(iter);
 	return true;
 }
@@ -816,7 +817,7 @@ int NetworkManager::ConnectResolvedSocket(socket_ * sock)
 		return ERR_SYSCALL_ERROR;
 	}
 	sock->m_state = STATE_TRANSMISSION;
-	m_connected_sockets.insert(sock);
+	m_connected_sockets.insert((int)sock);
 	sock->m_connected = true;
 end:
 	sock->m_timer = time(NULL);
@@ -903,6 +904,70 @@ int DomainNameResolver::split_domain_and_port()
 	sscanf(port_str.c_str(), "%u", &p);
 	m_addr->sin_port = htons(p);
 	return ERR_NO_ERROR;
+}
+
+void * NetworkManager::timeout_thread(void * arg)
+{
+	int ret = 1;
+	NetworkManager * nm = (NetworkManager*)arg;
+	//pthread_exit((void *)st);
+	//std::cout<<"TIMEOUT_THREAD started\n";
+	while(!nm->m_thread_stop)
+	{
+		pthread_mutex_lock(&nm->m_mutex_sockets);
+		//pthread_mutex_lock(&m_mutex_timeout_sockets);
+		for(socket_set_iter iter = nm->m_sockets.begin(); iter != nm->m_sockets.end(); ++iter)
+		{
+			socket_ * sock = (socket_*)(*iter);
+			if (sock->m_need2resolved)
+			{
+				std::string domain_name = sock->m_domain;
+				struct sockaddr_in addr;
+				memcpy(&addr, &sock->m_peer, sizeof(addr));
+				pthread_mutex_unlock(&nm->m_mutex_sockets);
+				try
+				{
+					DomainNameResolver dnr(domain_name, &addr);
+					pthread_mutex_lock(&nm->m_mutex_sockets);
+					memcpy(&sock->m_peer, &addr, sizeof(addr));
+					if (nm->ConnectResolvedSocket(sock) != ERR_NO_ERROR)
+						nm->m_unresolved_sockets.insert((int)sock);
+				}
+				catch (Exception e)
+				{
+					pthread_mutex_lock(&nm->m_mutex_sockets);
+					nm->m_unresolved_sockets.insert((int)sock);
+				}
+				sock->m_need2resolved = false;
+				continue;
+			}
+			if (sock->m_timer == 0)
+				continue;
+			if (time(NULL) - sock->m_timer >= TIMEOUT && (sock->m_state == STATE_CONNECTION || (sock->m_epoll_events & EPOLLIN) != 0) && !sock->m_closed)
+			{
+
+				nm->m_timeout_sockets.insert((int)sock);
+				//std::cout<<"THREAD: Timeout on "<<inet_ntoa(sock->m_peer.sin_addr)<<std::endl;
+				continue;
+			}
+		}
+		pthread_mutex_unlock(&nm->m_mutex_sockets);
+		//pthread_mutex_unlock(&m_mutex_timeout_sockets);
+		//sleep(TIMEOUT);
+		usleep(200);
+	}
+	//std::cout<<"TIMEOUT_THREAD stopped\n";
+	return (void*)ret;
+}
+
+void NetworkManager::lock_mutex()
+{
+	pthread_mutex_lock(&m_mutex_sockets);
+}
+
+void NetworkManager::unlock_mutex()
+{
+	pthread_mutex_unlock(&m_mutex_sockets);
 }
 
 /*socket_ * NetworkManager::get_socket(int id)

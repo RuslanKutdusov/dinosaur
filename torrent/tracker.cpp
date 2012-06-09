@@ -80,7 +80,7 @@ network::socket_ * Tracker::get_sock()
 
 void Tracker::hash2urlencode()
 {
-	memset(m_infohash, 0, SHA1_LENGTH * 3);
+	memset(m_infohash, 0, SHA1_LENGTH * 3 + 1);
 	for(int i = 0; i < SHA1_LENGTH; i++)
 	{
 		m_infohash[i * 3] = '%';
@@ -104,7 +104,8 @@ int Tracker::send_request(TRACKER_EVENT event )
 	urn.append(m_infohash);
 
 	urn.append("&peer_id=");
-	char peer_id[PEER_ID_LENGTH];
+	char peer_id[PEER_ID_LENGTH + 1];
+	memset(peer_id, 0, PEER_ID_LENGTH + 1);
 	m_g_cfg->get_peer_id(peer_id);
 	urn.append(peer_id);
 
@@ -392,6 +393,13 @@ Tracker::~Tracker()
 {
 	if(m_peers != NULL)
 		delete[] m_peers;
+
+	if (m_sock != NULL)
+	{
+		m_nm->Socket_close(m_sock);
+		m_nm->Socket_delete(m_sock);
+	}
+	delete_socket();
 }
 
 }

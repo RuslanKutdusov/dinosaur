@@ -42,100 +42,7 @@ private:
 	pthread_mutex_t m_mutex;
 	bool m_thread_stop;
 	bool m_thread_pause;
-	static void * thread(void * arg)
-	{
-		int ret = 1;
-		Bittorrent * bt = (Bittorrent*)arg;
-		//printf("MAIN_THREAD started\n");
-		while(!bt->m_thread_stop)
-		{
-			if (bt->m_thread_pause)
-			{
-				sleep(1);
-				continue;
-			}
-			pthread_mutex_lock(&bt->m_mutex);
-			bt->m_nm.Wait();
-					//nm.test_view_socks();
-
-			network::socket_ * sock = NULL;
-
-			while(bt->m_nm.event_accepted_sock(bt->m_sock, &sock))
-			{
-				std::cout<<"ACCEPTED\n";
-				//network::sock_event * t = (network::sock_event *)bt->m_nm.Socket_get_assoc(sock);
-				//std::cout<<t<<" "<<bt<<std::endl;
-				//if (t != NULL)
-				bt->m_nm.Socket_set_assoc(sock, bt);
-			}
-			while(bt->m_nm.event_connected_sock(&sock))
-			{
-				//std::cout<<"CONNECTED: "<<sock->get_fd()<<std::endl;
-				network::sock_event * t = (network::sock_event *)bt->m_nm.Socket_get_assoc(sock);
-				if (t != NULL)
-					t->event_sock_connected(sock);
-			}
-			while(bt->m_nm.event_ready2read_sock(&sock))
-			{
-				//std::cout<<"READY2READ: "<<inet_ntoa(sock->m_peer.sin_addr)<<std::endl;
-				network::sock_event * t = (network::sock_event *)bt->m_nm.Socket_get_assoc(sock);
-				if (t != NULL)
-					t->event_sock_ready2read(sock);
-
-			}
-			while(bt->m_nm.event_closed_sock(&sock))
-			{
-				//std::cout<<"CLOSED: "<<sock->get_fd()<<std::endl;
-				network::sock_event * t = (network::sock_event *)bt->m_nm.Socket_get_assoc(sock);
-				if (t != NULL)
-					t->event_sock_closed(sock);
-			}
-			while(bt->m_nm.event_sended_socks(&sock))
-			{
-				//std::cout<<"SENDED "<<sock->get_fd()<<std::endl;
-				network::sock_event * t = (network::sock_event *)bt->m_nm.Socket_get_assoc(sock);
-				if (t != NULL)
-					t->event_sock_sended(sock);
-			}
-
-			while(bt->m_nm.event_timeout_on(&sock))
-			{
-				//std::cout<<"TIMEOUT "<<sock->get_fd()<<std::endl;
-				network::sock_event * t = (network::sock_event *)bt->m_nm.Socket_get_assoc(sock);
-				if (t != NULL)
-					t->event_sock_timeout(sock);
-			}
-
-			while(bt->m_nm.event_unresolved_sock(&sock))
-			{
-				//std::cout<<"TIMEOUT "<<sock->get_fd()<<std::endl;
-				network::sock_event * t = (network::sock_event *)bt->m_nm.Socket_get_assoc(sock);
-				if (t != NULL)
-					t->event_sock_unresolved(sock);
-			}
-			//bt->m_nm.test_view_socks();
-			fs::write_event eo;
-			eo.assoc = NULL;
-			if (bt->m_fm.get_write_event(&eo))
-			{
-				fs::file_event * f = (fs::file_event *)eo.assoc;
-				if (f != NULL)
-				{
-					f->event_file_write(&eo);
-				}
-				else
-					std::cout<<"f == NULL\n";
-			}
-			for(torrent_map_iter iter = bt->m_torrents.begin(); iter != bt->m_torrents.end(); ++iter)
-			{
-				(*iter).second->clock();
-			}
-			//usleep(50);
-			pthread_mutex_unlock(&bt->m_mutex);
-		}
-		//printf("MAIN_THREAD stopped\n");
-		return (void*)ret;
-	}
+	static void * thread(void * arg);
 	void bin2hex(unsigned char * bin, char * hex, int len);
 	void add_error_mes(std::string & mes);
 	int load_our_torrents();
@@ -147,6 +54,10 @@ public:
 	int AddTorrent(torrent::Torrent * torrent, std::string * hash);
 	int StartTorrent(std::string & hash, std::string & download_directory);
 	int StopTorrent(std::string & hash);
+	int PauseTorrent(std::string & hash);
+	int ContinueTorrent(std::string & hash);
+	int CheckTorrent(std::string & hash);
+	int DeleteTorrent(std::string & hash);
 	int Torrent_info(std::string & hash, torrent::torrent_info * info);
 	int get_TorrentList(std::list<std::string> * list);
 	int get_DownloadDirectory(std::string * dir);

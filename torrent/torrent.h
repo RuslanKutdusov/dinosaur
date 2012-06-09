@@ -127,7 +127,7 @@ private:
 	std::string m_host;//доменное имя хоста, где находится трекер, нужен для заголовка HTTP запроса (Host: bla-bla-bla)
 	std::string m_params;//параметры в анонсе, нужен для формирования URN в HTTP загловке запроса
 	network::socket_ * m_sock;
-	char m_infohash[SHA1_LENGTH * 3];//infohash в url encode
+	char m_infohash[SHA1_LENGTH * 3 + 1];//infohash в url encode
 	char m_buf[BUFFER_SIZE];//буфер, куда кидаем ответ от сервера
 	ssize_t m_buflen;//длина ответа в буфере
 	time_t m_last_update;
@@ -350,6 +350,7 @@ public:
 	tracker_info_list trackers;
 	file_list file_list_;
 	char info_hash_hex[SHA1_LENGTH * 2 + 1];
+	int progress;
 };
 
 class Torrent : public network::sock_event, public fs::file_event
@@ -446,6 +447,7 @@ public:
 	int add_incoming_peer(network::socket_ * sock);
 	int get_info(torrent_info * info);
 	int save_meta2file(const char * filepath);
+	int erase_state();
 	virtual ~Torrent();
 	friend class Tracker;
 	friend class Peer;

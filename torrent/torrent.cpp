@@ -728,12 +728,13 @@ int Torrent::check()
 			m_torrent_file.unmark_if_match(piece,block_index, peer);
 		}
 	}
-	for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
+	/*for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
 	{
 		(*iter).second->send_stopped();
-	}
+	}*/
 	m_task_queue.clear();
 	m_downloaded = 0;
+	m_pieces_to_download.clear();
 	memset(m_bitfield, 0, m_bitfield_len);
 	for(uint32_t i = 0; i < m_piece_count; i++)
 	{
@@ -833,7 +834,8 @@ int Torrent::clock()
 			//printf("Send have %u\n", *iter);
 			peer->send_have(*iter);
 		}
-		peer->clock();
+		if (m_state == TORRENT_STATE_STARTED)
+			peer->clock();
 	}
 	m_have_list.clear();
 
@@ -1024,6 +1026,10 @@ int Torrent::get_info(torrent_info * info)
 		f.second = m_files[i].length;
 		info->file_list_.push_back(f);
 	}
+	if (m_state == TORRENT_STATE_CHECKING)
+		info->progress = ((m_piece_count - m_task_queue.size()) * 100) / m_piece_count;
+	else
+		info->progress = (m_downloaded * 100) / m_length;
 	return ERR_NO_ERROR;
 }
 
@@ -1073,6 +1079,14 @@ int Torrent::save_meta2file(const char * filepath)
 	close(fd);
 	delete[] bencoded_metafile;
 	return ERR_NO_ERROR;
+}
+
+int Torrent::erase_state()
+{
+	remove(m_state_file_name.c_str());
+	std::string infohash_str = m_info_hash_hex;
+	std::string fname =  m_work_directory + infohash_str + ".torrent";
+	remove(fname.c_str());
 }
 
 } /* namespace TorrentNamespace */
