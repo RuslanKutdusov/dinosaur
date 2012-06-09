@@ -17,7 +17,6 @@
     <property name="default_width">600</property>
     <property name="default_height">600</property>
     <property name="type_hint">dialog</property>
-    <signal name="destroy" handler="on_open_dialog_close" swapped="no"/>
     <child internal-child="vbox">
       <object class="GtkVBox" id="dialog-vbox1">
         <property name="visible">True</property>
