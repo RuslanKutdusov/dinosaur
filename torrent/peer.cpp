@@ -425,6 +425,7 @@ end:
 
 int Peer::event_sock_ready2read(network::socket_ * sock)
 {
+	std::cout<<"PEER ready2read "<<m_ip<<std::endl;
 	int ret = m_nm->Socket_recv(sock, m_buf.data + m_buf.length, BUFFER_SIZE - m_buf.length);
 	if (ret != -1)
 		m_buf.length += ret;
@@ -437,6 +438,7 @@ int Peer::event_sock_ready2read(network::socket_ * sock)
 
 int Peer::event_sock_closed(network::socket_ * sock)
 {
+	std::cout<<"PEER closed "<<m_ip<<std::endl;
 	if (m_nm->Socket_datalen(sock) > 0)
 		event_sock_ready2read(sock);
 	goto_sleep();
@@ -446,14 +448,14 @@ int Peer::event_sock_closed(network::socket_ * sock)
 
 int Peer::event_sock_sended(network::socket_ * sock)
 {
-	//std::cout<<"PEER sended\n";
+	std::cout<<"PEER sended "<<m_ip<<std::endl;
 	return 0;
 
 }
 
 int Peer::event_sock_connected(network::socket_ * sock)
 {
-	//std::cout<<"PEER connected "<<m_ip<<std::endl;
+	std::cout<<"PEER connected "<<m_ip<<std::endl;
 	return 0;
 
 }
@@ -467,6 +469,7 @@ int Peer::event_sock_accepted(network::socket_ * sock)
 
 int Peer::event_sock_timeout(network::socket_ * sock)
 {
+	std::cout<<"PEER timeout "<<m_ip<<std::endl;
 	if (m_nm->Socket_datalen(sock) > 0)
 		event_sock_ready2read(sock);
 	goto_sleep();
@@ -498,7 +501,7 @@ int Peer::clock()
 		}
 		m_torrent->add_socket(m_sock, this);
 		m_state = PEER_STATE_SEND_HANDSHAKE;
-		//std::cout<<"PEER wake up "<<m_ip<<std::endl;
+		std::cout<<"PEER wake up "<<m_ip<<std::endl;
 	}
 	if (m_state == PEER_STATE_SEND_HANDSHAKE)
 	{
@@ -506,6 +509,7 @@ int Peer::clock()
 			goto_sleep();
 		if (send_bitfield() != ERR_NO_ERROR)
 			goto_sleep();
+		std::cout<<"PEER sended handshake and wait it"<<m_ip<<std::endl;
 		m_state = PEER_STATE_WAIT_HANDSHAKE;
 	}
 	if (!m_peer_choking)
@@ -517,6 +521,7 @@ int Peer::clock()
 	{
 		send_interested();
 		m_state = PEER_STATE_WAIT_UNCHOKE;
+		std::cout<<"PEER sended interested and wait unchoke"<<m_ip<<std::endl;
 	}
 	//если находимся в нужном состоянии и очередь не пуста
 	if ((m_state == PEER_STATE_GENERAL_READY || m_state == PEER_STATE_REQUEST_READY || m_state == PEER_STATE_WAIT_UNCHOKE) && !m_requests_queue.empty())
@@ -542,6 +547,8 @@ int Peer::clock()
 
 void Peer::goto_sleep()
 {
+	if (m_state == PEER_STATE_SLEEP)
+		return;
 	m_torrent->delete_socket(m_sock, this);
 	m_nm->Socket_delete(m_sock);
 	m_sock = NULL;
@@ -553,6 +560,7 @@ void Peer::goto_sleep()
 	//memset(m_bitfield, 0, m_torrent->m_bitfield_len);
 	m_sleep_time = time(NULL);
 	m_state = PEER_STATE_SLEEP;
+	std::cout<<"PEER is sleep"<<m_ip<<std::endl;
 }
 
 int Peer::wake_up(network::socket_ * sock, PEER_ADD peer_add)
@@ -579,9 +587,10 @@ int Peer::wake_up(network::socket_ * sock, PEER_ADD peer_add)
 			goto_sleep();
 			return ERR_INTERNAL;
 		}
+		m_torrent->add_socket(m_sock, this);
 		m_state = PEER_STATE_SEND_HANDSHAKE;
 	}
-	//std::cout<<"PEER wake up 2"<<m_ip<<std::endl;
+	std::cout<<"PEER wake up 2"<<m_ip<<std::endl;
 	return ERR_NO_ERROR;
 }
 
