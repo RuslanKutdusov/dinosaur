@@ -118,9 +118,7 @@ extern "C" void on_window1_destroy (GtkWidget *object, gpointer user_data)
 
 extern "C" void on_open_dialog_close (GtkWidget *object, gpointer user_data)
 {
-	open_dialog = NULL;
-	if (torrent2add != NULL)
-		delete torrent2add;
+
 }
 
 extern "C" void on_open_dialog_button_ok_clicked (GtkWidget *object, gpointer user_data)
@@ -158,6 +156,8 @@ extern "C" void on_open_dialog_button_cancel_clicked (GtkWidget *object, gpointe
 {
 	gtk_object_destroy(GTK_OBJECT(open_dialog));
 	open_dialog = NULL;
+		if (torrent2add != NULL)
+			delete torrent2add;
 }
 
 
