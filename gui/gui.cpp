@@ -14,6 +14,11 @@ GtkTreeView* torrent_view;
 GtkListStore* torrent_list;
 GtkListStore* tracker_list;
 GtkListStore* peer_list;
+GtkLabel* label_hash;
+GtkLabel* label_length;
+GtkLabel* label_dir;
+GtkLabel* label_piece_number;
+GtkLabel* label_piece_length;
 bittorrent::Bittorrent * bt;
 torrent::Torrent * torrent2add = NULL;
 
@@ -261,6 +266,18 @@ extern "C" void  on_torrent_view_cursor_changed(GtkWidget *object, gpointer user
 		torrent::torrent_info info;
 		bt->Torrent_info(hash, &info);
 
+		gtk_label_set_text(label_hash, hash.c_str());
+		gtk_label_set_text(label_dir, info.download_directory.c_str());
+		char chars[100];
+		sprintf(chars, "%llu", info.length);
+		gtk_label_set_text(label_length, chars);
+
+		sprintf(chars, "%llu", info.piece_length);
+		gtk_label_set_text(label_piece_length, chars);
+
+		sprintf(chars, "%u", info.piece_count);
+		gtk_label_set_text(label_piece_number, chars);
+
 		for(torrent::torrent_info::tracker_info_iter i = info.trackers.begin(); i != info.trackers.end(); ++i)
 		{
 			gtk_list_store_append(tracker_list, &iter);
@@ -368,34 +385,6 @@ gboolean on_timer(gpointer data)
 
 		gtk_tree_model_foreach(GTK_TREE_MODEL(tracker_list), foreach_tracker_list, (gpointer)&info);
 
-		/*for(torrent::torrent_info::peer_info_iter stl_peer_iter = info.peers.begin(); stl_peer_iter != info.peers.end(); ++stl_peer_iter)
-		{
-			GtkTreeIter gtk_peer_iter;
-			bool need_to_append = true;
-			if (gtk_tree_model_get_iter_first(GTK_TREE_MODEL(peer_list), &gtk_peer_iter))
-			{
-				while(gtk_tree_model_iter_next(GTK_TREE_MODEL(peer_list), &gtk_peer_iter))
-				{
-					gchar * g_ip;
-					gtk_tree_model_get (GTK_TREE_MODEL(peer_list), &gtk_peer_iter, PEER_LIST_COL_IP, &g_ip, -1);
-					g_print("%s\n", g_ip);
-					std::string ip = g_ip;
-					g_free(g_ip);
-					std::string stl_peer_iter_ip = (*stl_peer_iter).ip;
-					if (ip == stl_peer_iter_ip)
-					{
-						gtk_list_store_set (peer_list, &gtk_peer_iter,
-											PEER_LIST_COL_DOWNLOADED, (gfloat)(*stl_peer_iter).downloaded,
-											PEER_LIST_COL_UPLOADED, (gfloat)(*stl_peer_iter).uploaded,
-											PEER_LIST_COL_DOWN_SPEED, (gfloat)(*stl_peer_iter).downSpeed,
-											PEER_LIST_COL_UP_SPEED, (gfloat)(*stl_peer_iter).upSpeed,
-											PEER_LIST_COL_AVAILABLE, (gfloat)(*stl_peer_iter).available,
-											-1);
-						need_to_append = false;
-					}
-				}
-			}
-		}*/
 		gtk_list_store_clear(peer_list);
 		for(torrent::torrent_info::peer_info_iter i = info.peers.begin(); i != info.peers.end(); ++i)
 		{
@@ -487,6 +476,41 @@ void init_gui()
 			g_critical ("Ошибка при получении виджета диалога");
 	}
 
+	label_hash = GTK_LABEL(gtk_builder_get_object (builder, "label_hash"));
+	if (!label_hash)
+	{
+			/* что-то не так, наверное, ошиблись в имени */
+			g_critical ("Ошибка при получении виджета диалога");
+	}
+
+	label_length = GTK_LABEL(gtk_builder_get_object (builder, "label_length"));
+	if (!label_length)
+	{
+			/* что-то не так, наверное, ошиблись в имени */
+			g_critical ("Ошибка при получении виджета диалога");
+	}
+
+	label_dir = GTK_LABEL(gtk_builder_get_object (builder, "label_dir"));
+	if (!label_dir)
+	{
+			/* что-то не так, наверное, ошиблись в имени */
+			g_critical ("Ошибка при получении виджета диалога");
+	}
+
+	label_piece_number = GTK_LABEL(gtk_builder_get_object (builder, "label_piece_number"));
+	if (!label_piece_number)
+	{
+			/* что-то не так, наверное, ошиблись в имени */
+			g_critical ("Ошибка при получении виджета диалога");
+	}
+
+	label_piece_length = GTK_LABEL(gtk_builder_get_object (builder, "label_piece_length"));
+	if (!label_piece_length)
+	{
+			/* что-то не так, наверное, ошиблись в имени */
+			g_critical ("Ошибка при получении виджета диалога");
+	}
+
 	g_object_unref (builder);
 
 	g_timeout_add_seconds(1,on_timer,NULL);
@@ -526,6 +550,35 @@ void show_open_dialog()
 			g_critical ("Ошибка при получении виджета диалога");
 	}
 
+	GtkLabel* label_hash = GTK_LABEL(gtk_builder_get_object (builder, "label_hash"));
+	if (!label_hash)
+	{
+			/* что-то не так, наверное, ошиблись в имени */
+			g_critical ("Ошибка при получении виджета диалога");
+	}
+
+	GtkLabel* label_length = GTK_LABEL(gtk_builder_get_object (builder, "label_length"));
+	if (!label_length)
+	{
+			/* что-то не так, наверное, ошиблись в имени */
+			g_critical ("Ошибка при получении виджета диалога");
+	}
+
+
+	GtkLabel* label_piece_number = GTK_LABEL(gtk_builder_get_object (builder, "label_piece_number"));
+	if (!label_piece_number)
+	{
+			/* что-то не так, наверное, ошиблись в имени */
+			g_critical ("Ошибка при получении виджета диалога");
+	}
+
+	GtkLabel* label_piece_length = GTK_LABEL(gtk_builder_get_object (builder, "label_piece_length"));
+	if (!label_piece_length)
+	{
+			/* что-то не так, наверное, ошиблись в имени */
+			g_critical ("Ошибка при получении виджета диалога");
+	}
+
 	open_dialog_dir_chooser = GTK_FILE_CHOOSER_WIDGET(gtk_builder_get_object (builder, "filechooserwidget1"));
 	if (!open_dialog_dir_chooser)
 	{
@@ -533,10 +586,26 @@ void show_open_dialog()
 			g_critical ("Ошибка при получении виджета диалога");
 	}
 
+
+
+
+
 	g_object_unref (builder);
 
 	torrent::torrent_info info;
 	torrent2add->get_info(&info);
+
+	gtk_label_set_text(label_hash, info.info_hash_hex);
+	char chars[100];
+	sprintf(chars, "%llu", info.length);
+	gtk_label_set_text(label_length, chars);
+
+	sprintf(chars, "%llu", info.piece_length);
+	gtk_label_set_text(label_piece_length, chars);
+
+	sprintf(chars, "%u", info.piece_count);
+	gtk_label_set_text(label_piece_number, chars);
+
 
 	GtkTreeIter   iter;
 	for(torrent::torrent_info::file_list_iter i = info.file_list_.begin(); i != info.file_list_.end(); ++i)

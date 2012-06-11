@@ -388,7 +388,7 @@ int Torrent::Init(std::string metafile, network::NetworkManager * nm, cfg::Glob_
 	init_members(nm, g_cfg, fm, bc, work_directory);
 	m_new = is_new;
 	try{
-		char * buf = read_file(metafile.c_str(), &m_metafile_len);
+		char * buf = read_file(metafile.c_str(), &m_metafile_len, MAX_TORRENT_FILE_LENGTH);
 		if (buf == NULL)
 		{
 			m_error = TORRENT_ERROR_IO_ERROR;
@@ -632,7 +632,7 @@ int Torrent::start(std::string & download_directory)
 
 int Torrent::stop()
 {
-	if (m_state == TORRENT_STATE_NONE)
+	if (m_state == TORRENT_STATE_NONE && m_state != TORRENT_STATE_CHECKING)
 		return ERR_INTERNAL;
 	for(peer_map_iter p = m_peers.begin(); p != m_peers.end(); ++p)
 	{
@@ -657,7 +657,7 @@ int Torrent::stop()
 
 int Torrent::pause()
 {
-	if (m_state != TORRENT_STATE_STARTED)
+	if (m_state != TORRENT_STATE_STARTED && m_state != TORRENT_STATE_CHECKING)
 		return ERR_INTERNAL;
 	for(peer_map_iter p = m_peers.begin(); p != m_peers.end(); ++p)
 	{
@@ -742,6 +742,7 @@ int Torrent::check()
 		task.task = TORRENT_TASK_CHECK_HASH;
 		task.task_data = i;
 		m_task_queue.push_back(task);
+		m_pieces_to_download.insert(i);
 	}
 	m_state = TORRENT_STATE_CHECKING;
 	return ERR_NO_ERROR;
@@ -844,6 +845,7 @@ int Torrent::clock()
 
 	if (m_task_queue.front().task == TORRENT_TASK_CHECK_HASH)
 	{
+		//printf("Checking %llu", m_task_queue.front().task_data);
 		m_torrent_file.check_piece_hash(m_task_queue.front().task_data);
 		m_task_queue.pop_front();
 		if (m_task_queue.empty())
@@ -948,6 +950,7 @@ int Torrent::event_piece_hash(uint32_t piece_index, bool ok, bool error)
 		m_downloaded +=m_torrent_file.m_piece_info[piece_index].length;
 		set_bitfield(piece_index, m_piece_count, m_bitfield);
 		save_state();
+		m_pieces_to_download.erase(piece_index);
 		//printf("Piece %d OK\n", piece_index);
 		//printf("rx=%f tx=%f done=%d downloaded=%llu\n", m_rx_speed, m_tx_speed, m_pieces_to_download.size(), m_downloaded);
 	}
@@ -992,6 +995,7 @@ int Torrent::get_info(torrent_info * info)
 	info->comment = m_comment;
 	info->created_by = m_created_by;
 	info->creation_date = m_creation_date;
+	info->download_directory = m_download_directory;
 	info->downloaded = m_downloaded;
 	info->length = m_length;
 	info->name = m_name;
@@ -1087,6 +1091,7 @@ int Torrent::erase_state()
 	std::string infohash_str = m_info_hash_hex;
 	std::string fname =  m_work_directory + infohash_str + ".torrent";
 	remove(fname.c_str());
+	return ERR_NO_ERROR;
 }
 
 } /* namespace TorrentNamespace */

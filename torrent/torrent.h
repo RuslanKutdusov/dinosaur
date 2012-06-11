@@ -337,6 +337,7 @@ public:
 	std::string name;
 	std::string comment;
 	std::string created_by;
+	std::string download_directory;
 	uint64_t creation_date;
 	uint64_t private_;
 	uint64_t length;

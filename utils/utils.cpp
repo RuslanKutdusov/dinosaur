@@ -23,7 +23,7 @@ uint32_t get_block_from_id(uint64_t id)
 	return (id & (uint32_t)4294967295);
 }
 
-char *read_file(const char *file, uint64_t *len)
+char *read_file(const char *file, uint64_t *len, uint64_t max_len)
 {
 	struct stat st;
 	char *ret = NULL;
@@ -32,6 +32,9 @@ char *read_file(const char *file, uint64_t *len)
 	if (stat(file, &st))
 		return ret;
 	*len = st.st_size;
+
+	if (*len > max_len)
+		return NULL;
 
 	fp = fopen(file, "r");
 	if (!fp)

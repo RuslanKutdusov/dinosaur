@@ -289,7 +289,7 @@ void bencode_test()
 	string metafile;
 	cin>>metafile;
 	uint64_t len;
-	char * buf = read_file(metafile.c_str(), &len);
+	char * buf = read_file(metafile.c_str(), &len, 10000000);
 	if (buf == NULL)
 	{
 		return;
