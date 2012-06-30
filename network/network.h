@@ -16,6 +16,8 @@
 #include <time.h>
 #include <pthread.h>
 #include <pcre.h>
+#include <boost/shared_ptr.hpp>
+#include <boost/enable_shared_from_this.hpp>
 #include "../exceptions/exceptions.h"
 #include "../err/err_code.h"
 
@@ -52,7 +54,8 @@ struct buffer
 
 class NetworkManager;
 class socket_;
-typedef std::set<socket_*> 		 socket_set;
+typedef boost::shared_ptr<socket_> Socket;
+typedef std::set<Socket> 		 socket_set;
 typedef socket_set::iterator socket_set_iter;
 
 class DomainNameResolver
@@ -69,6 +72,22 @@ public:
 	~DomainNameResolver(){}
 };
 
+class SocketAssociation : public boost::enable_shared_from_this<SocketAssociation>
+{
+public:
+	SocketAssociation(){}
+	virtual ~SocketAssociation(){}
+	virtual int event_sock_ready2read(Socket sock) = 0;
+	virtual int event_sock_closed(Socket  sock) = 0;
+	virtual int event_sock_sended(Socket  sock) = 0;
+	virtual int event_sock_connected(Socket  sock) = 0;
+	virtual int event_sock_accepted(Socket  sock) = 0;
+	virtual int event_sock_timeout(Socket  sock) = 0;
+	virtual int event_sock_unresolved(Socket  sock) = 0;
+};
+
+typedef boost::shared_ptr<SocketAssociation> SocketAssociationPtr;
+
 class socket_
 {
 private:
@@ -78,8 +97,7 @@ private:
 	int m_state;
 	int m_socket;
 	bool m_closed;
-	void * m_assoc;
-
+	SocketAssociationPtr m_assoc;
 	socket_set m_accepted_sockets;
 	bool m_connected;
 	int m_errno;
@@ -94,7 +112,7 @@ private:
 public:
 	struct sockaddr_in m_peer;
 	socket_()
-	:m_state(0), m_socket(-1), m_closed(true), m_assoc(NULL), m_connected(false), m_errno(0), m_timer(0), m_rx_last_time(get_time()),m_tx_last_time(get_time()),
+	:m_state(0), m_socket(-1), m_closed(true), m_connected(false), m_errno(0), m_timer(0), m_rx_last_time(get_time()),m_tx_last_time(get_time()),
 	 m_rx(0.0f), m_tx(0.0f), m_need2resolved(false), m_need2delete(false)
 	{	}
 	~socket_()
@@ -145,6 +163,9 @@ public:
 	NetworkManager();
 	int Init();
 	~NetworkManager();
+	int Socket_add(std::string & ip, uint16_t port, const SocketAssociationPtr & assoc, Socket & socket);
+	int Socket_add(const char * ip, uint16_t port, const SocketAssociationPtr & assoc, Socket & socket);
+	int Socket_add(sock_addr_in *addr, const SocketAssociationPtr & assoc, Socket & socket);
 	socket_ * Socket_add(std::string & ip, uint16_t port, void * assoc, bool lock_mutex = true);//
 	socket_ * Socket_add(const char * ip, uint16_t port, void * assoc, bool lock_mutex = true);
 	socket_ * Socket_add_domain(const char *domain_name, uint16_t port, void * assoc, bool lock_mutex = true);
@@ -226,17 +247,4 @@ public:
 	int Wait();
 };
 
-class sock_event
-{
-public:
-	sock_event(){}
-	virtual ~sock_event(){}
-	virtual int event_sock_ready2read(socket_ * sock) = 0;
-	virtual int event_sock_closed(socket_ * sock) = 0;
-	virtual int event_sock_sended(socket_ * sock) = 0;
-	virtual int event_sock_connected(socket_ * sock) = 0;
-	virtual int event_sock_accepted(socket_ * sock) = 0;
-	virtual int event_sock_timeout(socket_ * sock) = 0;
-	virtual int event_sock_unresolved(network::socket_* sock) = 0;
-};
 }
