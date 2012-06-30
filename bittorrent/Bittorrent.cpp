@@ -571,8 +571,6 @@ void * Bittorrent::thread(void * arg)
 			{
 				f->event_file_write(&eo);
 			}
-			else
-				std::cout<<"f == NULL\n";
 		}
 		for(torrent_map_iter iter = bt->m_torrents.begin(); iter != bt->m_torrents.end(); ++iter)
 		{

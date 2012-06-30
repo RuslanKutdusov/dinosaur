@@ -52,7 +52,7 @@ struct buffer
 
 class NetworkManager;
 class socket_;
-typedef std::set<int> 		 socket_set;
+typedef std::set<socket_*> 		 socket_set;
 typedef socket_set::iterator socket_set_iter;
 
 class DomainNameResolver
@@ -90,12 +90,12 @@ private:
 	uint32_t m_tx;
 	bool m_need2resolved;
 	std::string m_domain;
-
+	bool m_need2delete;
 public:
 	struct sockaddr_in m_peer;
 	socket_()
 	:m_state(0), m_socket(-1), m_closed(true), m_assoc(NULL), m_connected(false), m_errno(0), m_timer(0), m_rx_last_time(get_time()),m_tx_last_time(get_time()),
-	 m_rx(0.0f), m_tx(0.0f), m_need2resolved(false)
+	 m_rx(0.0f), m_tx(0.0f), m_need2resolved(false), m_need2delete(false)
 	{	}
 	~socket_()
 	{

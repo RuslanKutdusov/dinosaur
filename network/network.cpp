@@ -266,11 +266,6 @@ socket_ * NetworkManager::ListenSocket_add(uint16_t port, void * assoc, bool loc
 int NetworkManager::Wait()
 {
 	struct epoll_event events[MAX_EPOLL_EVENT];
-	/*for(socket_map_iter iter = m_sockets.begin(); iter != m_sockets.end(); ++iter)
-	{
-		std::cout<<"Sockets: "<<(*iter).first<<std::endl;
-	}
-	std::cout<<"epoll_wait\n";*/
 	int nfds = epoll_wait(m_epoll_fd, events, MAX_EPOLL_EVENT, 80);
 	if (nfds == -1)
 	{
@@ -279,23 +274,16 @@ int NetworkManager::Wait()
 	pthread_mutex_lock(&m_mutex_sockets);
 	for(int i=0; i<nfds; i++)
 	{
-		//struct socket_ * sock=(struct socket_ *)events[i].data.ptr;
 		socket_ * sock = (socket_ *)events[i].data.ptr;
 		sock->m_timer = time(NULL);
 		bool need2send = buffer_remain(&sock->m_send_buffer) > 0;
-		//if (!need2send)
-		//	m_sended_sockets.erase(sock->m_id);
 		bool connected = sock->m_connected;
-		//if (connected)
-		//	m_connected_sockets.erase(sock->m_id);
 
 		if (handle_event(sock, events[i].events) == ERR_SYSCALL_ERROR)
 			sock->m_errno = errno;
 
 		if (buffer_remain(&sock->m_recv_buffer) > 0)
 			m_ready2read_sockets.insert((int)sock);
-		//else
-		//	m_ready2read_sockets.erase(sock->m_id);
 
 		if (need2send && buffer_remain(&sock->m_send_buffer) == 0)
 			m_sended_sockets.insert((int)sock);
@@ -306,16 +294,37 @@ int NetworkManager::Wait()
 		if (sock->m_closed)
 			m_closed_sockets.insert((int)sock);
 	}
+	for(socket_map_iter iter = m_sockets.begin(), iter_;
+								iter != m_sockets.end();
+								iter = iter_)
+	{
+		task_iter_ = task_iter;
+							++task_iter_;
+		socket_ * sock = *iter;
+		if (sock->m_time != 0 &&
+			time(NULL) - sock->m_timer >= TIMEOUT &&
+			(sock->m_state == STATE_CONNECTION || (sock->m_epoll_events & EPOLLIN) != 0) &&
+			!sock->m_closed)
+		{
+			nm->m_timeout_sockets.insert(sock);
+		}
+		if (sock->m_need2delete)
+		{
+			m_ready2read_sockets.erase(sock);
+			m_sended_sockets.erase(sock);
+			m_closed_sockets.erase(sock);
+			m_timeout_sockets.erase(sock);
+			m_unresolved_sockets.erase(sock);
+			m_connected_sockets.erase(sock);
+		}
+	}
+
 	pthread_mutex_unlock(&m_mutex_sockets);
 	return 0;
 }
 
 int NetworkManager::Socket_send(socket_ * sock, const void * data, size_t len, bool full)
 {
-	//struct socket_ * sock = m_sockets[id];
-	//pthread_mutex_lock(&m_mutex_sockets);
-	//socket_ * sock = get_socket(id);//m_sockets[id];
-	//pthread_mutex_unlock(&m_mutex_sockets);
 	if (sock == NULL)
 		return ERR_BAD_ARG;
 	if (sock->m_closed)
@@ -392,13 +401,10 @@ int NetworkManager::Socket_delete(socket_ * sock)
 		pthread_mutex_unlock(&m_mutex_sockets);
 		return ERR_BAD_ARG;
 	}
-	m_ready2read_sockets.erase((int)sock);
-	m_sended_sockets.erase((int)sock);
-	m_closed_sockets.erase((int)sock);
-	m_timeout_sockets.erase((int)sock);
-	m_unresolved_sockets.erase((int)sock);
-	m_sockets.erase((int)sock);
-	delete sock;
+	sock->m_need2delete = true;
+	_close(sock);
+	//m_sockets.erase((int)sock);
+	//delete sock;
 	pthread_mutex_unlock(&m_mutex_sockets);
 	return ERR_NO_ERROR;
 }
@@ -939,15 +945,6 @@ void * NetworkManager::timeout_thread(void * arg)
 					nm->m_unresolved_sockets.insert((int)sock);
 				}
 				sock->m_need2resolved = false;
-				continue;
-			}
-			if (sock->m_timer == 0)
-				continue;
-			if (time(NULL) - sock->m_timer >= TIMEOUT && (sock->m_state == STATE_CONNECTION || (sock->m_epoll_events & EPOLLIN) != 0) && !sock->m_closed)
-			{
-
-				nm->m_timeout_sockets.insert((int)sock);
-				//std::cout<<"THREAD: Timeout on "<<inet_ntoa(sock->m_peer.sin_addr)<<std::endl;
 				continue;
 			}
 		}

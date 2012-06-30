@@ -951,7 +951,7 @@ int Torrent::event_piece_hash(uint32_t piece_index, bool ok, bool error)
 		set_bitfield(piece_index, m_piece_count, m_bitfield);
 		save_state();
 		m_pieces_to_download.erase(piece_index);
-		//printf("Piece %d OK\n", piece_index);
+		printf("Piece %d OK\n", piece_index);
 		//printf("rx=%f tx=%f done=%d downloaded=%llu\n", m_rx_speed, m_tx_speed, m_pieces_to_download.size(), m_downloaded);
 	}
 	if (!ok || error)
@@ -967,7 +967,7 @@ int Torrent::event_piece_hash(uint32_t piece_index, bool ok, bool error)
 		}
 		reset_bitfield(piece_index, m_piece_count, m_bitfield);
 		save_state();
-		//printf("Piece %d BAD\n", piece_index);
+		printf("Piece %d BAD\n", piece_index);
 		//printf("rx=%f tx=%f done=%d downloaded=%llu\n", m_rx_speed, m_tx_speed, m_pieces_to_download.size(), m_downloaded);
 	}
 	return ERR_NO_ERROR;
