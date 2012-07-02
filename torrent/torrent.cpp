@@ -82,7 +82,9 @@ Torrent::Torrent()
 
 Torrent::~Torrent()
 {
+	printf("Torrent destructor\n");
 	release();
+	printf("Torrent destroyed\n");
 }
 
 void Torrent::release()
@@ -99,12 +101,14 @@ void Torrent::release()
 		delete[] m_files;
 	for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
 	{
-		delete (*iter).second;
+		(*iter).second->DeleteSocket();
 	}
 	for(peer_map_iter iter = m_peers.begin(); iter != m_peers.end(); ++iter)
 	{
-		delete (*iter).second;
+		(*iter).second->DeleteSocket();
 	}
+	m_trackers.clear();
+	m_peers.clear();
 	if (m_bitfield != NULL)
 		delete[] m_bitfield;
 	//std::cout<<"Torrent released\n";
@@ -432,7 +436,7 @@ int Torrent::Init(std::string metafile, network::NetworkManager * nm, cfg::Glob_
 			}
 		}
 	}
-	catch( std::bad_alloc )
+	catch( std::bad_alloc & e)
 	{
 		m_error = GENERAL_ERROR_NO_MEMORY_AVAILABLE;
 		return ERR_INTERNAL;
@@ -521,9 +525,9 @@ void Torrent::take_peers(int count, sockaddr_in * addrs)
 			//если такого пира у нас нет, добавляем его
 			if (m_peers.count(key) == 0)
 			{
-				Peer * peer = new Peer(&addrs[i],this, PEER_ADD_TRACKER);
-				add_socket(peer->get_sock(), peer);
-				m_peers[key] = peer;
+				//PeerPtr peer(new Peer());
+				//peer->Init(&addrs[i], this, PEER_ADD_TRACKER);
+				//m_peers[key] = peer;
 			}
 		}
 		catch(NoneCriticalException & e)
@@ -533,25 +537,18 @@ void Torrent::take_peers(int count, sockaddr_in * addrs)
 	}
 }
 
-void Torrent::delete_peer(Peer * peer)
+void Torrent::delete_peer(PeerPtr & peer)
 {
 	if (peer != NULL)
 	{
 		//m_sockets.erase(peer->get_sock_id());
-		delete_socket(peer->get_sock(), peer);
+		//peer->DeleteSocket();
 		m_peers.erase(peer->get_ip_str());
-		while(!peer->no_requested_blocks())
-		{
-			uint64_t id = peer->get_requested_block();
-			uint32_t block_index = get_block_from_id(id);//(id & (uint32_t)4294967295);
-			uint32_t piece = get_piece_from_id(id);//(id - block_index)>>32;
-			m_torrent_file.unmark_if_match(piece,block_index, peer);
-		}
-		delete peer;
+		peer.reset();
 	}
 }
 
-int Torrent::add_incoming_peer(network::socket_ * sock)
+int Torrent::add_incoming_peer(network::Socket & sock)
 {
 	if (sock == NULL)
 		return ERR_NULL_REF;
@@ -560,19 +557,15 @@ int Torrent::add_incoming_peer(network::socket_ * sock)
 		std::string key;
 		get_peer_key(&sock->m_peer, &key);
 		//printf("add incoming peer %s\n", key.c_str());
-		if (m_peers.count(key) == 0)
+		if (m_peers.count(key) == 0 || m_peers[key] == NULL)
 		{
-			//printf("peer not exists %s\n", key.c_str());
-			Peer * peer = new Peer(sock, this, PEER_ADD_INCOMING);
-			add_socket(peer->get_sock(), peer);
+			PeerPtr peer(new Peer());
+			peer->Init(sock, this, PEER_ADD_INCOMING);
 			m_peers[key] = peer;
 		}
 		else
 		{
-			//printf("peer exists, waking up %s\n", key.c_str());
-			Peer * peer = m_peers[key];
-			add_socket(sock, peer);
-			peer->wake_up(sock, PEER_ADD_INCOMING);
+			m_peers[key]->wake_up(sock, PEER_ADD_INCOMING);
 		}
 		return ERR_NO_ERROR;
 	}
@@ -582,6 +575,7 @@ int Torrent::add_incoming_peer(network::socket_ * sock)
 		return ERR_INTERNAL;
 		//continue;
 	}
+	return ERR_NO_ERROR;
 }
 
 int Torrent::start(std::string & download_directory)
@@ -600,20 +594,17 @@ int Torrent::start(std::string & download_directory)
 		for (std::vector<std::string>::iterator iter = m_announces.begin(); iter != m_announces.end(); ++iter)
 		{
 			//std::cout<<*iter<<std::endl;
-			Tracker * temp;
+			TrackerPtr temp;
 			try
 			{
-				temp = new Tracker(this, *iter);
+				temp.reset(new Tracker(this, *iter));
+				m_trackers[*iter] = temp;
 			}
 			catch(NoneCriticalException & e)
 			{
 				e.print();
 				continue;
 			}
-			m_trackers[*iter] = temp;
-			network::socket_ * sock = temp->get_sock();
-			if (sock != NULL)
-				m_sockets[sock] = temp;
 		}
 		for(std::set<uint32_t>::iterator i = m_pieces_to_download.begin();
 					i != m_pieces_to_download.end(); ++i)
@@ -636,15 +627,7 @@ int Torrent::stop()
 		return ERR_INTERNAL;
 	for(peer_map_iter p = m_peers.begin(); p != m_peers.end(); ++p)
 	{
-		Peer * peer = (*p).second;
-		peer->goto_sleep();
-		while(!peer->no_requested_blocks())
-		{
-			uint64_t id = peer->get_requested_block();
-			uint32_t block_index = get_block_from_id(id);//(id & (uint32_t)4294967295);
-			uint32_t piece = get_piece_from_id(id);//(id - block_index)>>32;
-			m_torrent_file.unmark_if_match(piece,block_index, peer);
-		}
+		(*p).second->goto_sleep();
 	}
 	for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
 	{
@@ -661,15 +644,7 @@ int Torrent::pause()
 		return ERR_INTERNAL;
 	for(peer_map_iter p = m_peers.begin(); p != m_peers.end(); ++p)
 	{
-		Peer * peer = (*p).second;
-		peer->goto_sleep();
-		while(!peer->no_requested_blocks())
-		{
-			uint64_t id = peer->get_requested_block();
-			uint32_t block_index = get_block_from_id(id);//(id & (uint32_t)4294967295);
-			uint32_t piece = get_piece_from_id(id);//(id - block_index)>>32;
-			m_torrent_file.unmark_if_match(piece,block_index, peer);
-		}
+		(*p).second->goto_sleep();
 	}
 	for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
 	{
@@ -686,8 +661,8 @@ int Torrent::continue_()
 		return ERR_INTERNAL;
 	for(peer_map_iter p = m_peers.begin(); p != m_peers.end(); ++p)
 	{
-		Peer * peer = (*p).second;
-		peer->wake_up(NULL, PEER_ADD_TRACKER);
+		network::Socket sock;
+		(*p).second->wake_up(sock, PEER_ADD_TRACKER);
 	}
 	for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
 	{
@@ -718,20 +693,8 @@ int Torrent::check()
 		return ERR_INTERNAL;
 	for(peer_map_iter p = m_peers.begin(); p != m_peers.end(); ++p)
 	{
-		Peer * peer = (*p).second;
-		peer->goto_sleep();
-		while(!peer->no_requested_blocks())
-		{
-			uint64_t id = peer->get_requested_block();
-			uint32_t block_index = get_block_from_id(id);//(id & (uint32_t)4294967295);
-			uint32_t piece = get_piece_from_id(id);//(id - block_index)>>32;
-			m_torrent_file.unmark_if_match(piece,block_index, peer);
-		}
+		(*p).second->goto_sleep();
 	}
-	/*for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
-	{
-		(*iter).second->send_stopped();
-	}*/
 	m_task_queue.clear();
 	m_downloaded = 0;
 	m_pieces_to_download.clear();
@@ -751,7 +714,7 @@ int Torrent::check()
 
 int Torrent::handle_download_task()
 {
-	for(peer_map_iter p = m_peers.begin(); p != m_peers.end(); ++p)
+	/*for(peer_map_iter p = m_peers.begin(); p != m_peers.end(); ++p)
 	{
 		Peer * peer = (*p).second;
 		if(peer->may_request() && !peer->request_limit() && m_state == TORRENT_STATE_STARTED)
@@ -812,7 +775,7 @@ int Torrent::handle_download_task()
 				m_torrent_file.unmark_if_match(piece,block_index, peer);
 			}
 		}
-	}
+	}*/
 	return ERR_NO_ERROR;
 }
 
@@ -825,14 +788,13 @@ int Torrent::clock()
 		return ERR_NO_ERROR;
 	for(peer_map_iter p = m_peers.begin(); p != m_peers.end(); ++p)
 	{
-		Peer * peer = (*p).second;
+		PeerPtr peer = (*p).second;
 		m_rx_speed += peer->get_rx_speed();
 		m_tx_speed += peer->get_tx_speed();
 		for(std::list<uint32_t>::iterator iter = m_have_list.begin();
 				iter != m_have_list.end();
 				++iter)
 		{
-			//printf("Send have %u\n", *iter);
 			peer->send_have(*iter);
 		}
 		if (m_state == TORRENT_STATE_STARTED)
@@ -860,82 +822,6 @@ int Torrent::clock()
 	return 0;
 }
 
-network::sock_event * Torrent::get_sock_event(network::socket_ * sock)
-{
-	socket_map_iter iter = m_sockets.find(sock);
-	if (iter == m_sockets.end() && m_sockets.count(sock) == 0)
-		return NULL;
-	return (*iter).second;
-}
-
-int Torrent::event_sock_ready2read(network::socket_ * sock)
-{
-	//std::cout<<"TORRENT event_sock_ready2read "<<sock_id<<" "<<m_name<<std::endl;
-	network::sock_event * se = get_sock_event(sock);//m_sockets[sock_id];
-	if (se == NULL)
-		return ERR_BAD_ARG;
-	se->event_sock_ready2read(sock);
-	return 0;
-}
-
-int Torrent::event_sock_closed(network::socket_ * sock)
-{
-	//std::cout<<"TORRENT event_sock_closed "<<sock_id<<" "<<m_name<<std::endl;
-	network::sock_event * se = get_sock_event(sock);//m_sockets[sock_id];
-	if (se == NULL)
-		return ERR_BAD_ARG;
-	se->event_sock_closed(sock);
-	return 0;
-}
-
-int Torrent::event_sock_sended(network::socket_ * sock)
-{
-	//std::cout<<"TORRENT event_sock_sended "<<sock_id<<" "<<m_name<<std::endl;
-	network::sock_event * se = get_sock_event(sock);//m_sockets[sock_id];
-	if (se == NULL)
-		return ERR_BAD_ARG;
-	se->event_sock_sended(sock);
-	return 0;
-}
-
-int Torrent::event_sock_connected(network::socket_ * sock)
-{
-	//std::cout<<"TORRENT event_sock_connected "<<sock_id<<" "<<m_name<<std::endl;
-	network::sock_event * se = get_sock_event(sock);//m_sockets[sock_id];
-	if (se == NULL)
-		return ERR_BAD_ARG;
-	se->event_sock_connected(sock);
-	return 0;
-}
-
-int Torrent::event_sock_accepted(network::socket_ * sock)
-{
-	//std::cout<<"TORRENT event_sock_accepted "<<sock_id<<" "<<m_name<<std::endl;
-	network::sock_event * se = get_sock_event(sock);//m_sockets[sock_id];
-	if (se == NULL)
-		return ERR_BAD_ARG;
-	se->event_sock_accepted(sock);
-	return 0;
-}
-
-int Torrent::event_sock_timeout(network::socket_ * sock)
-{
-	network::sock_event * se = get_sock_event(sock);//m_sockets[sock_id];
-	if (se == NULL)
-		return ERR_BAD_ARG;
-	se->event_sock_timeout(sock);
-	return 0;
-}
-
-int Torrent::event_sock_unresolved(network::socket_* sock)
-{
-	network::sock_event * se = get_sock_event(sock);//m_sockets[sock_id];
-	if (se == NULL)
-		return ERR_BAD_ARG;
-	se->event_sock_unresolved(sock);
-	return 0;
-}
-
 int Torrent::event_file_write(fs::write_event * eo)
 {
 	return m_torrent_file.event_file_write(eo);
@@ -956,7 +842,6 @@ int Torrent::event_piece_hash(uint32_t piece_index, bool ok, bool error)
 	}
 	if (!ok || error)
 	{
-		m_torrent_file.restore_piece2download(piece_index);
 		m_pieces_to_download.insert(piece_index);
 		if (m_state == TORRENT_STATE_STARTED)
 		{
@@ -971,21 +856,6 @@ int Torrent::event_piece_hash(uint32_t piece_index, bool ok, bool error)
 		//printf("rx=%f tx=%f done=%d downloaded=%llu\n", m_rx_speed, m_tx_speed, m_pieces_to_download.size(), m_downloaded);
 	}
 	return ERR_NO_ERROR;
-}
-
-void Torrent::delete_socket(network::socket_ * sock, network::sock_event * se)
-{
-	socket_map_iter iter = m_sockets.find(sock);
-	if (iter == m_sockets.end() && m_sockets.count(sock) == 0)
-		return;
-	if ((*iter).second == se)
-		m_sockets.erase(iter);
-}
-
-void Torrent::add_socket(network::socket_ * sock, network::sock_event * se)
-{
-	if (sock != NULL)
-		m_sockets[sock] = se;
 }
 
 int Torrent::get_info(torrent_info * info)
@@ -1008,8 +878,8 @@ int Torrent::get_info(torrent_info * info)
 	memcpy(info->info_hash_hex, m_info_hash_hex, SHA1_LENGTH * 2 + 1);
 	for(peer_map_iter iter = m_peers.begin(); iter != m_peers.end(); ++iter)
 	{
-		Peer * peer = (*iter).second;
-		if (peer->get_sock() != NULL)
+		PeerPtr peer = (*iter).second;
+		if (!peer->is_sleep())
 		{
 			peer_info pi;
 			peer->get_info(&pi);
@@ -1018,9 +888,8 @@ int Torrent::get_info(torrent_info * info)
 	}
 	for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
 	{
-		Tracker *  tracker = (*iter).second;
 		tracker_info ti;
-		tracker->get_info(&ti);
+		(*iter).second->get_info(&ti);
 		info->trackers.push_back(ti);
 	}
 	for(int i = 0; i < m_files_count; i++)

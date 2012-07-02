@@ -299,7 +299,11 @@ int NetworkManager::clock()
 		if (sock->m_closed)
 			m_closed_sockets.insert(sock);
 	}
+	pthread_mutex_unlock(&m_mutex_sockets);
+}
 
+void NetworkManager::notify()
+{
 	for(socket_set_iter listening_sockets_iter = m_listening_sockets.begin();
 			listening_sockets_iter != m_listening_sockets.end(); ++listening_sockets_iter)
 	{
@@ -369,8 +373,6 @@ int NetworkManager::clock()
 			m_closed_sockets.erase(*iter);
 		}
 	}
-	pthread_mutex_unlock(&m_mutex_sockets);
-	return 0;
 }
 
 int NetworkManager::Socket_send(Socket & sock, const void * data, size_t len, bool full)
@@ -873,6 +875,7 @@ void * NetworkManager::timeout_thread(void * arg)
 	std::list<Socket> sock2resolve;
 	while(!nm->m_thread_stop)
 	{
+		//printf("timeout_thread loop\n");
 		pthread_mutex_lock(&nm->m_mutex_sockets);
 		for(socket_set_iter iter = nm->m_sockets.begin(); iter != nm->m_sockets.end(); ++iter)
 		{

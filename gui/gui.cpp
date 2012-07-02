@@ -20,7 +20,7 @@ GtkLabel* label_dir;
 GtkLabel* label_piece_number;
 GtkLabel* label_piece_length;
 bittorrent::Bittorrent * bt;
-torrent::Torrent * torrent2add = NULL;
+torrent::TorrentPtr torrent2add;
 
 enum
 {
@@ -81,7 +81,7 @@ extern "C" void on_button_open_clicked (GtkWidget *object, gpointer user_data)
 	{
 		char *filename;
 		filename = gtk_file_chooser_get_filename (GTK_FILE_CHOOSER (dialog));
-		torrent2add = bt->OpenTorrent(filename);
+		bt->OpenTorrent(filename, torrent2add);
 		if (torrent2add != NULL)
 		{
 			gtk_widget_destroy (dialog);
@@ -211,8 +211,7 @@ extern "C" void on_open_dialog_button_cancel_clicked (GtkWidget *object, gpointe
 {
 	gtk_object_destroy(GTK_OBJECT(open_dialog));
 	open_dialog = NULL;
-		if (torrent2add != NULL)
-			delete torrent2add;
+	torrent2add.reset();
 }
 
 

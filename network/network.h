@@ -19,8 +19,8 @@
 #include <pcre.h>
 #include <boost/shared_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
-#include "../dinosaur/src/exceptions/exceptions.h"
-#include "../dinosaur/src/err/err_code.h"
+#include "../exceptions/exceptions.h"
+#include "../err/err_code.h"
 
 namespace network
 {
@@ -124,7 +124,7 @@ public:
 	}
 	~socket_()
 	{
-		std::cout<<"Socket destructed "<<m_socket<<std::endl;
+		std::cout<<"Socket destructed "<<m_socket<<" "<<m_domain<<" "<<inet_ntoa(m_peer.sin_addr)<<std::endl;
 		close(m_socket);
 	}
 	int get_fd()
@@ -187,13 +187,6 @@ public:
 	int Socket_get_assoc(Socket & sock, SocketAssociation::ptr & assoc);
 	double Socket_get_rx_speed(Socket & sock);
 	double Socket_get_tx_speed(Socket & sock);
-	void clear_events()
-	{
-		m_sended_sockets.clear();
-		m_closed_sockets.clear();
-		m_connected_sockets.clear();
-		m_timeout_sockets.clear();
-	}
 	int get_sock_errno(socket_ * sock)
 	{
 		if (sock == NULL)
@@ -239,6 +232,7 @@ public:
 		return 0;
 	}
 	int clock();
+	void notify();
 };
 
 }

@@ -11,7 +11,7 @@
 namespace torrent {
 
 Peer::Peer()
-:network::sock_event()
+:network::SocketAssociation()
 {
 	m_nm = NULL;
 	m_g_cfg = NULL;
@@ -27,27 +27,20 @@ Peer::Peer()
 	memset(&m_buf, 0, sizeof(network::buffer));
 }
 
-Peer::Peer(sockaddr_in * addr, Torrent * torrent, PEER_ADD peer_add )
-:network::sock_event()
+int Peer::Init(sockaddr_in * addr, Torrent * torrent, PEER_ADD peer_add )
 {
 	if (addr == NULL)
-		throw NoneCriticalException("Can not initialize the peer");
-	//memset(&m_buf, 0, sizeof(network::buffer));
-	memcpy(&m_addr, addr, sizeof(sockaddr_in));
-	network::socket_ * sock = torrent->m_nm->Socket_add(&m_addr,torrent);
-	init(sock, torrent, peer_add);
+		return ERR_BAD_ARG;
+	network::Socket sock;
+	if (torrent->m_nm->Socket_add(addr, shared_from_this(), sock) != ERR_NO_ERROR)
+		return ERR_INTERNAL;
+	return Init(sock, torrent, peer_add);
 }
 
-Peer::Peer(network::socket_ * sock, Torrent * torrent, PEER_ADD peer_add)
-:network::sock_event()
-{
-	init(sock, torrent, peer_add);
-}
-
-void Peer::init(network::socket_ * sock, Torrent * torrent, PEER_ADD peer_add)
+int Peer::Init(network::Socket & sock, Torrent * torrent, PEER_ADD peer_add)
 {
 	if (sock == NULL || torrent == NULL)
-		throw NoneCriticalException("Can not initialize the peer");
+		return ERR_BAD_ARG;
 	memset(&m_buf, 0, sizeof(network::buffer));
 	m_torrent = torrent;
 	m_nm = torrent->m_nm;
@@ -62,8 +55,9 @@ void Peer::init(network::socket_ * sock, Torrent * torrent, PEER_ADD peer_add)
 	m_downloaded = 0;
 	m_uploaded = 0;
 	if (m_nm == NULL || m_g_cfg == NULL)
-		throw NoneCriticalException("Can not initialize the peer");
+		return ERR_BAD_ARG;
 	m_sock = sock;
+	m_nm->Socket_set_assoc(m_sock, shared_from_this());
 	memcpy(&m_addr, &m_sock->m_peer, sizeof(sockaddr_in));
 	switch(peer_add)
 	{
@@ -79,12 +73,7 @@ void Peer::init(network::socket_ * sock, Torrent * torrent, PEER_ADD peer_add)
 		break;
 	}
 	get_peer_key(&m_sock->m_peer, &m_ip);//inet_ntoa(m_sock->m_peer.sin_addr);
-	//std::cout<<"PEER created "<<m_ip<<std::endl;
-}
-
-network::socket_ * Peer::get_sock()
-{
-	return m_sock;
+	return ERR_NO_ERROR;
 }
 
 int Peer::send_handshake()
@@ -423,7 +412,7 @@ end:
 	return ERR_NO_ERROR;
 }
 
-int Peer::event_sock_ready2read(network::socket_ * sock)
+int Peer::event_sock_ready2read(network::Socket sock)
 {
 	int ret = m_nm->Socket_recv(sock, m_buf.data + m_buf.length, BUFFER_SIZE - m_buf.length);
 	if (ret != -1)
@@ -435,7 +424,7 @@ int Peer::event_sock_ready2read(network::socket_ * sock)
 	return ERR_NO_ERROR;
 }
 
-int Peer::event_sock_closed(network::socket_ * sock)
+int Peer::event_sock_closed(network::Socket sock)
 {
 	if (m_nm->Socket_datalen(sock) > 0)
 		event_sock_ready2read(sock);
@@ -444,26 +433,26 @@ int Peer::event_sock_closed(network::socket_ * sock)
 
 }
 
-int Peer::event_sock_sended(network::socket_ * sock)
+int Peer::event_sock_sended(network::Socket sock)
 {
 	return 0;
 
 }
 
-int Peer::event_sock_connected(network::socket_ * sock)
+int Peer::event_sock_connected(network::Socket sock)
 {
 	return 0;
 
 }
 
-int Peer::event_sock_accepted(network::socket_ * sock)
+int Peer::event_sock_accepted(network::Socket sock, network::Socket accepted_sock)
 {
 	//std::cout<<"PEER accepted\n";
 	return 0;
 
 }
 
-int Peer::event_sock_timeout(network::socket_ * sock)
+int Peer::event_sock_timeout(network::Socket sock)
 {
 	if (m_nm->Socket_datalen(sock) > 0)
 		event_sock_ready2read(sock);
@@ -471,7 +460,7 @@ int Peer::event_sock_timeout(network::socket_ * sock)
 	return ERR_NO_ERROR;
 }
 
-int Peer::event_sock_unresolved(network::socket_ * sock)
+int Peer::event_sock_unresolved(network::Socket sock)
 {
 	return ERR_NO_ERROR;
 }
@@ -488,13 +477,14 @@ int Peer::clock()
 	{
 		if (m_torrent->is_downloaded())
 			return ERR_NO_ERROR;
-		m_sock = m_nm->Socket_add(&m_addr,m_torrent);
+		//m_sock = m_nm->Socket_add(&m_addr,m_torrent);
+		m_sock.reset();
+		m_nm->Socket_add(&m_addr, shared_from_this(), m_sock);
 		if (m_sock == NULL)
 		{
 			goto_sleep();
 			return ERR_INTERNAL;
 		}
-		m_torrent->add_socket(m_sock, this);
 		m_state = PEER_STATE_SEND_HANDSHAKE;
 	}
 	if (m_state == PEER_STATE_SEND_HANDSHAKE)
@@ -541,9 +531,7 @@ void Peer::goto_sleep()
 {
 	if (m_state == PEER_STATE_SLEEP)
 		return;
-	m_torrent->delete_socket(m_sock, this);
 	m_nm->Socket_delete(m_sock);
-	m_sock = NULL;
 	m_peer_choking= true;
 	m_peer_interested = false;
 	m_am_choking = false;//
@@ -554,7 +542,7 @@ void Peer::goto_sleep()
 	m_state = PEER_STATE_SLEEP;
 }
 
-int Peer::wake_up(network::socket_ * sock, PEER_ADD peer_add)
+int Peer::wake_up(network::Socket & sock, PEER_ADD peer_add)
 {
 	//если не спит
 	if (m_state != PEER_STATE_SLEEP)
@@ -571,13 +559,13 @@ int Peer::wake_up(network::socket_ * sock, PEER_ADD peer_add)
 	}
 	if (peer_add == PEER_ADD_TRACKER)
 	{
-		m_sock = m_nm->Socket_add(&m_addr,m_torrent);
+		m_sock.reset();
+		m_nm->Socket_add(&m_addr,shared_from_this(), m_sock);
 		if (m_sock == NULL)
 		{
 			goto_sleep();
 			return ERR_INTERNAL;
 		}
-		m_torrent->add_socket(m_sock, this);
 		m_state = PEER_STATE_SEND_HANDSHAKE;
 	}
 	return ERR_NO_ERROR;
@@ -634,12 +622,7 @@ Peer::~Peer()
 {
 	if (m_bitfield != NULL)
 		delete[] m_bitfield;
-	if (m_sock != NULL)
-	{
-		m_torrent->delete_socket(m_sock, this);
-		m_nm->Socket_close(m_sock);
-		m_nm->Socket_delete(m_sock);
-	}
+	DeleteSocket();
 	//std::cout<<"Peer destroyed "<<std::endl;
 }
 

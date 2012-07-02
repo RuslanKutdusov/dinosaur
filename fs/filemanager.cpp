@@ -30,6 +30,10 @@ int FileManager::Init(cfg::Glob_cfg * cfg) {
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+	pthread_mutexattr_t   mta;
+	pthread_mutexattr_init(&mta);
+	pthread_mutexattr_settype(&mta, PTHREAD_MUTEX_RECURSIVE);
 	pthread_mutex_init(&m_mutex, NULL);
 	pthread_cond_init (&m_cond, NULL);
 	//pthread_mutex_init(&m_mutex_timeout_sockets, NULL);
@@ -201,7 +205,7 @@ void * FileManager::cache_thread(void * arg)
 		//printf("CACHE_THREAD started\n");
 		while(!fm->m_thread_stop)
 		{
-			//printf("thread loop\n");
+			//printf("cache_thread loop\n");
 			pthread_mutex_lock(&fm->m_mutex);
 			//printf("CACHE wait...\n");
 			//pthread_cond_wait(&fm->m_cond, &fm->m_mutex);

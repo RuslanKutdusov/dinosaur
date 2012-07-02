@@ -26,15 +26,15 @@
 
 namespace bittorrent {
 
-class Bittorrent : public network::sock_event {
+class Bittorrent : public network::SocketAssociation {
 private:
-	typedef std::map<std::string, torrent::Torrent *> torrent_map;
-	typedef std::map<std::string, torrent::Torrent *>::iterator torrent_map_iter;
+	typedef std::map<std::string, torrent::TorrentPtr> torrent_map;
+	typedef torrent_map::iterator torrent_map_iter;
 	network::NetworkManager m_nm;
 	cfg::Glob_cfg m_gcfg;
 	fs::FileManager m_fm;
 	block_cache::Block_cache m_bc;
-	network::socket_ * m_sock;
+	network::Socket m_sock;
 	torrent_map m_torrents;
 	std::string m_directory;
 	std::string m_error;
@@ -50,8 +50,8 @@ private:
 	int init_torrent(const char * filename, std::string * hash, bool is_new);
 public:
 	Bittorrent();
-	torrent::Torrent * OpenTorrent(char * filename);
-	int AddTorrent(torrent::Torrent * torrent, std::string * hash);
+	int OpenTorrent(char * filename, torrent::TorrentPtr & torrent);
+	int AddTorrent(torrent::TorrentPtr & torrent, std::string * hash);
 	int StartTorrent(std::string & hash, std::string & download_directory);
 	int StopTorrent(std::string & hash);
 	int PauseTorrent(std::string & hash);
@@ -62,16 +62,20 @@ public:
 	int get_TorrentList(std::list<std::string> * list);
 	int get_DownloadDirectory(std::string * dir);
 	//uint16_t Torrent_peers(std::string & hash, torrent::peer_info ** peers);
-	int event_sock_ready2read(network::socket_ * sock);
-	int event_sock_closed(network::socket_ * sock);
-	int event_sock_sended(network::socket_ * sock);
-	int event_sock_connected(network::socket_ * sock);
-	int event_sock_accepted(network::socket_ * sock);
-	int event_sock_timeout(network::socket_ * sock);
-	int event_sock_unresolved(network::socket_ * sock);
+	int event_sock_ready2read(network::Socket sock);
+	int event_sock_closed(network::Socket sock);
+	int event_sock_sended(network::Socket sock);
+	int event_sock_connected(network::Socket sock);
+	int event_sock_accepted(network::Socket sock, network::Socket accepted_sock);
+	int event_sock_timeout(network::Socket sock);
+	int event_sock_unresolved(network::Socket sock);
 	std::string get_error()
 	{
 		return m_error;
+	}
+	void DeleteSocket()
+	{
+		m_nm.Socket_delete(m_sock);
 	}
 	~Bittorrent();
 };

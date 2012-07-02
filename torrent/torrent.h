@@ -33,6 +33,12 @@
 
 namespace torrent {
 
+enum TRACKER_STATE
+{
+	TRACKER_STATE_NONE,
+	TRACKER_STATE_CONNECT,
+	TRACKER_STATE_WORK
+};
 
 //события трекера
 enum TRACKER_EVENT
@@ -114,10 +120,8 @@ public:
 
 class Torrent;
 
-typedef std::map<network::socket_ *, network::sock_event *> socket_map;
-typedef std::map<network::socket_ *, network::sock_event *>::iterator socket_map_iter;
 
-class Tracker : public network::sock_event
+class Tracker : public network::SocketAssociation
 {
 private:
 	network::NetworkManager * m_nm;
@@ -126,10 +130,11 @@ private:
 	Torrent * m_torrent;
 	std::string m_host;//доменное имя хоста, где находится трекер, нужен для заголовка HTTP запроса (Host: bla-bla-bla)
 	std::string m_params;//параметры в анонсе, нужен для формирования URN в HTTP загловке запроса
-	network::socket_ * m_sock;
+	network::Socket m_sock;
 	char m_infohash[SHA1_LENGTH * 3 + 1];//infohash в url encode
 	char m_buf[BUFFER_SIZE];//буфер, куда кидаем ответ от сервера
 	ssize_t m_buflen;//длина ответа в буфере
+	TRACKER_STATE m_state;
 	time_t m_last_update;
 	uint64_t m_downloaded;//с момента события started
 	uint64_t m_uploaded;//с момента события started
@@ -151,20 +156,18 @@ private:
 	//удаление сокета
 	TRACKER_EVENT m_event_after_connect;
 	int restore_socket();
-	void delete_socket();
 	int parse_announce();
 public:
 	Tracker();
 	Tracker(Torrent * torrent, std::string & announce);
 	virtual ~Tracker();
-	network::socket_ * get_sock();
-	int event_sock_ready2read(network::socket_ * sock);
-	int event_sock_closed(network::socket_ * sock);
-	int event_sock_sended(network::socket_ * sock);
-	int event_sock_connected(network::socket_ * sock);
-	int event_sock_accepted(network::socket_ * sock);
-	int event_sock_timeout(network::socket_ * sock);
-	int event_sock_unresolved(network::socket_* sock);
+	int event_sock_ready2read(network::Socket sock);
+	int event_sock_closed(network::Socket sock);
+	int event_sock_sended(network::Socket sock);
+	int event_sock_connected(network::Socket sock);
+	int event_sock_accepted(network::Socket sock, network::Socket accepted_sock);
+	int event_sock_timeout(network::Socket sock);
+	int event_sock_unresolved(network::Socket sock);
 	int get_peers_count();
 	const sockaddr_in * get_peer(int i);
 	int update();
@@ -173,6 +176,10 @@ public:
 	int send_started();
 	int clock();
 	int get_info(tracker_info * info);
+	void DeleteSocket()
+	{
+		m_nm->Socket_delete(m_sock);
+	}
 	void test_parse_announce(std::string & announce)
 	{
 		m_announce = announce;
@@ -186,14 +193,14 @@ public:
 	}
 };
 
-class Peer : public network::sock_event
+class Peer : public network::SocketAssociation
 {
 private:
 	network::NetworkManager * m_nm;
 	cfg::Glob_cfg * m_g_cfg;
 	Torrent * m_torrent;
 	sockaddr_in m_addr;
-	network::socket_ * m_sock;
+	network::Socket m_sock;
 	network::buffer m_buf;
 	std::string m_ip;
 	uint64_t m_downloaded;
@@ -209,20 +216,19 @@ private:
 	std::set<uint64_t> m_requested_blocks;//блоки, которые мы запросили
 	std::set<uint64_t> m_requests_queue;//блоки, которые у нас запросили(очередь запросов)
 	int process_messages();
-	void init(network::socket_ * sock, Torrent * torrent, PEER_ADD peer_add);
+	void init(network::Socket sock, Torrent * torrent, PEER_ADD peer_add);
 	time_t m_sleep_time;
 public:
 	Peer();
-	Peer(sockaddr_in * addr, Torrent * torrent, PEER_ADD peer_add = PEER_ADD_TRACKER);
-	Peer(network::socket_ * sock, Torrent * torrent, PEER_ADD peer_add = PEER_ADD_TRACKER);
-	network::socket_ * get_sock();
-	int event_sock_ready2read(network::socket_ * sock);
-	int event_sock_closed(network::socket_ * sock);
-	int event_sock_sended(network::socket_ * sock);
-	int event_sock_connected(network::socket_ * sock);
-	int event_sock_accepted(network::socket_ * sock);
-	int event_sock_timeout(network::socket_ * sock);
-	int event_sock_unresolved(network::socket_* sock);
+	int Init(sockaddr_in * addr, Torrent * torrent, PEER_ADD peer_add = PEER_ADD_TRACKER);
+	int Init(network::Socket & sock, Torrent * torrent, PEER_ADD peer_add = PEER_ADD_TRACKER);
+	int event_sock_ready2read(network::Socket sock);
+	int event_sock_closed(network::Socket sock);
+	int event_sock_sended(network::Socket sock);
+	int event_sock_connected(network::Socket sock);
+	int event_sock_accepted(network::Socket sock, network::Socket accepted_sock);
+	int event_sock_timeout(network::Socket sock);
+	int event_sock_unresolved(network::Socket sock);
 	//int download_piece(uint32_t piece_index);
 	int send_have(uint32_t piece_index);
 	int send_handshake();
@@ -236,7 +242,7 @@ public:
 	bool have_piece(uint32_t piece_index);
 	int clock();
 	void goto_sleep();
-	int wake_up(network::socket_ * sock, PEER_ADD peer_add);
+	int wake_up(network::Socket & sock, PEER_ADD peer_add);
 	bool is_sleep()
 	{
 		return m_state == PEER_STATE_SLEEP;
@@ -250,6 +256,10 @@ public:
 	double get_tx_speed();
 	std::string get_ip_str();
 	int get_info(peer_info * info);
+	void DeleteSocket()
+	{
+		m_nm->Socket_delete(m_sock);
+	}
 	~Peer();
 };
 
@@ -275,9 +285,14 @@ struct piece_info
 	uint64_t offset;//смещение внутри файла до начала куска
 	uint32_t remain;//сколько осталось скачать
 	uint32_t block_count;//кол-во блоков в куске
-	std::map<uint32_t, Peer*> blocks2download;//метки блоков, блок->пир,у которого скачиваем
-	uint32_t marked_blocks;//кол-во помеченных файлов
 };
+
+typedef boost::shared_ptr<Peer> PeerPtr;
+typedef boost::shared_ptr<Tracker> TrackerPtr;
+typedef std::map<std::string, TrackerPtr> tracker_map;
+typedef tracker_map::iterator tracker_map_iter;
+typedef std::map<std::string, PeerPtr> peer_map;
+typedef peer_map::iterator peer_map_iter;
 
 class TorrentFile
 {
@@ -302,26 +317,13 @@ public:
 	int read_piece(uint32_t piece_index);
 	bool check_piece_hash(uint32_t piece_index);
 	bool piece_is_done(uint32_t piece_index);
-	int blocks_in_progress(uint32_t piece_index);
 	int event_file_write(fs::write_event * eo);
 	uint32_t get_blocks_count_in_piece(uint32_t piece);
 	uint32_t get_piece_length(uint32_t piece);
-	int blocks2download(uint32_t piece_index, uint32_t * block, uint32_t array_len);
-	int mark_block(uint32_t piece_index, uint32_t block_index, Peer * peer);
-	int unmark_block(uint32_t piece_index, uint32_t block_index);
-	int unmark_if_match(uint32_t piece_index, uint32_t block_index, Peer * peer);
-	int restore_piece2download(uint32_t piece_index);
-	Peer * get_block_mark(uint32_t piece_index, uint32_t block_index);
-	int block_done(uint32_t piece_index, uint32_t block_index);
 	int get_block_index_by_offset(uint32_t piece_index, uint32_t block_offset, uint32_t * index);
 	int get_block_length_by_index(uint32_t piece_index, uint32_t block_index, uint32_t * block_length);
 	~TorrentFile();
 };
-
-typedef std::map<std::string, Tracker*> tracker_map;
-typedef std::map<std::string, Tracker*>::iterator tracker_map_iter;
-typedef std::map<std::string, Peer*> peer_map;
-typedef std::map<std::string, Peer*>::iterator peer_map_iter;
 
 class torrent_info
 {
@@ -354,7 +356,7 @@ public:
 	int progress;
 };
 
-class Torrent : public network::sock_event, public fs::file_event
+class Torrent : public fs::file_event
 {
 private:
 	network::NetworkManager * m_nm;
@@ -382,7 +384,6 @@ private:
 	unsigned char m_info_hash_bin[SHA1_LENGTH];
 	char m_info_hash_hex[SHA1_LENGTH * 2 + 1];
 	tracker_map m_trackers;
-	socket_map m_sockets;//по сокету ассоциируемся с объектом sock_event(Peer, Tracker)
 	//TorrentFile m_torrent_file;
 	peer_map m_peers;
 	bool m_new;
@@ -410,14 +411,11 @@ private:
 	int save_state_file(state_file * sf);
 	int get_state();
 	int save_state();
-	void delete_socket(network::socket_ * sock, network::sock_event * se);
-	void add_socket(network::socket_ * sock, network::sock_event * se);
-	network::sock_event * get_sock_event(network::socket_ * sock);
 	int handle_download_task();
 public:
 	TorrentFile m_torrent_file;
 	void take_peers(int count, sockaddr_in * addrs);
-	void delete_peer(Peer * peer);
+	void delete_peer(PeerPtr & peer);
 public:
 	Torrent();
 	int Init(std::string metafile, network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc,
@@ -432,20 +430,13 @@ public:
 	int continue_();
 	int check();
 	bool is_downloaded();
-	int event_sock_ready2read(network::socket_ * sock);
-	int event_sock_closed(network::socket_ * sock);
-	int event_sock_sended(network::socket_ * sock);
-	int event_sock_connected(network::socket_ * sock);
-	int event_sock_accepted(network::socket_ * sock);
-	int event_sock_timeout(network::socket_ * sock);
-	int event_sock_unresolved(network::socket_* sock);
 	int event_file_write(fs::write_event * eo);
 	int event_piece_hash(uint32_t piece_index, bool ok, bool error);
 	int clock();
 	//добавляет пира либо от пользователя, либо от входящего соединения
 	//если от пользователя то требуемое состояние PEER_STATE_WAIT_HANDSHAKE
 	//если вх. соединение
-	int add_incoming_peer(network::socket_ * sock);
+	int add_incoming_peer(network::Socket & sock);
 	int get_info(torrent_info * info);
 	int save_meta2file(const char * filepath);
 	int erase_state();
@@ -454,6 +445,8 @@ public:
 	friend class Peer;
 	friend class TorrentFile;
 };
+
+typedef boost::shared_ptr<Torrent> TorrentPtr;
 
 void set_bitfield(uint32_t piece, uint32_t piece_count, unsigned char * bitfield);
 void reset_bitfield(uint32_t piece, uint32_t piece_count, unsigned char * bitfield);

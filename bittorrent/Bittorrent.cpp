@@ -34,14 +34,15 @@ Bittorrent::Bittorrent()
 	if (m_bc.Init(m_gcfg.get_cache_size()) != ERR_NO_ERROR)
 		throw Exception();
 
-	m_sock = m_nm.ListenSocket_add(m_gcfg.get_port(), this);
-	if (m_sock == NULL)
-		throw Exception();
 	//m_thread_stop = false;
 	//pthread_mutex_unlock(&m_mutex);
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+	pthread_mutexattr_t   mta;
+	pthread_mutexattr_init(&mta);
+	pthread_mutexattr_settype(&mta, PTHREAD_MUTEX_RECURSIVE);
 	pthread_mutex_init(&m_mutex, NULL);
 	pthread_mutex_unlock(&m_mutex);
 	if (pthread_create(&m_thread, &attr, Bittorrent::thread, (void *)this))
@@ -60,8 +61,7 @@ Bittorrent::~Bittorrent() {
 		pthread_join(m_thread, &status);
 		pthread_mutex_destroy(&m_mutex);
 	}
-	for (torrent_map_iter iter = m_torrents.begin(); iter != m_torrents.end(); ++iter)
-		delete (*iter).second;
+	m_torrents.clear();
 }
 
 int Bittorrent::load_our_torrents()
@@ -113,23 +113,16 @@ int Bittorrent::init_torrent(const  char * filename, std::string * hash, bool is
 	if (hash == NULL)
 		return ERR_NULL_REF;
 	*hash = "";
-	torrent::Torrent * torrent = NULL;
-	torrent = new torrent::Torrent();
+	torrent::TorrentPtr torrent(new torrent::Torrent());
 	std::string err = "";
 	if (torrent->Init(filename,&m_nm,&m_gcfg, &m_fm, &m_bc, m_directory, is_new) != ERR_NO_ERROR)
 	{
 		err = torrent->get_error();
-		delete torrent;
 		add_error_mes(err);
 		return ERR_SEE_ERROR;
 	}
-	//ключ infohash в hex-e
-	//unsigned char infohash[SHA1_LENGTH];
 	torrent::torrent_info t_info;
 	torrent->get_info(&t_info);
-	//torrent->get_info_hash(infohash);
-	//char infohash_hex[SHA1_LENGTH * 2 + 1];
-	//bin2hex(infohash, infohash_hex, SHA1_LENGTH);
 	std::string infohash_str = t_info.info_hash_hex;
 
 	pthread_mutex_lock(&m_mutex);
@@ -146,22 +139,21 @@ int Bittorrent::init_torrent(const  char * filename, std::string * hash, bool is
 	return ERR_NO_ERROR;
 }
 
-torrent::Torrent * Bittorrent::OpenTorrent(char * filename)
+int Bittorrent::OpenTorrent(char * filename, torrent::TorrentPtr & torrent)
 {
-	torrent::Torrent * torrent = NULL;
-	torrent = new torrent::Torrent();
+	torrent.reset(new torrent::Torrent());
 	std::string err = "";
 	if (torrent->Init(filename,&m_nm,&m_gcfg, &m_fm, &m_bc, m_directory, true) != ERR_NO_ERROR)
 	{
 		err = torrent->get_error();
-		delete torrent;
 		add_error_mes(err);
-		return NULL;
+		torrent.reset();
+		return ERR_INTERNAL;
 	}
-	return torrent;
+	return ERR_NO_ERROR;
 }
 
-int Bittorrent::AddTorrent(torrent::Torrent * torrent, std::string * hash)
+int Bittorrent::AddTorrent(torrent::TorrentPtr & torrent, std::string * hash)
 {
 	if (torrent == NULL)
 	{
@@ -169,10 +161,6 @@ int Bittorrent::AddTorrent(torrent::Torrent * torrent, std::string * hash)
 		add_error_mes(err);
 		return ERR_NULL_REF;
 	}
-	//unsigned char infohash[SHA1_LENGTH];
-	//torrent->get_info_hash(infohash);
-	//char infohash_hex[SHA1_LENGTH * 2 + 1];
-	//bin2hex(infohash, infohash_hex, SHA1_LENGTH);
 
 	torrent::torrent_info t_info;
 	torrent->get_info(&t_info);
@@ -299,11 +287,11 @@ int Bittorrent::DeleteTorrent(std::string & hash)
 		return ERR_SEE_ERROR;
 	}
 	pthread_mutex_lock(&m_mutex);
-	torrent::Torrent * torrent = m_torrents[hash];
+	torrent::TorrentPtr torrent = m_torrents[hash];
 	m_torrents.erase(hash);
 	torrent->stop();
 	torrent->erase_state();
-	delete torrent;
+	torrent.reset();
 
 	std::ifstream fin;
 	std::ofstream fout;
@@ -362,12 +350,8 @@ int Bittorrent::get_DownloadDirectory(std::string * dir)
 	return ERR_NO_ERROR;
 }
 
-/*uint16_t Bittorrent::Torrent_peers(std::string & hash, torrent::peer_info ** peers)
-{
-	return ERR_NO_ERROR;
-}*/
 
-int Bittorrent::event_sock_ready2read(network::socket_ * sock)
+int Bittorrent::event_sock_ready2read(network::Socket sock)
 {
 	printf("ready\n");
 	if (m_nm.Socket_datalen(sock) < HANDSHAKE_LENGHT)
@@ -406,7 +390,6 @@ int Bittorrent::event_sock_ready2read(network::socket_ * sock)
 		return ERR_INTERNAL;
 	}
 	printf("accepted\n");
-	m_nm.Socket_set_assoc(sock, (*iter).second);
 	if ((*iter).second->add_incoming_peer(sock) != ERR_NO_ERROR)
 	{
 		printf("can not add peer\n");
@@ -416,32 +399,33 @@ int Bittorrent::event_sock_ready2read(network::socket_ * sock)
 	return 0;
 }
 
-int Bittorrent::event_sock_closed(network::socket_ * sock)
+int Bittorrent::event_sock_closed(network::Socket sock)
 {
 	return 0;
 }
 
-int Bittorrent::event_sock_sended(network::socket_ * sock)
+int Bittorrent::event_sock_sended(network::Socket sock)
 {
 	return 0;
 }
 
-int Bittorrent::event_sock_connected(network::socket_ * sock)
+int Bittorrent::event_sock_connected(network::Socket sock)
 {
 	return 0;
 }
 
-int Bittorrent::event_sock_accepted(network::socket_ * sock)
+int Bittorrent::event_sock_accepted(network::Socket sock, network::Socket accepted_sock)
+{
+	m_nm.Socket_set_assoc(accepted_sock, shared_from_this());
+	return 0;
+}
+
+int Bittorrent::event_sock_timeout(network::Socket sock)
 {
 	return 0;
 }
 
-int Bittorrent::event_sock_timeout(network::socket_ * sock)
-{
-	return 0;
-}
-
-int Bittorrent::event_sock_unresolved(network::socket_ * sock)
+int Bittorrent::event_sock_unresolved(network::Socket sock)
 {
 	return 0;
 }
@@ -458,110 +442,12 @@ void * Bittorrent::thread(void * arg)
 			sleep(1);
 			continue;
 		}*/
-		bt->m_nm.Wait();
+		//printf("main_thread loop\n");
+		bt->m_nm.clock();
 		pthread_mutex_lock(&bt->m_mutex);
-		//bt->m_nm.lock_mutex();
-				//nm.test_view_socks();
+		bt->m_nm.notify();
+		//
 
-		network::socket_ * sock = NULL;
-		std::list<network::socket_*> accepted_socks;
-		std::list<network::socket_*> connected_sock;
-		std::list<network::socket_*> ready2read_sock;
-		std::list<network::socket_*> closed_sock;
-		std::list<network::socket_*> sended_socks;
-		std::list<network::socket_*> timeout_on;
-		std::list<network::socket_*> unresolved_sock;
-		bt->m_nm.lock_mutex();
-		while(bt->m_nm.event_accepted_sock(bt->m_sock, &sock))
-		{
-			accepted_socks.push_back(sock);
-		}
-		while(bt->m_nm.event_connected_sock(&sock))
-		{
-			connected_sock.push_back(sock);
-		}
-		while(bt->m_nm.event_ready2read_sock(&sock))
-		{
-			ready2read_sock.push_back(sock);
-		}
-		while(bt->m_nm.event_closed_sock(&sock))
-		{
-			closed_sock.push_back(sock);
-		}
-		while(bt->m_nm.event_sended_socks(&sock))
-		{
-			sended_socks.push_back(sock);
-		}
-		while(bt->m_nm.event_timeout_on(&sock))
-		{
-			timeout_on.push_back(sock);
-		}
-		while(bt->m_nm.event_unresolved_sock(&sock))
-		{
-			unresolved_sock.push_back(sock);
-		}
-		bt->m_nm.unlock_mutex();
-
-
-		while(!accepted_socks.empty())
-		{
-			sock = accepted_socks.front();
-			accepted_socks.pop_front();
-			bt->m_nm.Socket_set_assoc(sock, bt);
-		}
-		while(!connected_sock.empty())
-		{
-			sock = connected_sock.front();
-			connected_sock.pop_front();
-			network::sock_event * t = (network::sock_event *)bt->m_nm.Socket_get_assoc(sock);
-			if (t != NULL)
-				t->event_sock_connected(sock);
-		}
-		while(!ready2read_sock.empty())
-		{
-			sock = ready2read_sock.front();
-			ready2read_sock.pop_front();
-			network::sock_event * t = (network::sock_event *)bt->m_nm.Socket_get_assoc(sock);
-			if (t != NULL)
-				t->event_sock_ready2read(sock);
-
-		}
-		while(!closed_sock.empty())
-		{
-			sock = closed_sock.front();
-			closed_sock.pop_front();
-			network::sock_event * t = (network::sock_event *)bt->m_nm.Socket_get_assoc(sock);
-			if (t != NULL)
-				t->event_sock_closed(sock);
-		}
-		while(!sended_socks.empty())
-		{
-			sock = sended_socks.front();
-			sended_socks.pop_front();
-			network::sock_event * t = (network::sock_event *)bt->m_nm.Socket_get_assoc(sock);
-			if (t != NULL)
-				t->event_sock_sended(sock);
-		}
-
-		while(!timeout_on.empty())
-		{
-			sock = timeout_on.front();
-			timeout_on.pop_front();
-			network::sock_event * t = (network::sock_event *)bt->m_nm.Socket_get_assoc(sock);
-			if (t != NULL)
-				t->event_sock_timeout(sock);
-		}
-
-		while(!unresolved_sock.empty())
-		{
-			sock = unresolved_sock.front();
-			unresolved_sock.pop_front();
-			network::sock_event * t = (network::sock_event *)bt->m_nm.Socket_get_assoc(sock);
-			if (t != NULL)
-				t->event_sock_unresolved(sock);
-		}
-
-		//bt->m_nm.test_view_socks();
 		fs::write_event eo;
 		eo.assoc = NULL;
 		if (bt->m_fm.get_write_event(&eo))

@@ -10,12 +10,13 @@
 namespace torrent {
 
 Tracker::Tracker()
-	:network::sock_event()
+	:network::SocketAssociation()
 {
 	memset(m_buf, 0, 16384);
 	m_buflen = 0;
 	m_peers = NULL;
 	m_peers_count = 0;
+	m_state = TRACKER_STATE_NONE;
 }
 
 int Tracker::parse_announce()
@@ -45,7 +46,7 @@ int Tracker::parse_announce()
 }
 
 Tracker::Tracker(Torrent * torrent, std::string & announce)
-	:network::sock_event()
+	:network::SocketAssociation()
 {
 	if (torrent == NULL || announce == "")
 		throw NoneCriticalException("Bad args");
@@ -56,7 +57,6 @@ Tracker::Tracker(Torrent * torrent, std::string & announce)
 	memset(m_buf, 0, 16384);
 	m_buflen = 0;
 	m_interval = m_g_cfg->get_tracker_default_interval();
-	m_last_update = time(NULL);
 	m_min_interval = 0;
 	m_seeders = 0;
 	m_leechers = 0;
@@ -64,18 +64,10 @@ Tracker::Tracker(Torrent * torrent, std::string & announce)
 	m_downloaded = torrent->m_downloaded;
 	m_uploaded = torrent->m_uploaded;
 	m_peers_count = 0;
-	m_sock = NULL;
 	if (parse_announce() != ERR_NO_ERROR)
 		throw NoneCriticalException("Invalid announce");
-	restore_socket() ;
-	m_event_after_connect = TRACKER_EVENT_STARTED;
+	m_state = TRACKER_STATE_CONNECT;
 	hash2urlencode();
-}
-
-
-network::socket_ * Tracker::get_sock()
-{
-	return m_sock;
 }
 
 void Tracker::hash2urlencode()
@@ -236,13 +228,11 @@ int Tracker::process_response()
 	{
 		m_torrent->take_peers(m_peers_count, m_peers);
 	}
-	m_nm->Socket_close(m_sock);
-	m_nm->Socket_delete(m_sock);
-	delete_socket();
+	DeleteSocket();
 	return 0;
 }
 
-int Tracker::event_sock_ready2read(network::socket_ * sock)
+int Tracker::event_sock_ready2read(network::Socket sock)
 {
 	//std::cout<<"TRACKER event_sock_ready2read "<<sock->get_fd()<<" "<<m_announce<<std::endl;
 	int len = m_nm->Socket_recv(sock, m_buf + m_buflen, BUFFER_SIZE - m_buflen);
@@ -253,56 +243,52 @@ int Tracker::event_sock_ready2read(network::socket_ * sock)
 	return ERR_NO_ERROR;
 }
 
-int Tracker::event_sock_closed(network::socket_ * sock)
+int Tracker::event_sock_closed(network::Socket sock)
 {
 	//std::cout<<"TRACKER event_sock_closed "<<sock->get_fd()<<" "<<m_announce<<std::endl;
 	if (m_nm->Socket_datalen(sock) > 0)
 		event_sock_ready2read(sock);
-	delete_socket();
-	m_nm->Socket_delete(sock);
+	DeleteSocket();
 	if (m_status == TRACKER_STATUS_UPDATING)
 		m_status = TRACKER_STATUS_ERROR;
 	return ERR_NO_ERROR;
 }
 
-int Tracker::event_sock_sended(network::socket_ * sock)
+int Tracker::event_sock_sended(network::Socket sock)
 {
 	//std::cout<<"TRACKER event_sock_sended "<<sock->get_fd()<<" "<<m_announce<<std::endl;
 	return ERR_NO_ERROR;
 }
 
-int Tracker::event_sock_connected(network::socket_ * sock)
+int Tracker::event_sock_connected(network::Socket sock)
 {
 	//std::cout<<"TRACKER event_sock_connected "<<sock->get_fd()<<" "<<m_announce<<std::endl;
 	return send_request(m_event_after_connect);
 }
 
-int Tracker::event_sock_accepted(network::socket_ * sock)
+int Tracker::event_sock_accepted(network::Socket sock, network::Socket accepted_sock)
 {
 	return ERR_NO_ERROR;
 }
 
-int Tracker::event_sock_timeout(network::socket_ * sock)
+int Tracker::event_sock_timeout(network::Socket sock)
 {
 	//std::cout<<"TRACKER event_sock_timeout "<<sock->get_fd()<<" "<<m_announce<<std::endl;
 	m_status = TRACKER_STATUS_TIMEOUT;
 	m_last_update = time(NULL);
 	if (m_nm->Socket_datalen(sock) > 0)
 		event_sock_ready2read(sock);
-	delete_socket();
-	m_nm->Socket_close(sock);
-	return m_nm->Socket_delete(sock);
-	//return ERR_NO_ERROR;
+	DeleteSocket();
+	return ERR_NO_ERROR;
 }
 
-int Tracker::event_sock_unresolved(network::socket_ * sock)
+int Tracker::event_sock_unresolved(network::Socket sock)
 {
 	//std::cout<<"TRACKER event_sock_unresolved "<<sock->get_fd()<<" "<<m_announce<<std::endl;
 	m_status = TRACKER_STATUS_UNRESOLVED;
 	m_last_update = time(NULL);
-	delete_socket();
-	m_nm->Socket_close(sock);
-	return m_nm->Socket_delete(sock);
+	DeleteSocket();
+	return ERR_NO_ERROR;
 }
 
 int Tracker::get_peers_count()
@@ -322,23 +308,24 @@ int Tracker::restore_socket()
 	if (m_sock == NULL)
 	{
 		m_status = TRACKER_STATUS_CONNECTING;
-		m_sock = m_nm->Socket_add_domain(m_host, 80, m_torrent);
+		m_sock.reset();
+		m_nm->Socket_add_domain(m_host, 80, shared_from_this(), m_sock);
 		if (m_sock == NULL)
 			return ERR_INTERNAL;
-		m_torrent->m_sockets[m_sock] = this;
 	}
 	return ERR_NO_ERROR;
 }
 
-void Tracker::delete_socket()
-{
-	m_torrent->delete_socket(m_sock, this);
-	m_sock = NULL;
-}
-
 int Tracker::clock()
 {
-	if ((uint32_t)(time(NULL) - m_last_update) >= m_interval)
+	if (m_state == TRACKER_STATE_CONNECT)
+	{
+		restore_socket() ;
+		m_event_after_connect = TRACKER_EVENT_STARTED;
+		m_state = TRACKER_STATE_WORK;
+		m_last_update = time(NULL);
+	}
+	if (m_state == TRACKER_STATE_WORK && (uint32_t)(time(NULL) - m_last_update) >= m_interval)
 	{
 		return update();
 	}
@@ -391,15 +378,11 @@ int Tracker::get_info(tracker_info * info)
 
 Tracker::~Tracker()
 {
+	printf("Tracker destructor\n");
 	if(m_peers != NULL)
 		delete[] m_peers;
-
-	if (m_sock != NULL)
-	{
-		m_nm->Socket_close(m_sock);
-		m_nm->Socket_delete(m_sock);
-	}
-	delete_socket();
+	DeleteSocket();
+	printf("Tracker destroyed\n");
 }
 
 }

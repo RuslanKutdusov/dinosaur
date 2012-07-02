@@ -57,6 +57,11 @@ int TorrentFile::Init(Torrent * t, std::string & path,bool _new)
 	}
 
 	m_files = new file_info[m_files_count];
+	if (m_files == NULL)
+	{
+		t->m_error = GENERAL_ERROR_NO_MEMORY_AVAILABLE;
+		return ERR_SYSCALL_ERROR;
+	}
 	std::string i_path(path);
 	if (i_path[i_path.length() - 1] != '/')
 		i_path.append("/");
@@ -81,10 +86,7 @@ int TorrentFile::Init(Torrent * t, std::string & path,bool _new)
 		strncat(m_files[i].name, i_path.c_str(), i_path.length());
 		strncat(m_files[i].name, t->m_files[i].name, strlen(t->m_files[i].name));
 		m_files[i].download = t->m_files[i].download;
-		//std::cout<<i<<" "<<m_files[i].name<<std::endl;
 		m_files[i].fm_id = m_fm->File_add(m_files[i].name, m_files[i].length, false, t);
-		//if (m_files[i].fm_id < 0)
-		//	printf("%s\n", m_files[i].name);
 	}
 	build_piece_offset_table();
 	return ERR_NO_ERROR;
@@ -137,12 +139,6 @@ void TorrentFile::build_piece_offset_table()
 		m_piece_info[i].offset = abs_offset - file_offset;//смещение до начала куска внутри файла
 		m_piece_info[i].remain = piece_length;
 		m_piece_info[i].block_count = (uint32_t)ceil((double)piece_length / (double)BLOCK_LENGTH);
-		m_piece_info[i].blocks2download = std::map<uint32_t, Peer*>();
-		m_piece_info[i].marked_blocks = 0;// marked <=> value != NULL
-		for(uint32_t j = 0; j < m_piece_info[i].block_count; j++)
-		{
-			m_piece_info[i].blocks2download[j] = NULL;
-		}
 	}
 }
 
@@ -157,7 +153,6 @@ int TorrentFile::save_block(uint32_t piece, uint32_t block_offset, uint32_t bloc
 	uint32_t real_block_length;
 	if (get_block_length_by_index(piece, block_index, &real_block_length) != ERR_NO_ERROR || real_block_length != block_length)
 	{
-		unmark_block(piece, block_index);
 		return ERR_INTERNAL;
 	}
 
@@ -181,7 +176,7 @@ int TorrentFile::save_block(uint32_t piece, uint32_t block_offset, uint32_t bloc
 		if (m_fm->File_write(m_files[file_index++].fm_id, &block[pos], to_write, offset, id) != ERR_NO_ERROR)
 		{
 			//printf("can not save block %u %u\n", piece, block_index);
-			unmark_block(piece, block_index);
+
 		}
 		pos += to_write;
 		offset = 0;
@@ -296,128 +291,6 @@ uint32_t TorrentFile::get_piece_length(uint32_t piece)
 	return m_piece_info[piece].length;
 }
 
-int TorrentFile::blocks2download(uint32_t piece_index, uint32_t * block, uint32_t array_len)
-{
-	if (piece_index >= m_pieces_count || block == NULL)
-		return -1;
-	if (m_piece_info[piece_index].blocks2download.size() == 0)
-		return 0;
-	if (m_piece_info[piece_index].marked_blocks == m_piece_info[piece_index].blocks2download.size())
-		return 0;
-	uint32_t i = 0;
-	for(std::map<uint32_t, Peer*>::iterator iter = m_piece_info[piece_index].blocks2download.begin();
-		iter != m_piece_info[piece_index].blocks2download.end(); ++iter)
-	{
-		if ((*iter).second == NULL)
-		{
-			if (i >= array_len)
-				return -1;
-			//printf("Unmarked piece %u block %d\n", piece_index, (*iter).first);
-			block[i++] = (*iter).first;
-		}
-	}
-	return i;
-}
-
-int TorrentFile::blocks_in_progress(uint32_t piece_index)
-{
-	if (piece_index >= m_pieces_count)
-		return -1;
-	return m_piece_info[piece_index].blocks2download.size();
-}
-
-int TorrentFile::mark_block(uint32_t piece_index, uint32_t block_index, Peer * peer)
-{
-	if (piece_index >= m_pieces_count)
-		return -1;
-	if (block_index >= m_piece_info[piece_index].block_count)
-		return -1;
-	std::map<uint32_t, Peer*>::iterator iter = m_piece_info[piece_index].blocks2download.find(block_index);
-	if (iter == m_piece_info[piece_index].blocks2download.end() && m_piece_info[piece_index].blocks2download.count(block_index) == 0)
-		return -1;
-	if ((*iter).second == NULL && peer != NULL)
-	{
-		//printf("block is marked %u %u\n", piece_index, block_index);
-		m_piece_info[piece_index].marked_blocks++;
-	}
-	if ((*iter).second != NULL && peer == NULL)
-	{
-		//printf("block is unmarked %u %u\n", piece_index, block_index);
-		m_piece_info[piece_index].marked_blocks--;
-		(*iter).second->erase_requested_block(generate_block_id(piece_index, block_index));
-	}
-	(*iter).second = peer;
-	return 0;
-}
-
-int TorrentFile::unmark_block(uint32_t piece_index, uint32_t block_index)
-{
-	return mark_block(piece_index, block_index, NULL);
-}
-
-Peer * TorrentFile::get_block_mark(uint32_t piece_index, uint32_t block_index)
-{
-	if (piece_index >= m_pieces_count)
-		return NULL;
-	if (block_index >= m_piece_info[piece_index].block_count)
-		return NULL;
-	std::map<uint32_t, Peer*>::iterator iter = m_piece_info[piece_index].blocks2download.find(block_index);
-	if (iter == m_piece_info[piece_index].blocks2download.end() && m_piece_info[piece_index].blocks2download.count(block_index) == 0)
-		return NULL;
-	return (*iter).second;
-}
-
-int TorrentFile::unmark_if_match(uint32_t piece_index, uint32_t block_index, Peer * peer)
-{
-	if (piece_index >= m_pieces_count || peer == NULL)
-		return -1;
-	if (block_index >= m_piece_info[piece_index].block_count)
-		return -1;
-	std::map<uint32_t, Peer*>::iterator iter = m_piece_info[piece_index].blocks2download.find(block_index);
-	if (iter == m_piece_info[piece_index].blocks2download.end() && m_piece_info[piece_index].blocks2download.count(block_index) == 0)
-		return -1;
-	if ((*iter).second == peer)
-	{
-		//printf("block is unmarked %u %u\n", piece_index, block_index);
-		m_piece_info[piece_index].marked_blocks--;
-		(*iter).second->erase_requested_block(generate_block_id(piece_index, block_index));
-		(*iter).second = NULL;
-	}
-	return 0;
-}
-
-int TorrentFile::restore_piece2download(uint32_t piece_index)
-{
-	//printf("restore piece2download\n");
-	if (piece_index >= m_pieces_count)
-			return ERR_BAD_ARG;
-	for(uint32_t j = 0; j < m_piece_info[piece_index].block_count; j++)
-	{
-		m_piece_info[piece_index].blocks2download[j] = NULL;
-	}
-	m_piece_info[piece_index].remain = m_piece_info[piece_index].length;
-	m_piece_info[piece_index].marked_blocks = 0;
-	return ERR_NO_ERROR;
-}
-
-int TorrentFile::block_done(uint32_t piece_index, uint32_t block_index)
-{
-	if (piece_index >= m_pieces_count)
-		return -1;
-	if (block_index >= m_piece_info[piece_index].block_count)
-		return -1;
-	std::map<uint32_t, Peer*>::iterator iter = m_piece_info[piece_index].blocks2download.find(block_index);
-	if (iter == m_piece_info[piece_index].blocks2download.end() && m_piece_info[piece_index].blocks2download.count(block_index) == 0)
-		return 0;
-	if ((*iter).second != NULL)
-	{
-		//printf("block is done %u %u\n", piece_index, block_index);
-		m_piece_info[piece_index].marked_blocks--;
-		(*iter).second->erase_requested_block(generate_block_id(piece_index, block_index));
-		m_piece_info[piece_index].blocks2download.erase(iter);
-	}
-	return 0;
-}
 
 int TorrentFile::get_block_index_by_offset(uint32_t piece_index, uint32_t block_offset, uint32_t * index)
 {
@@ -450,9 +323,9 @@ int TorrentFile::event_file_write(fs::write_event * eo)
 	{
 		uint32_t block_index = get_block_from_id(eo->block_id);//(eo->id & (uint32_t)4294967295);
 		uint32_t piece = get_piece_from_id(eo->block_id);//(eo->id - block_index)>>32;
-		//printf("WRITE %u %u\n", piece, block_index);
-		if (block_done(piece, block_index) == 0)
-			m_piece_info[piece].remain -= eo->writted;
+
+		//if (block_done(piece, block_index) == 0)
+		//	m_piece_info[piece].remain -= eo->writted;
 		if (m_piece_info[piece].remain == 0)
 		{
 			//printf("piece done %u, checking hash\n", piece);
@@ -465,8 +338,9 @@ int TorrentFile::event_file_write(fs::write_event * eo)
 		//printf("write error\n");
 		uint32_t block_index = get_block_from_id(eo->block_id);//(eo->id & (uint32_t)4294967295);
 		uint32_t piece = get_piece_from_id(eo->block_id);//(eo->id - block_index)>>32;
-		return unmark_block(piece, block_index);
+
 	}
+	return ERR_NO_ERROR;
 }
 
 
