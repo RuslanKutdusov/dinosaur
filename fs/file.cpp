@@ -16,10 +16,9 @@ file::file()
 	m_fictive = false;
 	m_fn = NULL;
 	m_fd = -1;
-	m_assoc = NULL;
 }
 
-file::file(const char * fn, uint64_t length, bool fictive, file_event * assoc)
+file::file(const char * fn, uint64_t length, bool fictive, const FileAssociation::ptr & assoc)
 {
 	if (fn == NULL || length == 0)
 		throw Exception("Can not create file");

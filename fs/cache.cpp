@@ -77,7 +77,7 @@ void cache::pop()
 }
 
 
-int cache::push(int file, const char * buf, uint32_t length, uint64_t offset, uint64_t id)
+int cache::push(File & file, const char * buf, uint32_t length, uint64_t offset, uint64_t id)
 {
 	if (m_count >= m_size)
 	{

@@ -76,41 +76,39 @@ FileManager::~FileManager() {
 		pthread_join(m_write_thread, &status);
 		pthread_mutex_destroy(&m_mutex);
 	}
-	for(std::map<int, file*>::iterator iter = m_files.begin(); iter != m_files.end(); ++iter)
+	for(std::set<File>::iterator iter = m_files.begin(); iter != m_files.end(); ++iter)
 	{
-		delete (*iter).second;
+		(*iter)->m_assoc.reset();
 	}
 }
 
-int FileManager::File_add(const char * fn, uint64_t length, bool fictive, file_event * assoc)
+int FileManager::File_add(const char * fn, uint64_t length, bool fictive, const FileAssociation::ptr & assoc, File & file_)
 {
 	if (fn == NULL)
 		return ERR_BAD_ARG;
-	file * f;
 	try
 	{
-		f = new file(fn, length, fictive, assoc);
+		file_.reset(new file(fn, length, fictive, assoc));
 	}
 	catch (Exception & e)
 	{
+		file_.reset();
 		return ERR_INTERNAL;
 	}
-	f->m_id = m_count;
 	pthread_mutex_lock(&m_mutex);
-	m_files[m_count++] = f;
+	m_files.insert(file_);
 	pthread_mutex_unlock(&m_mutex);
 	//printf("File added id=%d\n", f->m_id);
-	return f->m_id;
+	return ERR_NO_ERROR;
 }
 
-int FileManager::prepare_file(file * file)
+int FileManager::prepare_file(File & file)
 {
 	if (file == NULL)
 		return ERR_NULL_REF;
 	int fd;
-	int file_id = file->m_id;
 	//printf("preparing file id=%d\n", file_id);
-	if (m_fd_cache.get(file_id,&fd) == ERR_LRU_CACHE_NE)
+	if (m_fd_cache.get(file,&fd) == ERR_LRU_CACHE_NE)
 	{
 		//pthread_mutex_lock(&m_mutex);
 		if (file->_open() != ERR_NO_ERROR)
@@ -119,33 +117,33 @@ int FileManager::prepare_file(file * file)
 			//printf("can not open file\n");
 			return ERR_INTERNAL;
 		}
-		int deleted_file_id = -1;
+		File deleted_file;
 		int file_desc = file->m_fd;
-		if (m_fd_cache.put(file_id, file_desc, &deleted_file_id) != ERR_NO_ERROR)
+		if (m_fd_cache.put(file, file_desc, deleted_file) != ERR_NO_ERROR)
 		{
 			//pthread_mutex_unlock(&m_mutex);
 			//printf("can not put to fd cache\n");
 			return ERR_INTERNAL;
 		}
-		if(deleted_file_id != -1)
-			m_files[deleted_file_id]->_close();
+		if(deleted_file != NULL)
+			deleted_file->_close();
 		//pthread_mutex_unlock(&m_mutex);
 	}
 	//printf("prepare ok\n");
 	return ERR_NO_ERROR;
 }
 
-int FileManager::File_write(int file, const char * buf, uint32_t length, uint64_t offset, uint64_t block_id)
+int FileManager::File_write(File & file, const char * buf, uint32_t length, uint64_t offset, uint64_t block_id)
 {
 	//printf("File_write id=%d\n", file);
 	pthread_mutex_lock(&m_mutex);
-	if (buf == NULL || length == 0 || m_files.count(file) == 0)
+	if (buf == NULL || length == 0 )
 	{
 		pthread_mutex_unlock(&m_mutex);
 		//printf("bad args\n");
 		return ERR_BAD_ARG;
 	}
-	if (offset >= m_files[file]->m_length)
+	if (offset >= file->m_length)
 	{
 		pthread_mutex_unlock(&m_mutex);
 		//printf("offset overflow\n");
@@ -159,26 +157,25 @@ int FileManager::File_write(int file, const char * buf, uint32_t length, uint64_
 	return ret;
 }
 
-int FileManager::File_read_immediately(int _file, char * buf, uint64_t offset, uint64_t length)
+int FileManager::File_read_immediately(File & file, char * buf, uint64_t offset, uint64_t length)
 {
 	pthread_mutex_lock(&m_mutex);
-	if (buf == NULL || length == 0 || m_files.count(_file) == 0)
+	if (buf == NULL || length == 0)
 	{
 		pthread_mutex_unlock(&m_mutex);
 		return ERR_BAD_ARG;
 	}
-	file * f = m_files[_file];
-	if (offset >= f->m_length)
+	if (offset >= file->m_length)
 	{
 		pthread_mutex_unlock(&m_mutex);
 		return ERR_BAD_ARG;
 	}
-	if (prepare_file(f) != ERR_NO_ERROR)
+	if (prepare_file(file) != ERR_NO_ERROR)
 	{
 		pthread_mutex_unlock(&m_mutex);
 		return ERR_INTERNAL;
 	}
-	int r = f->_read(buf, offset, length);
+	int r = file->_read(buf, offset, length);
 	pthread_mutex_unlock(&m_mutex);
 	return r;
 }
@@ -213,21 +210,19 @@ void * FileManager::cache_thread(void * arg)
 			if (!fm->m_write_cache.empty())
 			{
 				write_cache_element * ce = fm->m_write_cache.front();
-				//memcpy(&ce, fm->m_write_cache.front(), sizeof(write_cache_element));
-				//fm->m_write_cache.pop();
-				//pthread_mutex_unlock(&fm->m_mutex);
-				file * f = fm->m_files[ce->file];
 				write_event we;
 				we.block_id = ce->block_id;
-				we.assoc = f->m_assoc;
-				if (fm->prepare_file(f) != ERR_NO_ERROR)
+				we.file = ce->file;
+				ce->file.reset();
+				if (fm->prepare_file(we.file) != ERR_NO_ERROR)
 					ret = -1;
 				else
-					ret = f->_write(ce->block, ce->offset, ce->length);
+					ret = we.file->_write(ce->block, ce->offset, ce->length);
 				//pthread_mutex_lock(&fm->m_mutex);
 				fm->m_write_cache.pop();
 				we.writted = ret;
 				fm->m_write_event.push_back(we);
+				we.file.reset();
 			}
 			pthread_mutex_unlock(&fm->m_mutex);
 			usleep(50);

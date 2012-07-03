@@ -16,12 +16,14 @@
 #include <map>
 #include <queue>
 #include <list>
-#include "../err/err_code.h"
-#include "../exceptions/exceptions.h"
-#include "../cfg/glob_cfg.h"
-#include "../consts.h"
-#include "../utils/utils.h"
-#include "../lru_cache/lru_cache.h"
+#include <boost/shared_ptr.hpp>
+#include <boost/enable_shared_from_this.hpp>
+#include "../dinosaur/src/err/err_code.h"
+#include "../dinosaur/src/exceptions/exceptions.h"
+#include "../dinosaur/src/cfg/glob_cfg.h"
+#include "../dinosaur/src/consts.h"
+#include "../dinosaur/src/utils/utils.h"
+#include "../dinosaur/src/lru_cache/lru_cache.h"
 #define BUFFER_SIZE 32768
 //#define CACHE_ELEMENT_SIZE BLOCK_LENGTH
 #define MAX_OPENED_FILES 512
@@ -35,34 +37,45 @@ struct buffer
 	size_t pos;
 };
 
+class FileManager;
+class file;
+typedef boost::shared_ptr<file> File;
+
 struct write_cache_element
 {
-	int file;
+	File file;
 	char block[BLOCK_LENGTH];
 	uint32_t length;
 	uint64_t offset;
 	uint64_t block_id;
+	write_cache_element()
+	:file(File())
+	{}
 };
-
-class FileManager;
-class file_event;
-
 
 struct write_event
 {
 	uint64_t block_id;
 	ssize_t writted;
-	file_event * assoc;//файл куда писали ассоциирован с этим классом
+	File file;
+	write_event()
+	:file(File())
+	{}
 };
 
-
-class file_event
+class FileAssociation : public boost::enable_shared_from_this<FileAssociation>
 {
 public:
-	file_event(){};
-	virtual ~file_event(){};
+	typedef boost::shared_ptr<FileAssociation> ptr;
+	FileAssociation(){}
+	virtual ~FileAssociation(){}
+	ptr get_ptr()
+	{
+		return shared_from_this();
+	}
 	virtual int event_file_write(write_event * eo) = 0;
 };
+
 
 class file
 {
@@ -71,11 +84,10 @@ private:
 	uint16_t m_fictive;
 	char * m_fn;
 	int m_fd;
-	int m_id;
-	file_event * m_assoc;
+	FileAssociation::ptr m_assoc;
 public:
 	file();
-	file(const char * fn, uint64_t length, bool fictive, file_event * assoc);
+	file(const char * fn, uint64_t length, bool fictive, const FileAssociation::ptr & assoc);
 	int _open();
 	int _write(const char * buf, uint64_t offset, uint64_t length);
 	int _read(char * buf, uint64_t offset, uint64_t length);
@@ -85,14 +97,14 @@ public:
 	friend class FileManager;
 };
 
-class FD_LRU_Cache : public lru_cache::LRU_Cache<int, int>//file id -> file descriptor
+class FD_LRU_Cache : public lru_cache::LRU_Cache<File, int>//file id -> file descriptor
 {
 private:
 
 public:
 	FD_LRU_Cache(){}
 	virtual ~FD_LRU_Cache(){}
-	int put(int file_id, int file_desc, int * deleted_file_id);
+	int put(File & file_id, int file_desc, File & deleted_file);
 	void dump();
 };
 
@@ -116,7 +128,7 @@ public:
 	~cache();
 	write_cache_element * front();
 	void pop();
-	int push(int file, const char * buf, uint32_t length, uint64_t offset, uint64_t id);
+	int push(File & file, const char * buf, uint32_t length, uint64_t offset, uint64_t id);
 	bool empty();
 	uint16_t count(){return m_count;}
 };
@@ -133,18 +145,18 @@ private:
 	//lockable vars
 	cache m_write_cache;
 	FD_LRU_Cache m_fd_cache;
-	std::map<int, file*> m_files;
+	std::set<File> m_files;
 	std::list<write_event> m_write_event;
 	static void * cache_thread(void * arg);
-	int prepare_file(file* file);
+	int prepare_file(File & file);
 public:
 	FileManager();
 	int Init(cfg::Glob_cfg * cfg);
 	int Init_for_tests(uint16_t write_cache_size, uint16_t fd_cache_size);
 	~FileManager();
-	int File_add(const char * fn, uint64_t length, bool fictive, file_event * assoc);
-	int File_write(int file, const char * buf, uint32_t length, uint64_t offset, uint64_t block_id );
-	int File_read_immediately(int file, char * buf, uint64_t offset, uint64_t length);
+	int File_add(const char * fn, uint64_t length, bool fictive, const FileAssociation::ptr & assoc, File & file);
+	int File_write(File & file, const char * buf, uint32_t length, uint64_t offset, uint64_t block_id );
+	int File_read_immediately(File & file, char * buf, uint64_t offset, uint64_t length);
 	bool get_write_event(write_event * id);
 	void test_dump_fd_cache()
 	{
