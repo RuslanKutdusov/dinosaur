@@ -246,7 +246,7 @@ void * FileManager::cache_thread(void * arg)
 				we.file.reset();
 			}
 			pthread_mutex_unlock(&fm->m_mutex);
-			usleep(50);
+			usleep(1000);
 		}
 		//printf("CACHE_THREAD stopped\n");
 		return (void*)ret;

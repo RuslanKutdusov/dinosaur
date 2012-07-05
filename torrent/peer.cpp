@@ -627,7 +627,7 @@ Peer::~Peer()
 #endif
 	if (m_bitfield != NULL)
 		delete[] m_bitfield;
-	DeleteSocket();
+	prepare2release();
 #ifdef BITTORRENT_DEBUG
 	printf("Peer destroyed\n");
 #endif

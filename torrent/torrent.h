@@ -37,7 +37,8 @@ enum TRACKER_STATE
 {
 	TRACKER_STATE_NONE,
 	TRACKER_STATE_CONNECT,
-	TRACKER_STATE_WORK
+	TRACKER_STATE_WORK,
+	TRACKER_STATE_STOPPING
 };
 
 //события трекера
@@ -129,12 +130,15 @@ private:
 	std::string m_announce;
 	TorrentPtr m_torrent;
 	std::string m_host;//доменное имя хоста, где находится трекер, нужен для заголовка HTTP запроса (Host: bla-bla-bla)
-	std::string m_params;//параметры в анонсе, нужен для формирования URN в HTTP загловке запроса
+	std::string m_params;//параметры в анонсе, нужен для формирования URN в HTTP-загловке запроса
 	network::Socket m_sock;
+	sockaddr_in * m_addr;
 	char m_infohash[SHA1_LENGTH * 3 + 1];//infohash в url encode
 	char m_buf[BUFFER_SIZE];//буфер, куда кидаем ответ от сервера
 	ssize_t m_buflen;//длина ответа в буфере
 	TRACKER_STATE m_state;
+	std::string m_status;
+	bool m_ready2release;
 	time_t m_last_update;
 	uint64_t m_downloaded;//с момента события started
 	uint64_t m_uploaded;//с момента события started
@@ -146,7 +150,6 @@ private:
 	uint64_t m_leechers;
 	sockaddr_in * m_peers;
 	int m_peers_count;
-	std::string m_status;
 	//берет хэш у Torrent и делает url encode
 	void hash2urlencode();
 	//обрабатывает ответ сервера, парсит его
@@ -157,6 +160,11 @@ private:
 	TRACKER_EVENT m_event_after_connect;
 	int restore_socket();
 	int parse_announce();
+	int send_completed();
+	void delete_socket()
+	{
+		m_nm->Socket_delete(m_sock);
+	}
 public:
 	Tracker();
 	Tracker(const TorrentPtr & torrent, std::string & announce);
@@ -171,26 +179,11 @@ public:
 	int get_peers_count();
 	const sockaddr_in * get_peer(int i);
 	int update();
-	int send_completed();
+	int prepare2release();
+	int clock(bool & release_me);
 	int send_stopped();
 	int send_started();
-	int clock();
 	int get_info(tracker_info * info);
-	void DeleteSocket()
-	{
-		m_nm->Socket_delete(m_sock);
-	}
-	void test_parse_announce(std::string & announce)
-	{
-		m_announce = announce;
-		if (parse_announce() == ERR_NO_ERROR)
-		{
-			std::cout<<m_host<<std::endl;
-			std::cout<<m_params<<std::endl;
-		}
-		else
-			std::cout<<"error"<<std::endl;
-	}
 };
 
 class Peer : public network::SocketAssociation
@@ -256,9 +249,10 @@ public:
 	double get_tx_speed();
 	std::string get_ip_str();
 	int get_info(peer_info * info);
-	void DeleteSocket()
+	int prepare2release()
 	{
 		m_nm->Socket_delete(m_sock);
+		return ERR_NO_ERROR;
 	}
 	~Peer();
 };

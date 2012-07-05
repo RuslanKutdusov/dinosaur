@@ -20,6 +20,7 @@
 
 namespace block_cache {
 
+//то что ссылка нормально, всего 4 байт вместо 60, если ставить хэш, ссылкой пользуемся лишь для сравнения
 typedef std::pair<void*, uint64_t> cache_key;//(reference to Torrent, piece+block)
 
 struct cache_element

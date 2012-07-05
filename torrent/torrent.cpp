@@ -98,13 +98,14 @@ void Torrent::Prepare2Release()
 {
 	for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
 	{
-		(*iter).second->DeleteSocket();
+		if ((*iter).second->prepare2release() != ERR_NO_ERROR)
+			m_trackers.erase(iter);
 	}
 	for(peer_map_iter iter = m_peers.begin(); iter != m_peers.end(); ++iter)
 	{
-		(*iter).second->DeleteSocket();
+		(*iter).second->prepare2release();
 	}
-	m_trackers.clear();
+	//m_trackers.clear();
 	m_peers.clear();
 	m_torrent_file->ReleaseFiles();
 	m_torrent_file.reset();
@@ -831,7 +832,10 @@ int Torrent::clock()
 	if (m_state == TORRENT_STATE_STARTED)
 		for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
 		{
-			(*iter).second->clock();
+			bool release_tracker_instance;
+			(*iter).second->clock(release_tracker_instance);
+			if (release_tracker_instance)
+				m_trackers.erase(iter);
 		}
 	return 0;
 }

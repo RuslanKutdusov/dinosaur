@@ -67,6 +67,7 @@ Bittorrent::~Bittorrent() {
 			if ((*iter).second.use_count() == 1)
 				m_torrents.erase(iter);
 		}
+		usleep(100000);
 	}
 	if (m_thread != 0)
 	{
