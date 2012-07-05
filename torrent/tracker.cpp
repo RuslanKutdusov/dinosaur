@@ -12,6 +12,9 @@ namespace torrent {
 Tracker::Tracker()
 	:network::SocketAssociation()
 {
+#ifdef BITTORRENT_DEBUG
+	printf("Tracker default constructor\n");
+#endif
 	memset(m_buf, 0, 16384);
 	m_buflen = 0;
 	m_peers = NULL;
@@ -45,9 +48,12 @@ int Tracker::parse_announce()
 	return ERR_NO_ERROR;
 }
 
-Tracker::Tracker(Torrent * torrent, std::string & announce)
+Tracker::Tracker(const TorrentPtr & torrent, std::string & announce)
 	:network::SocketAssociation()
 {
+#ifdef BITTORRENT_DEBUG
+	printf("Tracker constructor %s\n", announce.c_str());
+#endif
 	if (torrent == NULL || announce == "")
 		throw NoneCriticalException("Bad args");
 	m_torrent = torrent;
@@ -378,11 +384,15 @@ int Tracker::get_info(tracker_info * info)
 
 Tracker::~Tracker()
 {
+#ifdef BITTORRENT_DEBUG
 	printf("Tracker destructor\n");
+#endif
 	if(m_peers != NULL)
 		delete[] m_peers;
 	DeleteSocket();
+#ifdef BITTORRENT_DEBUG
 	printf("Tracker destroyed\n");
+#endif
 }
 
 }

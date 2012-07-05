@@ -18,16 +18,15 @@
 #include <list>
 #include <boost/shared_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
-#include "../dinosaur/src/err/err_code.h"
-#include "../dinosaur/src/exceptions/exceptions.h"
-#include "../dinosaur/src/cfg/glob_cfg.h"
-#include "../dinosaur/src/consts.h"
-#include "../dinosaur/src/utils/utils.h"
-#include "../dinosaur/src/lru_cache/lru_cache.h"
+#include "../err/err_code.h"
+#include "../exceptions/exceptions.h"
+#include "../cfg/glob_cfg.h"
+#include "../consts.h"
+#include "../utils/utils.h"
+#include "../lru_cache/lru_cache.h"
 #define BUFFER_SIZE 32768
 //#define CACHE_ELEMENT_SIZE BLOCK_LENGTH
 #define MAX_OPENED_FILES 512
-#define FS_DEBUG
 
 namespace fs {
 
@@ -89,7 +88,7 @@ public:
 	int _read(char * buf, uint64_t offset, uint64_t length);
 	void _close();
 	bool is_opened();
-#ifdef FS_DEBUG
+#ifdef BITTORRENT_DEBUG
 	const char * fn() const {return m_fn;}
 	int get_fd() const {return m_fd;}
 	void set_fd(int fd) { m_fd = fd; }

@@ -11,6 +11,9 @@ namespace torrent
 
 TorrentFile::TorrentFile()
 {
+#ifdef BITTORRENT_DEBUG
+	printf("TorrentFile default constructor\n");
+#endif
 	m_files = NULL;
 	m_length = 0;
 	m_files_count = 0;
@@ -21,7 +24,7 @@ TorrentFile::TorrentFile()
 	//std::cout<<"TorrentFile created(default)\n";
 }
 
-int TorrentFile::Init(Torrent * t, std::string & path,bool _new)
+int TorrentFile::Init(const TorrentPtr & t, std::string & path,bool _new)
 {
 	//std::cout<<"TorrentFile created\n";
 	if (t == NULL || path == "" || path[0] != '/')
@@ -86,7 +89,8 @@ int TorrentFile::Init(Torrent * t, std::string & path,bool _new)
 		strncat(m_files[i].name, i_path.c_str(), i_path.length());
 		strncat(m_files[i].name, t->m_files[i].name, strlen(t->m_files[i].name));
 		m_files[i].download = t->m_files[i].download;
-		m_files[i].fm_id = m_fm->File_add(m_files[i].name, m_files[i].length, false, t);
+		m_files[i].file = fs::File();
+		m_fm->File_add(m_files[i].name, m_files[i].length, false, shared_from_this(), m_files[i].file);
 	}
 	build_piece_offset_table();
 	return ERR_NO_ERROR;
@@ -94,6 +98,9 @@ int TorrentFile::Init(Torrent * t, std::string & path,bool _new)
 
 TorrentFile::~TorrentFile()
 {
+#ifdef BITTORRENT_DEBUG
+	printf("TorrentFile destructor\n");
+#endif
 	if (m_pieces != NULL)
 	{
 		for(uint32_t i=0;i<m_pieces_count;i++)
@@ -113,6 +120,9 @@ TorrentFile::~TorrentFile()
 	}
 	if (m_piece_for_check_hash != NULL)
 		delete[] m_piece_for_check_hash;
+#ifdef BITTORRENT_DEBUG
+	printf("TorrentFile destroyed\n");
+#endif
 }
 
 void TorrentFile::build_piece_offset_table()
@@ -173,7 +183,7 @@ int TorrentFile::save_block(uint32_t piece, uint32_t block_offset, uint32_t bloc
 		uint32_t to_write = block_length - pos > remain ? remain : block_length - pos;
 		//bad arg на этом этапе получить не реально, ошибку нехватки места в кэше не прокидываем,
 		//т.к блок сможем скачать позже у кого угодно
-		if (m_fm->File_write(m_files[file_index++].fm_id, &block[pos], to_write, offset, id) != ERR_NO_ERROR)
+		if (m_fm->File_write(m_files[file_index++].file, &block[pos], to_write, offset, id) != ERR_NO_ERROR)
 		{
 			//printf("can not save block %u %u\n", piece, block_index);
 
@@ -194,7 +204,7 @@ int TorrentFile::read_block(uint32_t piece, uint32_t block_index, char * block, 
 
 	uint64_t id = generate_block_id(piece, block_index);
 	//printf("look to cache...\n");
-	block_cache::cache_key key(m_torrent, id);
+	block_cache::cache_key key(m_torrent.get(), id);
 	//if (m_torrent->m_bc->get(m_torrent, id, block) == ERR_NO_ERROR)
 	if (m_torrent->m_bc->get(key, (block_cache::cache_element *)block) == ERR_NO_ERROR)
 		return ERR_NO_ERROR;
@@ -213,7 +223,7 @@ int TorrentFile::read_block(uint32_t piece, uint32_t block_index, char * block, 
 		uint32_t remain = m_files[file_index].length - offset;
 		//если прочитать надо больше, чем это возможно, читаем сколько можем(remain), иначе читаем все
 		uint32_t to_read = *block_length - pos > remain ? remain : *block_length - pos;
-		int ret = m_fm->File_read_immediately(m_files[file_index++].fm_id, &block[pos], offset, to_read);
+		int ret = m_fm->File_read_immediately(m_files[file_index++].file, &block[pos], offset, to_read);
 		if (ret < 0)
 			return ERR_INTERNAL;
 		pos += to_read;
@@ -258,7 +268,7 @@ int TorrentFile::read_piece(uint32_t piece_index)
 
 	while(pos < piece_length)
 	{
-		int r = m_fm->File_read_immediately(m_files[file_index++].fm_id, &m_piece_for_check_hash[pos], offset, to_read);
+		int r = m_fm->File_read_immediately(m_files[file_index++].file, &m_piece_for_check_hash[pos], offset, to_read);
 		if (r == -1)
 		{
 			return ERR_INTERNAL;
@@ -341,6 +351,16 @@ int TorrentFile::event_file_write(fs::write_event * eo)
 
 	}
 	return ERR_NO_ERROR;
+}
+
+void TorrentFile::ReleaseFiles()
+{
+	if (m_files == NULL)
+		return;
+	for(uint32_t i = 0; i < m_files_count; i++)
+	{
+		m_fm->File_delete(m_files[i].file);
+	}
 }
 
 

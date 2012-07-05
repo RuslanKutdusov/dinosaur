@@ -11,6 +11,9 @@ namespace fs {
 
 FileManager::FileManager()
 {
+#ifdef BITTORRENT_DEBUG
+	printf("FileManager default constructor\n");
+#endif
 	m_write_thread = 0;
 }
 
@@ -70,8 +73,9 @@ int FileManager::Init_for_tests(uint16_t write_cache_size, uint16_t fd_cache_siz
 }
 
 FileManager::~FileManager() {
-	// TODO Auto-generated destructor stub
-	//printf("FileManager destructor\n");
+#ifdef BITTORRENT_DEBUG
+	printf("FileManager destructor\n");
+#endif
 	if (m_write_thread != 0)
 	{
 		m_thread_stop = true;
@@ -83,6 +87,9 @@ FileManager::~FileManager() {
 	{
 		(*iter)->m_assoc.reset();
 	}
+#ifdef BITTORRENT_DEBUG
+	printf("FileManager destroyed\n");
+#endif
 }
 
 int FileManager::File_add(const char * fn, uint64_t length, bool fictive, const FileAssociation::ptr & assoc, File & file_)
@@ -140,7 +147,7 @@ int FileManager::File_write(File & file, const char * buf, uint32_t length, uint
 {
 	//printf("File_write id=%d\n", file);
 	pthread_mutex_lock(&m_mutex);
-	if (buf == NULL || length == 0 )
+	if (buf == NULL || length == 0 || file == NULL)
 	{
 		pthread_mutex_unlock(&m_mutex);
 		//printf("bad args\n");
@@ -163,7 +170,7 @@ int FileManager::File_write(File & file, const char * buf, uint32_t length, uint
 int FileManager::File_read_immediately(File & file, char * buf, uint64_t offset, uint64_t length)
 {
 	pthread_mutex_lock(&m_mutex);
-	if (buf == NULL || length == 0)
+	if (buf == NULL || length == 0|| file == NULL)
 	{
 		pthread_mutex_unlock(&m_mutex);
 		return ERR_BAD_ARG;

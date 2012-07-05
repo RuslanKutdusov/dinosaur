@@ -11,7 +11,7 @@
 #include <iostream>
 #include "fs.h"
 
-void test_write_to_file()
+/*void test_write_to_file()
 {
 	fs::FileManager fm;
 	fm.Init_for_tests(512, 1);
@@ -56,5 +56,5 @@ void test_fd_cache_test()
 	fm.test_dump_fd_cache();
 	std::cin>>id1;
 }
-
+*/
 #endif /* FS_TESTS_H_ */

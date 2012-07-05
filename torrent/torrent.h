@@ -119,7 +119,7 @@ public:
 };
 
 class Torrent;
-
+typedef boost::shared_ptr<Torrent> TorrentPtr;
 
 class Tracker : public network::SocketAssociation
 {
@@ -127,7 +127,7 @@ private:
 	network::NetworkManager * m_nm;
 	cfg::Glob_cfg * m_g_cfg;
 	std::string m_announce;
-	Torrent * m_torrent;
+	TorrentPtr m_torrent;
 	std::string m_host;//доменное имя хоста, где находится трекер, нужен для заголовка HTTP запроса (Host: bla-bla-bla)
 	std::string m_params;//параметры в анонсе, нужен для формирования URN в HTTP загловке запроса
 	network::Socket m_sock;
@@ -159,7 +159,7 @@ private:
 	int parse_announce();
 public:
 	Tracker();
-	Tracker(Torrent * torrent, std::string & announce);
+	Tracker(const TorrentPtr & torrent, std::string & announce);
 	virtual ~Tracker();
 	int event_sock_ready2read(network::Socket sock);
 	int event_sock_closed(network::Socket sock);
@@ -198,7 +198,7 @@ class Peer : public network::SocketAssociation
 private:
 	network::NetworkManager * m_nm;
 	cfg::Glob_cfg * m_g_cfg;
-	Torrent * m_torrent;
+	TorrentPtr m_torrent;
 	sockaddr_in m_addr;
 	network::Socket m_sock;
 	network::buffer m_buf;
@@ -220,8 +220,8 @@ private:
 	time_t m_sleep_time;
 public:
 	Peer();
-	int Init(sockaddr_in * addr, Torrent * torrent, PEER_ADD peer_add = PEER_ADD_TRACKER);
-	int Init(network::Socket & sock, Torrent * torrent, PEER_ADD peer_add = PEER_ADD_TRACKER);
+	int Init(sockaddr_in * addr, const TorrentPtr & torrent, PEER_ADD peer_add = PEER_ADD_TRACKER);
+	int Init(network::Socket & sock, const TorrentPtr & torrent, PEER_ADD peer_add = PEER_ADD_TRACKER);
 	int event_sock_ready2read(network::Socket sock);
 	int event_sock_closed(network::Socket sock);
 	int event_sock_sended(network::Socket sock);
@@ -268,7 +268,7 @@ struct file_info
 	uint64_t length;
 	char *  name;
 	bool download;
-	int fm_id;
+	fs::File file;
 };
 
 struct piece_offset
@@ -294,11 +294,11 @@ typedef tracker_map::iterator tracker_map_iter;
 typedef std::map<std::string, PeerPtr> peer_map;
 typedef peer_map::iterator peer_map_iter;
 
-class TorrentFile
+class TorrentFile : public fs::FileAssociation
 {
 private:
 	fs::FileManager * m_fm;
-	Torrent * m_torrent;
+	TorrentPtr m_torrent;
 	file_info * m_files;
 	uint64_t m_length;
 	uint32_t m_files_count;
@@ -311,7 +311,7 @@ private:
 public:
 	std::vector<piece_info> m_piece_info;
 	TorrentFile();
-	int Init(Torrent * t, std::string & path, bool _new);
+	int Init(const TorrentPtr & t, std::string & path, bool _new);
 	int save_block(uint32_t piece, uint32_t block_offset, uint32_t block_length, char * block);
 	int read_block(uint32_t piece, uint32_t block_index, char * block, uint32_t * block_length);
 	int read_piece(uint32_t piece_index);
@@ -322,6 +322,7 @@ public:
 	uint32_t get_piece_length(uint32_t piece);
 	int get_block_index_by_offset(uint32_t piece_index, uint32_t block_offset, uint32_t * index);
 	int get_block_length_by_index(uint32_t piece_index, uint32_t block_index, uint32_t * block_length);
+	void ReleaseFiles();
 	~TorrentFile();
 };
 
@@ -356,7 +357,7 @@ public:
 	int progress;
 };
 
-class Torrent : public fs::file_event
+class Torrent : public boost::enable_shared_from_this<Torrent>
 {
 private:
 	network::NetworkManager * m_nm;
@@ -384,7 +385,6 @@ private:
 	unsigned char m_info_hash_bin[SHA1_LENGTH];
 	char m_info_hash_hex[SHA1_LENGTH * 2 + 1];
 	tracker_map m_trackers;
-	//TorrentFile m_torrent_file;
 	peer_map m_peers;
 	bool m_new;
 	bool m_multifile;
@@ -413,7 +413,7 @@ private:
 	int save_state();
 	int handle_download_task();
 public:
-	TorrentFile m_torrent_file;
+	boost::shared_ptr<TorrentFile> m_torrent_file;
 	void take_peers(int count, sockaddr_in * addrs);
 	void delete_peer(PeerPtr & peer);
 public:
@@ -430,7 +430,6 @@ public:
 	int continue_();
 	int check();
 	bool is_downloaded();
-	int event_file_write(fs::write_event * eo);
 	int event_piece_hash(uint32_t piece_index, bool ok, bool error);
 	int clock();
 	//добавляет пира либо от пользователя, либо от входящего соединения
@@ -440,13 +439,12 @@ public:
 	int get_info(torrent_info * info);
 	int save_meta2file(const char * filepath);
 	int erase_state();
+	void Prepare2Release();
 	virtual ~Torrent();
 	friend class Tracker;
 	friend class Peer;
 	friend class TorrentFile;
 };
-
-typedef boost::shared_ptr<Torrent> TorrentPtr;
 
 void set_bitfield(uint32_t piece, uint32_t piece_count, unsigned char * bitfield);
 void reset_bitfield(uint32_t piece, uint32_t piece_count, unsigned char * bitfield);

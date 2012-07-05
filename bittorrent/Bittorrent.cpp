@@ -53,7 +53,21 @@ Bittorrent::Bittorrent()
 
 Bittorrent::~Bittorrent() {
 	// TODO Auto-generated destructor stub
+#ifdef BITTORRENT_DEBUG
 	printf("Bittorrent destructor\n");
+#endif
+	for(torrent_map_iter iter = m_torrents.begin(); iter != m_torrents.end(); ++iter)
+	{
+		(*iter).second->Prepare2Release();
+	}
+	while(m_torrents.size() != 0)
+	{
+		for(torrent_map_iter iter = m_torrents.begin(); iter != m_torrents.end(); ++iter)
+		{
+			if ((*iter).second.use_count() == 1)
+				m_torrents.erase(iter);
+		}
+	}
 	if (m_thread != 0)
 	{
 		m_thread_stop = true;
@@ -62,6 +76,9 @@ Bittorrent::~Bittorrent() {
 		pthread_mutex_destroy(&m_mutex);
 	}
 	m_torrents.clear();
+#ifdef BITTORRENT_DEBUG
+	printf("Bittorrent destroyed\n");
+#endif
 }
 
 int Bittorrent::load_our_torrents()
@@ -446,18 +463,7 @@ void * Bittorrent::thread(void * arg)
 		bt->m_nm.clock();
 		pthread_mutex_lock(&bt->m_mutex);
 		bt->m_nm.notify();
-		//
-
-		fs::write_event eo;
-		eo.assoc = NULL;
-		if (bt->m_fm.get_write_event(&eo))
-		{
-			fs::file_event * f = (fs::file_event *)eo.assoc;
-			if (f != NULL)
-			{
-				f->event_file_write(&eo);
-			}
-		}
+		bt->m_fm.notify();
 		for(torrent_map_iter iter = bt->m_torrents.begin(); iter != bt->m_torrents.end(); ++iter)
 		{
 			(*iter).second->clock();

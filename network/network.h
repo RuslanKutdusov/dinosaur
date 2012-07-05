@@ -70,7 +70,7 @@ private:
 public:
 	DomainNameResolver(std::string & domain, struct sockaddr_in * addr);
 	DomainNameResolver(const char * domain, struct sockaddr_in * addr);
-	~DomainNameResolver(){}
+	~DomainNameResolver();
 };
 
 class SocketAssociation : public boost::enable_shared_from_this<SocketAssociation>
@@ -120,21 +120,27 @@ public:
 	:m_epoll_events(0),m_state(0), m_socket(-1), m_closed(true), m_connected(false), m_errno(0), m_timer(0), m_rx_last_time(get_time()),m_tx_last_time(get_time()),
 	 m_rx(0.0f), m_tx(0.0f), m_need2resolved(false), m_need2delete(false)
 	{
-		std::cout<<"Socket constructed\n";
+#ifdef BITTORRENT_DEBUG
+	printf("Socket constructor\n");
+#endif
 	}
 	~socket_()
 	{
+#ifdef BITTORRENT_DEBUG
 		std::cout<<"Socket destructed "<<m_socket<<" "<<m_domain<<" "<<inet_ntoa(m_peer.sin_addr)<<std::endl;
+#endif
 		close(m_socket);
 	}
 	int get_fd()
 	{
 		return m_socket;
 	}
+#ifdef BITTORRENT_DEBUG
 	void print_ip()
 	{
 		printf("%s\n", inet_ntoa(m_peer.sin_addr));
 	}
+#endif
 	friend class NetworkManager;
 };
 
@@ -205,6 +211,7 @@ public:
 			return -1;
 		return sock->m_send_buffer.length;
 	}
+#ifdef BITTORRENT_DEBUG
 	int test_view_socks()
 	{
 		for(socket_set_iter iter = m_sockets.begin(); iter != m_sockets.end(); ++iter)
@@ -231,6 +238,7 @@ public:
 		}
 		return 0;
 	}
+#endif
 	int clock();
 	void notify();
 };
