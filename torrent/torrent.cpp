@@ -525,9 +525,9 @@ void Torrent::take_peers(int count, sockaddr_in * addrs)
 			//если такого пира у нас нет, добавляем его
 			if (m_peers.count(key) == 0)
 			{
-				//PeerPtr peer(new Peer());
-				//peer->Init(&addrs[i], this, PEER_ADD_TRACKER);
-				//m_peers[key] = peer;
+				PeerPtr peer(new Peer());
+				peer->Init(&addrs[i], this, PEER_ADD_TRACKER);
+				m_peers[key] = peer;
 			}
 		}
 		catch(NoneCriticalException & e)

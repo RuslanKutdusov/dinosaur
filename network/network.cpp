@@ -300,6 +300,7 @@ int NetworkManager::clock()
 			m_closed_sockets.insert(sock);
 	}
 	pthread_mutex_unlock(&m_mutex_sockets);
+	return ERR_NO_ERROR;
 }
 
 void NetworkManager::notify()
@@ -316,12 +317,14 @@ void NetworkManager::notify()
 			}
 	}
 
+	pthread_mutex_lock(&m_mutex_sockets);
 	socket_set temp_ready2read_sockets = m_ready2read_sockets;
 	socket_set temp_sended_sockets = m_sended_sockets;
 	socket_set temp_closed_sockets = m_closed_sockets;
 	socket_set temp_connected_sockets = m_connected_sockets;
 	socket_set temp_timeout_sockets = m_timeout_sockets;
 	socket_set temp_unresolved_sockets = m_unresolved_sockets;
+	pthread_mutex_unlock(&m_mutex_sockets);
 
 	for(socket_set_iter iter = temp_ready2read_sockets.begin(); iter != temp_ready2read_sockets.end(); ++iter)
 	{

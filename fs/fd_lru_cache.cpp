@@ -38,8 +38,7 @@ int FD_LRU_Cache::put(File & file, int file_desc, File & deleted_file)
 			time_queue_left_iterator time_queue_iter_to_old_element = m_time_queue.left.begin();
 			//берем его ключ
 			File old_file = time_queue_iter_to_old_element->second;
-			if (deleted_file != NULL)
-				deleted_file = old_file;
+			deleted_file = old_file;
 			//находим ссылку на элемент
 			hash_table_iterator hash_table_iter_to_old_element = m_hash_table.find(old_file);
 			//добавляем ссылку в free_elements
@@ -78,16 +77,16 @@ int FD_LRU_Cache::put(File & file, int file_desc, File & deleted_file)
 
 void FD_LRU_Cache::dump()
 {
-	/*printf("HASHTABLE:\n");
+	printf("HASHTABLE:\n");
 	for (hash_table_iterator iter = m_hash_table.begin(); iter != m_hash_table.end(); ++iter)
 	{
-		printf("  key=%d value=%d\n",(*iter).first, *(*iter).second);
+		printf("  key=%X value=%d\n",(*iter).first.get(), *(*iter).second);
 	}
 	printf("TIME QUEUE:\n");
 	for(typename time_queue::left_iterator iter = m_time_queue.left.begin(); iter != m_time_queue.left.end(); ++iter)
 	{
-		printf("  key=%d value=%llu\n", (*iter).second, (*iter).first);
-	}*/
+		printf("  key=%X time=%llu\n", (*iter).second.get(), (*iter).first);
+	}
 }
 
 

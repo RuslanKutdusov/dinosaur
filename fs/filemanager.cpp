@@ -57,7 +57,10 @@ int FileManager::Init_for_tests(uint16_t write_cache_size, uint16_t fd_cache_siz
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-	pthread_mutex_init(&m_mutex, NULL);
+	pthread_mutexattr_t   mta;
+	pthread_mutexattr_init(&mta);
+	pthread_mutexattr_settype(&mta, PTHREAD_MUTEX_RECURSIVE);
+	pthread_mutex_init(&m_mutex, &mta);
 	pthread_cond_init (&m_cond, NULL);
 	//pthread_mutex_init(&m_mutex_timeout_sockets, NULL);
 	if (pthread_create(&m_write_thread, &attr, FileManager::cache_thread, (void *)this))
@@ -180,19 +183,26 @@ int FileManager::File_read_immediately(File & file, char * buf, uint64_t offset,
 	return r;
 }
 
-bool FileManager::get_write_event(write_event * id)
+void FileManager::notify()
 {
 	pthread_mutex_lock(&m_mutex);
-	if (m_write_event.size() == 0)
+	while(!m_write_event.empty())
 	{
-		pthread_mutex_unlock(&m_mutex);
-		return false;
+		write_event we = m_write_event.front();
+		m_write_event.pop_front();
+		we.file->m_assoc->event_file_write(&we);
 	}
-	//*id = m_write.front();
-	memcpy(id, &m_write_event.front(), sizeof(write_event));
-	m_write_event.pop_front();
 	pthread_mutex_unlock(&m_mutex);
-	return true;
+}
+
+void FileManager::File_delete(File & file)
+{
+	pthread_mutex_lock(&m_mutex);
+	m_files.erase(file);
+	m_fd_cache.remove(file);
+	file->m_instance2delete = true;
+	file.reset();
+	pthread_mutex_unlock(&m_mutex);
 }
 
 void * FileManager::cache_thread(void * arg)
@@ -209,11 +219,15 @@ void * FileManager::cache_thread(void * arg)
 			//printf("CACHE signal received\n");
 			if (!fm->m_write_cache.empty())
 			{
-				write_cache_element * ce = fm->m_write_cache.front();
+				const write_cache_element * ce = fm->m_write_cache.front();
+				if (ce->file->m_instance2delete)
+				{
+					fm->m_write_cache.pop();
+					continue;
+				}
 				write_event we;
 				we.block_id = ce->block_id;
 				we.file = ce->file;
-				ce->file.reset();
 				if (fm->prepare_file(we.file) != ERR_NO_ERROR)
 					ret = -1;
 				else

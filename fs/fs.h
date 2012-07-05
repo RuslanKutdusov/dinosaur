@@ -27,6 +27,7 @@
 #define BUFFER_SIZE 32768
 //#define CACHE_ELEMENT_SIZE BLOCK_LENGTH
 #define MAX_OPENED_FILES 512
+#define FS_DEBUG
 
 namespace fs {
 
@@ -48,9 +49,6 @@ struct write_cache_element
 	uint32_t length;
 	uint64_t offset;
 	uint64_t block_id;
-	write_cache_element()
-	:file(File())
-	{}
 };
 
 struct write_event
@@ -58,9 +56,6 @@ struct write_event
 	uint64_t block_id;
 	ssize_t writted;
 	File file;
-	write_event()
-	:file(File())
-	{}
 };
 
 class FileAssociation : public boost::enable_shared_from_this<FileAssociation>
@@ -85,6 +80,7 @@ private:
 	char * m_fn;
 	int m_fd;
 	FileAssociation::ptr m_assoc;
+	bool m_instance2delete;
 public:
 	file();
 	file(const char * fn, uint64_t length, bool fictive, const FileAssociation::ptr & assoc);
@@ -93,6 +89,13 @@ public:
 	int _read(char * buf, uint64_t offset, uint64_t length);
 	void _close();
 	bool is_opened();
+#ifdef FS_DEBUG
+	const char * fn() const {return m_fn;}
+	int get_fd() const {return m_fd;}
+	void set_fd(int fd) { m_fd = fd; }
+#endif
+	void get_name(std::string & name);
+	uint64_t get_length();
 	~file();
 	friend class FileManager;
 };
@@ -126,11 +129,12 @@ public:
 	cache();
 	void init_cache(uint16_t size);
 	~cache();
-	write_cache_element * front();
+	const write_cache_element * const front() const;
 	void pop();
-	int push(File & file, const char * buf, uint32_t length, uint64_t offset, uint64_t id);
-	bool empty();
-	uint16_t count(){return m_count;}
+	int push(const File & file, const char * buf, uint32_t length, uint64_t offset, uint64_t id);
+	bool empty() const;
+	uint16_t count() const
+	{return m_count;}
 };
 
 class FileManager {
@@ -157,11 +161,8 @@ public:
 	int File_add(const char * fn, uint64_t length, bool fictive, const FileAssociation::ptr & assoc, File & file);
 	int File_write(File & file, const char * buf, uint32_t length, uint64_t offset, uint64_t block_id );
 	int File_read_immediately(File & file, char * buf, uint64_t offset, uint64_t length);
-	bool get_write_event(write_event * id);
-	void test_dump_fd_cache()
-	{
-		m_fd_cache.dump();
-	}
+	void File_delete(File & file);
+	void notify();
 };
 
 
