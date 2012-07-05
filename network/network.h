@@ -131,11 +131,11 @@ public:
 #endif
 		close(m_socket);
 	}
+#ifdef BITTORRENT_DEBUG
 	int get_fd()
 	{
 		return m_socket;
 	}
-#ifdef BITTORRENT_DEBUG
 	void print_ip()
 	{
 		printf("%s\n", inet_ntoa(m_peer.sin_addr));
@@ -193,23 +193,24 @@ public:
 	int Socket_get_assoc(Socket & sock, SocketAssociation::ptr & assoc);
 	double Socket_get_rx_speed(Socket & sock);
 	double Socket_get_tx_speed(Socket & sock);
-	int get_sock_errno(socket_ * sock)
+	int Socket_get_addr(Socket & sock, sockaddr_in * addr);
+	int get_sock_errno(Socket & sock)
 	{
 		if (sock == NULL)
 			return ERR_BAD_ARG;
 		return sock->m_errno;
 	}
-	const char * get_sock_errno_str(socket_ * sock)
+	const char * get_sock_errno_str(Socket & sock)
 	{
 		if (sock == NULL)
 			return NULL;
 		return sys_errlist[sock->m_errno];
 	}
-	ssize_t Socket_send_buf_len(socket_ * sock)
+	ssize_t Socket_sendbuf_remain(Socket & sock)
 	{
 		if (sock == NULL)
 			return -1;
-		return sock->m_send_buffer.length;
+		return sock->m_send_buffer.length - sock->m_send_buffer.pos;
 	}
 #ifdef BITTORRENT_DEBUG
 	int test_view_socks()
@@ -220,7 +221,7 @@ public:
 			std::cout<<"Socket fd = "<<sock->m_socket<<std::endl;
 			std::cout<<"       cl = "<<sock->m_closed<<std::endl;
 			std::cout<<"       cn = "<<sock->m_connected<<std::endl;
-			std::cout<<"       er = "<<sock->m_errno<<" "<<get_sock_errno_str(sock.get())<<std::endl;
+			std::cout<<"       er = "<<sock->m_errno<<" "<<get_sock_errno_str(sock)<<std::endl;
 			char * ip = inet_ntoa (sock->m_peer.sin_addr ) ;
 			std::cout<<"       IP:port ="<<ip<<":"<<ntohs(sock->m_peer.sin_port)<<std::endl;
 			std::cout<<"       Recvbuffer"<<std::endl;
