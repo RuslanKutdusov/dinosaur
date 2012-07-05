@@ -120,14 +120,15 @@ public:
 	:m_epoll_events(0),m_state(0), m_socket(-1), m_closed(true), m_connected(false), m_errno(0), m_timer(0), m_rx_last_time(get_time()),m_tx_last_time(get_time()),
 	 m_rx(0.0f), m_tx(0.0f), m_need2resolved(false), m_need2delete(false)
 	{
+		memset(&m_peer, 0, sizeof(sockaddr_in));
 #ifdef BITTORRENT_DEBUG
-	printf("Socket constructor\n");
+	printf("Socket constructor %X\n", this);
 #endif
 	}
 	~socket_()
 	{
 #ifdef BITTORRENT_DEBUG
-		std::cout<<"Socket destructed "<<m_socket<<" "<<m_domain<<" "<<inet_ntoa(m_peer.sin_addr)<<std::endl;
+		printf("Socket destructed %X %d %s %s\n", this, m_socket, m_domain.c_str(), inet_ntoa(m_peer.sin_addr));
 #endif
 		close(m_socket);
 	}

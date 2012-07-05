@@ -56,10 +56,12 @@ Bittorrent::~Bittorrent() {
 #ifdef BITTORRENT_DEBUG
 	printf("Bittorrent destructor\n");
 #endif
+	pthread_mutex_lock(&m_mutex);
 	for(torrent_map_iter iter = m_torrents.begin(); iter != m_torrents.end(); ++iter)
 	{
 		(*iter).second->Prepare2Release();
 	}
+	pthread_mutex_unlock(&m_mutex);
 	while(m_torrents.size() != 0)
 	{
 		for(torrent_map_iter iter = m_torrents.begin(); iter != m_torrents.end(); ++iter)

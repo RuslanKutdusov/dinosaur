@@ -101,6 +101,9 @@ int NetworkManager::Socket_add(const char * ip, uint16_t port, const SocketAssoc
 
 int NetworkManager::Socket_add_domain(const char *domain_name, uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock)
 {
+#ifdef BITTORRENT_DEBUG
+	printf("Adding socket %s\n", domain_name);
+#endif
 	sock.reset(new socket_());
 	if (sock == NULL || domain_name == NULL)
 		return ERR_INTERNAL;;
@@ -131,6 +134,9 @@ int NetworkManager::Socket_add_domain(std::string & domain_name, uint16_t port, 
 
 int NetworkManager::Socket_add(struct sockaddr_in * addr, const SocketAssociation::ptr & assoc, Socket & sock)
 {
+#ifdef BITTORRENT_DEBUG
+	printf("Adding socket %s\n",  inet_ntoa(addr->sin_addr));
+#endif
 	sock.reset(new socket_());
 	if (sock == NULL)
 		return ERR_INTERNAL;

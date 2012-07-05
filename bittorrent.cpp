@@ -215,7 +215,7 @@ int main(int argc,char* argv[]) {
 	{
 		init_gui();
 	}
-	catch(Exception e)
+	catch(Exception  &e)
 	{
 		e.print();
 	}
