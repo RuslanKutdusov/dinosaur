@@ -30,6 +30,8 @@ struct config_file
 	uint16_t cache_size;
 	uint64_t tracker_default_interval;
 	uint32_t tracker_numwant;
+	uint32_t max_active_seeders;
+	uint32_t max_active_leechers;
 };
 
 class Glob_cfg {
@@ -41,6 +43,8 @@ private:
 	uint16_t m_cache_size;
 	uint64_t m_tracker_default_interval;
 	uint32_t m_tracker_numwant;
+	uint32_t m_max_active_seeders;
+	uint32_t m_max_active_leechers;
 public:
 	Glob_cfg(){}
 	Glob_cfg(std::string work_directory)
@@ -88,6 +92,8 @@ public:
 		cf.cache_size = m_cache_size;
 		cf.tracker_default_interval = m_tracker_default_interval;
 		cf.tracker_numwant = m_tracker_numwant;
+		cf.max_active_seeders = m_max_active_seeders;
+		cf.max_active_leechers = m_max_active_leechers;
 		ssize_t ret = write(fd, &cf, sizeof(config_file));
 		if (ret == -1)
 			return ERR_SYSCALL_ERROR;
@@ -114,6 +120,8 @@ public:
 		m_tracker_default_interval = cf.tracker_default_interval;
 		m_tracker_numwant = cf.tracker_numwant;
 		m_download_directory = cf.download_directory;
+		m_max_active_seeders = cf.max_active_seeders;
+		m_max_active_leechers = cf.max_active_leechers;
 		return ERR_NO_ERROR;
 	}
 	int init_default_config()
@@ -131,6 +139,8 @@ public:
 		m_tracker_numwant = 300;
 		m_cache_size = 512;
 		m_tracker_default_interval = 600;
+		m_max_active_seeders = 20;
+		m_max_active_leechers = 10;
 		return ERR_NO_ERROR;
 	}
 	void get_download_directory(std::string * s)
@@ -160,6 +170,14 @@ public:
 	uint64_t get_tracker_default_interval()
 	{
 		return m_tracker_default_interval;
+	}
+	uint32_t get_max_active_seeders()
+	{
+		return m_max_active_seeders;
+	}
+	uint32_t get_max_active_leechers()
+	{
+		return m_max_active_leechers;
 	}
 	~Glob_cfg(){}
 };
