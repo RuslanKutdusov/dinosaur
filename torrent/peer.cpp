@@ -29,26 +29,26 @@ Peer::Peer()
 	memset(&m_buf, 0, sizeof(network::buffer));
 }
 
-int Peer::Init(sockaddr_in * addr, const TorrentBasePtr & torrent, PEER_ADD peer_add )
+int Peer::Init(sockaddr_in * addr, const TorrentInterfaceForPeerPtr & torrent, PEER_ADD peer_add )
 {
 	if (addr == NULL)
 		return ERR_BAD_ARG;
 	network::Socket sock;
-	if (torrent->m_nm->Socket_add(addr, shared_from_this(), sock) != ERR_NO_ERROR)
+	if (torrent->get_nm()->Socket_add(addr, shared_from_this(), sock) != ERR_NO_ERROR)
 		return ERR_INTERNAL;
 	return Init(sock, torrent, peer_add);
 }
 
-int Peer::Init(network::Socket & sock, const TorrentBasePtr & torrent, PEER_ADD peer_add)
+int Peer::Init(network::Socket & sock, const TorrentInterfaceForPeerPtr & torrent, PEER_ADD peer_add)
 {
 	if (sock == NULL || torrent == NULL)
 		return ERR_BAD_ARG;
 	memset(&m_buf, 0, sizeof(network::buffer));
 	m_torrent = torrent;
-	m_nm = torrent->m_nm;
-	m_g_cfg = torrent->m_g_cfg;
-	m_bitfield = new unsigned char[m_torrent->m_bitfield_len];
-	memset(m_bitfield, 0, m_torrent->m_bitfield_len);
+	m_nm = torrent->get_nm();
+	m_g_cfg = torrent->get_cfg();
+	m_bitfield = new unsigned char[m_torrent->get_bitfield_length()];
+	memset(m_bitfield, 0, m_torrent->get_bitfield_length());
 	m_sleep_time = 0;
 	m_peer_choking= true;
 	m_peer_interested = false;
@@ -86,7 +86,8 @@ int Peer::send_handshake()
 	memset(handshake, 0, HANDSHAKE_LENGHT);
 	handshake[0] = '\x13';
 	strncpy(&handshake[1], "BitTorrent protocol", 19);
-	memcpy(&handshake[28], m_torrent->m_info_hash_bin, 20);
+	//memcpy(&handshake[28], m_torrent->m_info_hash_bin, 20);
+	m_torrent->copy_infohash_bin(&handshake[28]);
 	m_g_cfg->get_peer_id(&handshake[48]);
 	if (m_nm->Socket_send(m_sock, handshake, HANDSHAKE_LENGHT) == HANDSHAKE_LENGHT)
 		return ERR_NO_ERROR;
@@ -98,12 +99,13 @@ int Peer::send_bitfield()
 {
 	if (m_state == PEER_STATE_WAIT_HANDSHAKE)
 		return ERR_INTERNAL;
-	int len =  m_torrent->m_bitfield_len;
+	int len =  m_torrent->get_bitfield_length();
 	char * bitfield = new char[5 + len];
 	uint32_t net_len = htonl(len + 1);
 	memcpy(bitfield, &net_len, 4);
 	bitfield[4] = '\x05';
-	memcpy(&bitfield[5], m_torrent->m_bitfield, len);
+	//memcpy(&bitfield[5], m_torrent->m_bitfield, len);
+	m_torrent->copy_bitfield(&bitfield[5]);
 	int ret =  m_nm->Socket_send(m_sock, bitfield, 5 + len);
 	delete[] bitfield;
 	if (ret == 5 + len)
@@ -248,7 +250,8 @@ int Peer::process_messages()
 	if (m_buf.length - m_buf.pos >= HANDSHAKE_LENGHT &&
 		m_buf.data[m_buf.pos] == '\x13' &&
 		memcmp(&m_buf.data[m_buf.pos + 1], "BitTorrent protocol", 19) == 0 &&
-		memcmp(&m_buf.data[m_buf.pos + 28], m_torrent->m_info_hash_bin, SHA1_LENGTH) == 0)
+		//memcmp(&m_buf.data[m_buf.pos + 28], m_torrent->m_info_hash_bin, SHA1_LENGTH) == 0)
+		m_torrent->memcmp_infohash_bin(&m_buf.data[m_buf.pos + 28]) == 0)
 	{
 		if (m_state != PEER_STATE_WAIT_HANDSHAKE)
 			return ERR_INTERNAL;
@@ -258,6 +261,9 @@ int Peer::process_messages()
 	char ip[16];
 	memset(ip, 0, 16);
 	strcpy(ip,  inet_ntoa(m_sock->m_peer.sin_addr));
+	uint32_t piece_count = m_torrent->get_piece_count();
+	TorrentFilePtr tfp;
+	m_torrent->get_torrentfile(tfp);
 	while((int)m_buf.length - (int)m_buf.pos > 4)
 	{
 		uint32_t len = 0;
@@ -302,21 +308,21 @@ int Peer::process_messages()
 				uint32_t piece_index;
 				memcpy(&piece_index, &m_buf.data[m_buf.pos], 4);
 				piece_index = ntohl(piece_index);
-				if (piece_index >= m_torrent->m_piece_count)
+				if (piece_index >= piece_count)
 					return ERR_INTERNAL;
 				m_available_pieces.insert(piece_index);
-				set_bitfield(piece_index, m_torrent->m_piece_count, m_bitfield);
+				set_bitfield(piece_index, piece_count, m_bitfield);
 				break;
 			case '\x05'://bitfield: <len=0001+X><id=5><bitfield>
 
-				if (len - 1 != m_torrent->m_bitfield_len)
+				if (len - 1 != m_torrent->get_bitfield_length())
 					return ERR_INTERNAL;
 				if (m_state == PEER_STATE_WAIT_HANDSHAKE)
 					return ERR_INTERNAL;
 				memcpy(m_bitfield, &m_buf.data[m_buf.pos], len - 1);
-				for(uint32_t i = 0; i < m_torrent->m_piece_count; i++)
+				for(uint32_t i = 0; i < piece_count; i++)
 				{
-					if (bit_in_bitfield(i, m_torrent->m_piece_count, m_bitfield))
+					if (bit_in_bitfield(i, piece_count, m_bitfield))
 						m_available_pieces.insert(i);
 				}
 				break;
@@ -337,10 +343,10 @@ int Peer::process_messages()
 				if (length == 0 || length > BLOCK_LENGTH || offset % BLOCK_LENGTH != 0)
 					return ERR_INTERNAL;
 				uint32_t block_index;
-				if (m_torrent->m_torrent_file->get_block_index_by_offset(index, offset, &block_index) != ERR_NO_ERROR)
+				if (tfp->get_block_index_by_offset(index, offset, &block_index) != ERR_NO_ERROR)
 					return ERR_INTERNAL;
 				uint32_t real_block_length;
-				if (m_torrent->m_torrent_file->get_block_length_by_index(index, block_index, &real_block_length) != ERR_NO_ERROR || real_block_length != length)
+				if (tfp->get_block_length_by_index(index, block_index, &real_block_length) != ERR_NO_ERROR || real_block_length != length)
 					return ERR_INTERNAL;
 				//кладем индекс блока в очередь запросов
 				block_id = generate_block_id(index, block_index);
@@ -362,7 +368,7 @@ int Peer::process_messages()
 				if (offset % BLOCK_LENGTH != 0)
 					return ERR_INTERNAL;
 				m_downloaded += block_length;
-				if (m_torrent->m_torrent_file->save_block(index, offset, block_length, &m_buf.data[m_buf.pos + 8]) != ERR_NO_ERROR)
+				if (tfp->save_block(index, offset, block_length, &m_buf.data[m_buf.pos + 8]) != ERR_NO_ERROR)
 					return ERR_INTERNAL;
 				break;
 			}
@@ -384,10 +390,10 @@ int Peer::process_messages()
 				if (length == 0 || length > BLOCK_LENGTH || offset % BLOCK_LENGTH != 0)
 					return ERR_INTERNAL;
 				uint32_t block_index;
-				if (m_torrent->m_torrent_file->get_block_index_by_offset(index, offset, &block_index) != ERR_NO_ERROR)
+				if (tfp->get_block_index_by_offset(index, offset, &block_index) != ERR_NO_ERROR)
 					return ERR_INTERNAL;
 				uint32_t real_block_length;
-				if (m_torrent->m_torrent_file->get_block_length_by_index(index, block_index, &real_block_length) != ERR_NO_ERROR || real_block_length != length)
+				if (tfp->get_block_length_by_index(index, block_index, &real_block_length) != ERR_NO_ERROR || real_block_length != length)
 					return ERR_INTERNAL;
 				block_id = generate_block_id(index, block_index);
 				m_requests_queue.erase(block_id);
@@ -469,7 +475,7 @@ int Peer::event_sock_unresolved(network::Socket sock)
 
 bool Peer::have_piece(uint32_t piece_index)
 {
-	return bit_in_bitfield(piece_index, m_torrent->m_piece_count, m_bitfield);
+	return bit_in_bitfield(piece_index, m_torrent->get_piece_count(), m_bitfield);
 }
 
 int Peer::clock()
@@ -517,11 +523,14 @@ int Peer::clock()
 		uint32_t piece_index = get_piece_from_id(id);
 		uint32_t block_index = get_block_from_id(id);
 		//если удалось прочитать блок и отправить, удаляем индекс блока из очереди
-		if (m_torrent->m_torrent_file->read_block(piece_index, block_index, block, &block_length) == ERR_NO_ERROR &&
+		TorrentFilePtr tfp;
+		m_torrent->get_torrentfile(tfp);
+		if (tfp->read_block(piece_index, block_index, block, &block_length) == ERR_NO_ERROR &&
 				send_piece(piece_index, BLOCK_LENGTH * block_index, block_length, block) == ERR_NO_ERROR)
 		{
 			m_requests_queue.erase(iter);
-			m_torrent->m_uploaded += block_length;
+			//m_torrent->m_uploaded += block_length;
+			m_torrent->inc_uploaded(block_length);
 			m_uploaded += block_length;
 			//printf("rx=%f tx=%f\n", get_rx_speed(), get_tx_speed());
 		}
@@ -614,7 +623,7 @@ int Peer::get_info(peer_info * info)
 	info->upSpeed = get_tx_speed();
 	info->downloaded = m_downloaded;
 	info->uploaded = m_uploaded;
-	info->available = m_available_pieces.size() / m_torrent->m_piece_count;
+	info->available = m_available_pieces.size() / m_torrent->get_piece_count();
 	memset(info->ip, 0, 22);
 	memcpy(info->ip, m_ip.c_str(), 22);
 	return ERR_NO_ERROR;

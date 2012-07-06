@@ -59,7 +59,7 @@ Bittorrent::~Bittorrent() {
 	pthread_mutex_lock(&m_mutex);
 	for(torrent_map_iter iter = m_torrents.begin(); iter != m_torrents.end(); ++iter)
 	{
-		(*iter).second->Prepare2Release();
+		(*iter).second->prepare2release();
 	}
 	pthread_mutex_unlock(&m_mutex);
 	while(m_torrents.size() != 0)
@@ -133,7 +133,7 @@ int Bittorrent::init_torrent(const  char * filename, std::string * hash, bool is
 	if (hash == NULL)
 		return ERR_NULL_REF;
 	*hash = "";
-	torrent::TorrentBasePtr torrent(new torrent::TorrentBase());
+	torrent::TorrentInterfaceBasePtr torrent((torrent::TorrentInterfaceBase *)new torrent::TorrentBase());
 	std::string err = "";
 	if (torrent->Init(filename,&m_nm,&m_gcfg, &m_fm, &m_bc, m_directory, is_new) != ERR_NO_ERROR)
 	{
@@ -159,9 +159,9 @@ int Bittorrent::init_torrent(const  char * filename, std::string * hash, bool is
 	return ERR_NO_ERROR;
 }
 
-int Bittorrent::OpenTorrent(char * filename, torrent::TorrentBasePtr & torrent)
+int Bittorrent::OpenTorrent(char * filename, torrent::TorrentInterfaceBasePtr & torrent)
 {
-	torrent.reset(new torrent::TorrentBase());
+	torrent.reset((torrent::TorrentInterfaceBase *)new torrent::TorrentBase());
 	std::string err = "";
 	if (torrent->Init(filename,&m_nm,&m_gcfg, &m_fm, &m_bc, m_directory, true) != ERR_NO_ERROR)
 	{
@@ -173,7 +173,7 @@ int Bittorrent::OpenTorrent(char * filename, torrent::TorrentBasePtr & torrent)
 	return ERR_NO_ERROR;
 }
 
-int Bittorrent::AddTorrent(torrent::TorrentBasePtr & torrent, std::string * hash)
+int Bittorrent::AddTorrent(torrent::TorrentInterfaceBasePtr & torrent, std::string * hash)
 {
 	if (torrent == NULL)
 	{
@@ -307,7 +307,7 @@ int Bittorrent::DeleteTorrent(std::string & hash)
 		return ERR_SEE_ERROR;
 	}
 	pthread_mutex_lock(&m_mutex);
-	torrent::TorrentBasePtr torrent = m_torrents[hash];
+	torrent::TorrentInterfaceBasePtr torrent = m_torrents[hash];
 	m_torrents.erase(hash);
 	torrent->stop();
 	torrent->erase_state();

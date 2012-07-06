@@ -20,7 +20,7 @@ GtkLabel* label_dir;
 GtkLabel* label_piece_number;
 GtkLabel* label_piece_length;
 bittorrent::Bittorrent * bt;
-torrent::TorrentBasePtr torrent2add;
+torrent::TorrentInterfaceBasePtr torrent2add;
 
 enum
 {
@@ -191,6 +191,7 @@ extern "C" void on_open_dialog_button_ok_clicked (GtkWidget *object, gpointer us
 		gtk_object_destroy(GTK_OBJECT(open_dialog));
 		messagebox(bt->get_error().c_str());
 		open_dialog = NULL;
+		torrent2add.reset();
 		return;
 	}
 	if (bt->StartTorrent(hash, dir_str) != ERR_NO_ERROR)
@@ -198,12 +199,14 @@ extern "C" void on_open_dialog_button_ok_clicked (GtkWidget *object, gpointer us
 		gtk_object_destroy(GTK_OBJECT(open_dialog));
 		messagebox(bt->get_error().c_str());
 		open_dialog = NULL;
+		torrent2add.reset();
 		return;
 	}
 	g_free(dir);
 	//commit
 	gtk_object_destroy(GTK_OBJECT(open_dialog));
 	open_dialog = NULL;
+	torrent2add.reset();
 	on_window1_show(NULL,NULL);
 }
 

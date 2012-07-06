@@ -24,45 +24,46 @@ TorrentFile::TorrentFile()
 	//std::cout<<"TorrentFile created(default)\n";
 }
 
-int TorrentFile::Init(const TorrentBasePtr & t, std::string & path,bool _new)
+int TorrentFile::Init(const TorrentInterfaceForTorrentFilePtr & t, std::string & path,bool _new)
 {
 	//std::cout<<"TorrentFile created\n";
 	if (t == NULL || path == "" || path[0] != '/')
 		return ERR_BAD_ARG;
-	m_piece_for_check_hash = new(std::nothrow) char[t->m_piece_length];
+	m_piece_for_check_hash = new(std::nothrow) char[t->get_piece_length()];
 	if (m_piece_for_check_hash == NULL)
 	{
-		t->m_error = GENERAL_ERROR_NO_MEMORY_AVAILABLE;
+		t->set_error(GENERAL_ERROR_NO_MEMORY_AVAILABLE);
 		return ERR_SYSCALL_ERROR;
 	}
 
 	m_torrent = t;
-	m_fm = t->m_fm;
-	m_pieces_count = t->m_piece_count;
-	m_piece_length = t->m_piece_length;
-	m_files_count  = t->m_files_count;
-	m_length = t->m_length;
+	m_fm = t->get_fm();
+	m_pieces_count = t->get_piece_count();
+	m_piece_length = t->get_piece_length();
+	m_files_count  = t->get_files_count();
+	m_length = t->get_length();
 	m_pieces = new(std::nothrow) unsigned char*[m_pieces_count];
 	if (m_pieces == NULL)
 	{
-		t->m_error = GENERAL_ERROR_NO_MEMORY_AVAILABLE;
+		t->set_error(GENERAL_ERROR_NO_MEMORY_AVAILABLE);
 		return ERR_SYSCALL_ERROR;
 	}
 	for(uint32_t i = 0; i < m_pieces_count; i++)
 	{
-		m_pieces[i]=new(std::nothrow) unsigned char[20];
+		m_pieces[i]=new(std::nothrow) unsigned char[SHA1_LENGTH];
 		if (m_pieces[i] == NULL)
 		{
-			t->m_error = GENERAL_ERROR_NO_MEMORY_AVAILABLE;
+			t->set_error(GENERAL_ERROR_NO_MEMORY_AVAILABLE);
 			return ERR_SYSCALL_ERROR;
 		}
-		memcpy(m_pieces[i], &t->m_pieces[i*20], 20);
+		//memcpy(m_pieces[i], &t->m_pieces[i*20], 20);
+		t->copy_piece_hash(m_pieces[i], i);
 	}
 
 	m_files = new file_info[m_files_count];
 	if (m_files == NULL)
 	{
-		t->m_error = GENERAL_ERROR_NO_MEMORY_AVAILABLE;
+		t->set_error(GENERAL_ERROR_NO_MEMORY_AVAILABLE);
 		return ERR_SYSCALL_ERROR;
 	}
 	std::string i_path(path);
@@ -70,25 +71,31 @@ int TorrentFile::Init(const TorrentBasePtr & t, std::string & path,bool _new)
 		i_path.append("/");
 	//std::cout<<i_path<<std::endl;
 
-	if (m_torrent->m_multifile && m_torrent->m_dir_tree != NULL)
+	if (m_files_count > 1)
 	{
-		m_torrent->m_dir_tree->make_dir_tree(i_path);
-		i_path.append(m_torrent->m_name + "/");
+		if (m_torrent->get_dirtree() == NULL)
+		{
+			t->set_error(GENERAL_ERROR_UNDEF_ERROR);
+			return ERR_SYSCALL_ERROR;
+		}
+		m_torrent->get_dirtree()->make_dir_tree(i_path);
+		i_path.append(m_torrent->get_name() + "/");
 	}
 	for(uint32_t i = 0; i < m_files_count; i++)
 	{
-		m_files[i].length = t->m_files[i].length;
-		int l = strlen(t->m_files[i].name) + i_path.length();
+		file_info * fi = t->get_file_info(i);
+		m_files[i].length = fi->length;
+		int l = strlen(fi->name) + i_path.length();
 		m_files[i].name = new(std::nothrow) char[l + 1];// + \0
 		if (m_files[i].name  == NULL)
 		{
-			t->m_error = GENERAL_ERROR_NO_MEMORY_AVAILABLE;
+			t->set_error(GENERAL_ERROR_NO_MEMORY_AVAILABLE);
 			return ERR_SYSCALL_ERROR;
 		}
 		memset(m_files[i].name, 0, l + 1);
 		strncat(m_files[i].name, i_path.c_str(), i_path.length());
-		strncat(m_files[i].name, t->m_files[i].name, strlen(t->m_files[i].name));
-		m_files[i].download = t->m_files[i].download;
+		strncat(m_files[i].name, fi->name, strlen(fi->name));
+		m_files[i].download = fi->download;
 		m_files[i].file = fs::File();
 		m_fm->File_add(m_files[i].name, m_files[i].length, false, shared_from_this(), m_files[i].file);
 	}
@@ -206,7 +213,7 @@ int TorrentFile::read_block(uint32_t piece, uint32_t block_index, char * block, 
 	//printf("look to cache...\n");
 	block_cache::cache_key key(m_torrent.get(), id);
 	//if (m_torrent->m_bc->get(m_torrent, id, block) == ERR_NO_ERROR)
-	if (m_torrent->m_bc->get(key, (block_cache::cache_element *)block) == ERR_NO_ERROR)
+	if (m_torrent->get_bc()->get(key, (block_cache::cache_element *)block) == ERR_NO_ERROR)
 		return ERR_NO_ERROR;
 
 	//printf("not in cache, read from file\n");
@@ -230,7 +237,7 @@ int TorrentFile::read_block(uint32_t piece, uint32_t block_index, char * block, 
 		offset = 0;
 	}
 	//printf("Put in cache\n");
-	m_torrent->m_bc->put(key, (block_cache::cache_element*)block);
+	m_torrent->get_bc()->put(key, (block_cache::cache_element*)block);
 	return ERR_NO_ERROR;
 
 }

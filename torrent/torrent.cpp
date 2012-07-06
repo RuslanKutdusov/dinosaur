@@ -99,7 +99,7 @@ std::string TorrentBase::get_error()
 	return m_error;
 }
 
-void TorrentBase::Prepare2Release()
+void TorrentBase::prepare2release()
 {
 	for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
 	{
@@ -134,7 +134,8 @@ void TorrentBase::release()
 		delete[] m_files;
 	if (m_bitfield != NULL)
 		delete[] m_bitfield;
-
+	if (m_dir_tree != NULL)
+		delete m_dir_tree;
 	//std::cout<<"Torrent released\n";
 }
 
@@ -249,7 +250,6 @@ int TorrentBase::get_files_info_from_metafile(bencode::be_node * info)
 		//m_files->name[sl] = '\0';
 		m_files[0].download = true;
 		m_files_count = 1;
-		m_multifile = false;
 	}
 	else
 	{//определяем кол-во файлов
@@ -326,7 +326,6 @@ int TorrentBase::get_files_info_from_metafile(bencode::be_node * info)
 			m_files[i].download = true;
 			m_length += m_files[i].length;
 		}
-		m_multifile = true;
 	}
 	return ERR_NO_ERROR;
 }
@@ -389,6 +388,7 @@ int TorrentBase::calculate_info_hash(bencode::be_node * info, uint64_t metafile_
 		m_error = TORRENT_ERROR_INVALID_METAFILE;
 		return ERR_INTERNAL;
 	}
+	bencode::dump(info);
 	CSHA1 csha1;
 	csha1.Update((unsigned char*)bencoded_info,bencoded_info_len);
 	csha1.Final();
@@ -423,6 +423,9 @@ int TorrentBase::Init(std::string metafile, network::NetworkManager * nm, cfg::G
 			return ERR_NULL_REF; //throw FileException(errno);
 		}
 		m_metafile = bencode::decode(buf, m_metafile_len, true);
+#ifdef BITTORRENT_DEBUG
+		bencode::dump(m_metafile);
+#endif
 		free(buf);
 		if (!m_metafile)
 		{
@@ -550,7 +553,7 @@ void TorrentBase::add_seeders(int count, sockaddr_in * addrs)
 			if (m_seeders.count(key) == 0)
 			{
 				PeerPtr peer(new Peer());
-				peer->Init(&addrs[i], shared_from_this(), PEER_ADD_TRACKER);
+				peer->Init(&addrs[i], boost::static_pointer_cast<TorrentInterfaceForPeer>(shared_from_this()), PEER_ADD_TRACKER);
 				m_seeders[key] = peer;
 			}
 		}
@@ -573,7 +576,7 @@ int TorrentBase::add_leecher(network::Socket & sock)
 		if (m_leechers.count(key) == 0 || m_leechers[key] == NULL)
 		{
 			PeerPtr peer(new Peer());
-			peer->Init(sock, shared_from_this(), PEER_ADD_INCOMING);
+			peer->Init(sock, boost::static_pointer_cast<TorrentInterfaceForPeer>(shared_from_this()), PEER_ADD_INCOMING);
 			m_leechers[key] = peer;
 		}
 		else
@@ -613,7 +616,7 @@ int TorrentBase::start(std::string & download_directory)
 				m_download_directory.append("/");
 			save_state();
 		}
-		if (m_torrent_file->Init(shared_from_this(), m_download_directory, m_new) != ERR_NO_ERROR)
+		if (m_torrent_file->Init(boost::static_pointer_cast<TorrentInterfaceForTorrentFile>(shared_from_this()), m_download_directory, m_new) != ERR_NO_ERROR)
 			return ERR_FILE_ERROR;
 		for (std::vector<std::string>::iterator iter = m_announces.begin(); iter != m_announces.end(); ++iter)
 		{
@@ -621,7 +624,7 @@ int TorrentBase::start(std::string & download_directory)
 			TrackerPtr temp;
 			try
 			{
-				temp.reset(new Tracker(shared_from_this(), *iter));
+				temp.reset(new Tracker(boost::static_pointer_cast<TorrentInterfaceForTracker>(shared_from_this()), *iter));
 				m_trackers[*iter] = temp;
 			}
 			catch(NoneCriticalException & e)

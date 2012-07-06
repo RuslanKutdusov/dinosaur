@@ -50,7 +50,7 @@ int Tracker::parse_announce()
 	return ERR_NO_ERROR;
 }
 
-Tracker::Tracker(const TorrentBasePtr & torrent, std::string & announce)
+Tracker::Tracker(const TorrentInterfaceForTrackerPtr & torrent, std::string & announce)
 	:network::SocketAssociation()
 {
 #ifdef BITTORRENT_DEBUG
@@ -59,8 +59,8 @@ Tracker::Tracker(const TorrentBasePtr & torrent, std::string & announce)
 	if (torrent == NULL || announce == "")
 		throw NoneCriticalException("Bad args");
 	m_torrent = torrent;
-	m_nm = m_torrent->m_nm;
-	m_g_cfg = m_torrent->m_g_cfg;
+	m_nm = m_torrent->get_nm();
+	m_g_cfg = m_torrent->get_cfg();
 	m_announce = announce;
 	memset(m_buf, 0, 16384);
 	m_buflen = 0;
@@ -70,8 +70,8 @@ Tracker::Tracker(const TorrentBasePtr & torrent, std::string & announce)
 	m_leechers = 0;
 	m_peers = NULL;
 	m_addr = NULL;
-	m_downloaded = torrent->m_downloaded;
-	m_uploaded = torrent->m_uploaded;
+	m_downloaded = torrent->get_downloaded();
+	m_uploaded = torrent->get_uploaded();
 	m_peers_count = 0;
 	m_ready2release = false;
 	if (parse_announce() != ERR_NO_ERROR)
@@ -83,10 +83,12 @@ Tracker::Tracker(const TorrentBasePtr & torrent, std::string & announce)
 void Tracker::hash2urlencode()
 {
 	memset(m_infohash, 0, SHA1_LENGTH * 3 + 1);
+	unsigned char infohash_bin[SHA1_LENGTH];
+	m_torrent->copy_infohash_bin(infohash_bin);
 	for(int i = 0; i < SHA1_LENGTH; i++)
 	{
 		m_infohash[i * 3] = '%';
-		sprintf(&m_infohash[i * 3 + 1], "%02x", m_torrent->m_info_hash_bin[i]);
+		sprintf(&m_infohash[i * 3 + 1], "%02x", infohash_bin[i]);
 	}
 }
 
@@ -119,23 +121,23 @@ int Tracker::send_request(TRACKER_EVENT event )
 	if (event != TRACKER_EVENT_STARTED)
 	{
 		urn.append("&downloaded=");
-		sprintf(t, "%lld", m_torrent->m_downloaded - m_downloaded);
+		sprintf(t, "%lld", m_torrent->get_downloaded() - m_downloaded);
 		urn.append(t);
 
 		urn.append("&uploaded=");
-		sprintf(t, "%lld", m_torrent->m_uploaded - m_uploaded);
+		sprintf(t, "%lld", m_torrent->get_uploaded() - m_uploaded);
 		urn.append(t);
 	}
 	else
 	{
-		m_downloaded = m_torrent->m_downloaded;
-		m_uploaded = m_torrent->m_uploaded;
+		m_downloaded = m_torrent->get_downloaded();
+		m_uploaded = m_torrent->get_uploaded();
 
 		urn.append("&downloaded=0&uploaded=0");
 	}
 
 	urn.append("&left=");
-	sprintf(t, "%lld", m_torrent->m_length - m_torrent->m_downloaded);
+	sprintf(t, "%lld", m_torrent->get_length() - m_torrent->get_downloaded());
 	urn.append(t);
 
 	urn.append("&numwant=");
