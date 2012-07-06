@@ -190,8 +190,8 @@ private:
 	time_t m_sleep_time;
 public:
 	Peer();
-	int Init(sockaddr_in * addr, const TorrentInterfaceForPeerPtr & torrent, PEER_ADD peer_add = PEER_ADD_TRACKER);
-	int Init(network::Socket & sock, const TorrentInterfaceForPeerPtr & torrent, PEER_ADD peer_add = PEER_ADD_TRACKER);
+	int Init(sockaddr_in * addr, const TorrentInterfaceForPeerPtr & torrent);
+	int Init(network::Socket & sock, const TorrentInterfaceForPeerPtr & torrent, PEER_ADD peer_add);
 	int event_sock_ready2read(network::Socket sock);
 	int event_sock_closed(network::Socket sock);
 	int event_sock_sended(network::Socket sock);

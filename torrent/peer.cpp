@@ -29,14 +29,30 @@ Peer::Peer()
 	memset(&m_buf, 0, sizeof(network::buffer));
 }
 
-int Peer::Init(sockaddr_in * addr, const TorrentInterfaceForPeerPtr & torrent, PEER_ADD peer_add )
+int Peer::Init(sockaddr_in * addr, const TorrentInterfaceForPeerPtr & torrent)
 {
-	if (addr == NULL)
+	if (addr == NULL || torrent == NULL)
 		return ERR_BAD_ARG;
-	network::Socket sock;
-	if (torrent->get_nm()->Socket_add(addr, shared_from_this(), sock) != ERR_NO_ERROR)
-		return ERR_INTERNAL;
-	return Init(sock, torrent, peer_add);
+	memset(&m_buf, 0, sizeof(network::buffer));
+	m_torrent = torrent;
+	m_nm = torrent->get_nm();
+	m_g_cfg = torrent->get_cfg();
+	m_bitfield = new unsigned char[m_torrent->get_bitfield_length()];
+	memset(m_bitfield, 0, m_torrent->get_bitfield_length());
+	m_sleep_time = 0;
+	m_peer_choking= true;
+	m_peer_interested = false;
+	m_am_choking = false;//
+	m_am_interested = false;//
+	m_downloaded = 0;
+	m_uploaded = 0;
+	m_sock.reset();
+	if (m_nm == NULL || m_g_cfg == NULL)
+		return ERR_BAD_ARG;
+	memcpy(&m_addr, addr, sizeof(sockaddr_in));
+	m_state = PEER_STATE_SEND_HANDSHAKE;
+	get_peer_key(&m_sock->m_peer, &m_ip);//inet_ntoa(m_sock->m_peer.sin_addr);
+	return ERR_NO_ERROR;
 }
 
 int Peer::Init(network::Socket & sock, const TorrentInterfaceForPeerPtr & torrent, PEER_ADD peer_add)
@@ -497,6 +513,15 @@ int Peer::clock()
 	}
 	if (m_state == PEER_STATE_SEND_HANDSHAKE)
 	{
+		if (m_sock == NULL)
+		{
+			m_nm->Socket_add(&m_addr, shared_from_this(), m_sock);
+			if (m_sock == NULL)
+			{
+				goto_sleep();
+				return ERR_INTERNAL;
+			}
+		}
 		if (send_handshake() != ERR_NO_ERROR)
 			goto_sleep();
 		if (send_bitfield() != ERR_NO_ERROR)

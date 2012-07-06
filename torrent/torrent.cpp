@@ -553,7 +553,7 @@ void TorrentBase::add_seeders(int count, sockaddr_in * addrs)
 			if (m_seeders.count(key) == 0)
 			{
 				PeerPtr peer(new Peer());
-				peer->Init(&addrs[i], boost::static_pointer_cast<TorrentInterfaceForPeer>(shared_from_this()), PEER_ADD_TRACKER);
+				peer->Init(&addrs[i], boost::static_pointer_cast<TorrentInterfaceForPeer>(shared_from_this()));
 				m_seeders[key] = peer;
 			}
 		}
