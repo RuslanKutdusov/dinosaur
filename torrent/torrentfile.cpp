@@ -24,7 +24,7 @@ TorrentFile::TorrentFile()
 	//std::cout<<"TorrentFile created(default)\n";
 }
 
-int TorrentFile::Init(const TorrentPtr & t, std::string & path,bool _new)
+int TorrentFile::Init(const TorrentBasePtr & t, std::string & path,bool _new)
 {
 	//std::cout<<"TorrentFile created\n";
 	if (t == NULL || path == "" || path[0] != '/')

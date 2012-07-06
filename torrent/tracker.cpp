@@ -50,7 +50,7 @@ int Tracker::parse_announce()
 	return ERR_NO_ERROR;
 }
 
-Tracker::Tracker(const TorrentPtr & torrent, std::string & announce)
+Tracker::Tracker(const TorrentBasePtr & torrent, std::string & announce)
 	:network::SocketAssociation()
 {
 #ifdef BITTORRENT_DEBUG
@@ -236,7 +236,7 @@ int Tracker::process_response()
 	m_buflen = 0;
 	if (m_peers_count > 0)
 	{
-		m_torrent->take_peers(m_peers_count, m_peers);
+		m_torrent->add_seeders(m_peers_count, m_peers);
 	}
 	delete_socket();
 	return 0;

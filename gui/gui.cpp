@@ -20,7 +20,7 @@ GtkLabel* label_dir;
 GtkLabel* label_piece_number;
 GtkLabel* label_piece_length;
 bittorrent::Bittorrent * bt;
-torrent::TorrentPtr torrent2add;
+torrent::TorrentBasePtr torrent2add;
 
 enum
 {

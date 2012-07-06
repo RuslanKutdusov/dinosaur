@@ -29,7 +29,7 @@ Peer::Peer()
 	memset(&m_buf, 0, sizeof(network::buffer));
 }
 
-int Peer::Init(sockaddr_in * addr, const TorrentPtr & torrent, PEER_ADD peer_add )
+int Peer::Init(sockaddr_in * addr, const TorrentBasePtr & torrent, PEER_ADD peer_add )
 {
 	if (addr == NULL)
 		return ERR_BAD_ARG;
@@ -39,7 +39,7 @@ int Peer::Init(sockaddr_in * addr, const TorrentPtr & torrent, PEER_ADD peer_add
 	return Init(sock, torrent, peer_add);
 }
 
-int Peer::Init(network::Socket & sock, const TorrentPtr & torrent, PEER_ADD peer_add)
+int Peer::Init(network::Socket & sock, const TorrentBasePtr & torrent, PEER_ADD peer_add)
 {
 	if (sock == NULL || torrent == NULL)
 		return ERR_BAD_ARG;

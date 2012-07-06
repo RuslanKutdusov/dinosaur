@@ -28,7 +28,7 @@ namespace bittorrent {
 
 class Bittorrent : public network::SocketAssociation {
 private:
-	typedef std::map<std::string, torrent::TorrentPtr> torrent_map;
+	typedef std::map<std::string, torrent::TorrentBasePtr> torrent_map;
 	typedef torrent_map::iterator torrent_map_iter;
 	network::NetworkManager m_nm;
 	cfg::Glob_cfg m_gcfg;
@@ -50,8 +50,8 @@ private:
 	int init_torrent(const char * filename, std::string * hash, bool is_new);
 public:
 	Bittorrent();
-	int OpenTorrent(char * filename, torrent::TorrentPtr & torrent);
-	int AddTorrent(torrent::TorrentPtr & torrent, std::string * hash);
+	int OpenTorrent(char * filename, torrent::TorrentBasePtr & torrent);
+	int AddTorrent(torrent::TorrentBasePtr & torrent, std::string * hash);
 	int StartTorrent(std::string & hash, std::string & download_directory);
 	int StopTorrent(std::string & hash);
 	int PauseTorrent(std::string & hash);

@@ -33,70 +33,10 @@
 
 namespace torrent {
 
-enum TRACKER_STATE
-{
-	TRACKER_STATE_NONE,
-	TRACKER_STATE_CONNECT,
-	TRACKER_STATE_WORK,
-	TRACKER_STATE_STOPPING
-};
-
-//события трекера
-enum TRACKER_EVENT
-{
-	TRACKER_EVENT_STARTED,
-	TRACKER_EVENT_STOPPED,
-	TRACKER_EVENT_COMPLETED,
-	TRACKER_EVENT_NONE
-};
-//состояния автомата в классе Peer
-enum PEER_STATE
-{
-	PEER_STATE_SEND_HANDSHAKE,
-	PEER_STATE_WAIT_HANDSHAKE,
-	//PEER_STATE_WAIT_BITFIELD,
-	PEER_STATE_GENERAL_READY,
-	PEER_STATE_WAIT_UNCHOKE,
-	PEER_STATE_REQUEST_READY,
-	PEER_STATE_SLEEP
-};
-
 enum PEER_ADD
 {
 	PEER_ADD_TRACKER,
 	PEER_ADD_INCOMING
-};
-
-enum TORRENT_STATE
-{
-	TORRENT_STATE_NONE,
-	TORRENT_STATE_STARTED,
-	TORRENT_STATE_STOPPED,
-	TORRENT_STATE_PAUSED,
-	TORRENT_STATE_CHECKING
-};
-
-enum TORRENT_TASKS
-{
-		TORRENT_TASK_DOWNLOAD_PIECE,
-		TORRENT_TASK_CHECK_HASH
-};
-
-struct TORRENT_TASK
-{
-		TORRENT_TASKS task;
-		uint64_t task_data;//здесь будем хранить например номер куска для проверки
-};
-
-//так выглядит файл состояний
-struct state_file
-{
-	int version;
-	char download_directory[MAX_FILENAME_LENGTH];
-	//uint64_t downloaded;
-	uint64_t uploaded;
-	char future_use[256];
-	char bitfield[131072];
 };
 
 struct peer_info
@@ -119,16 +59,33 @@ public:
 	time_t update_in;
 };
 
-class Torrent;
-typedef boost::shared_ptr<Torrent> TorrentPtr;
+class TorrentBase;
+typedef boost::shared_ptr<TorrentBase> TorrentBasePtr;
 
 class Tracker : public network::SocketAssociation
 {
 private:
+	enum TRACKER_STATE
+	{
+		TRACKER_STATE_NONE,
+		TRACKER_STATE_CONNECT,
+		TRACKER_STATE_WORK,
+		TRACKER_STATE_STOPPING
+	};
+
+	//события трекера
+	enum TRACKER_EVENT
+	{
+		TRACKER_EVENT_STARTED,
+		TRACKER_EVENT_STOPPED,
+		TRACKER_EVENT_COMPLETED,
+		TRACKER_EVENT_NONE
+	};
+private:
 	network::NetworkManager * m_nm;
 	cfg::Glob_cfg * m_g_cfg;
 	std::string m_announce;
-	TorrentPtr m_torrent;
+	TorrentBasePtr m_torrent;
 	std::string m_host;//доменное имя хоста, где находится трекер, нужен для заголовка HTTP запроса (Host: bla-bla-bla)
 	std::string m_params;//параметры в анонсе, нужен для формирования URN в HTTP-загловке запроса
 	network::Socket m_sock;
@@ -167,7 +124,7 @@ private:
 	}
 public:
 	Tracker();
-	Tracker(const TorrentPtr & torrent, std::string & announce);
+	Tracker(const TorrentBasePtr & torrent, std::string & announce);
 	virtual ~Tracker();
 	int event_sock_ready2read(network::Socket sock);
 	int event_sock_closed(network::Socket sock);
@@ -189,9 +146,21 @@ public:
 class Peer : public network::SocketAssociation
 {
 private:
+	//состояния автомата в классе Peer
+	enum PEER_STATE
+	{
+		PEER_STATE_SEND_HANDSHAKE,
+		PEER_STATE_WAIT_HANDSHAKE,
+		//PEER_STATE_WAIT_BITFIELD,
+		PEER_STATE_GENERAL_READY,
+		PEER_STATE_WAIT_UNCHOKE,
+		PEER_STATE_REQUEST_READY,
+		PEER_STATE_SLEEP
+	};
+private:
 	network::NetworkManager * m_nm;
 	cfg::Glob_cfg * m_g_cfg;
-	TorrentPtr m_torrent;
+	TorrentBasePtr m_torrent;
 	sockaddr_in m_addr;
 	network::Socket m_sock;
 	network::buffer m_buf;
@@ -209,12 +178,12 @@ private:
 	std::set<uint64_t> m_requested_blocks;//блоки, которые мы запросили
 	std::set<uint64_t> m_requests_queue;//блоки, которые у нас запросили(очередь запросов)
 	int process_messages();
-	void init(network::Socket sock, Torrent * torrent, PEER_ADD peer_add);
+	void init(network::Socket sock, TorrentBase * torrent, PEER_ADD peer_add);
 	time_t m_sleep_time;
 public:
 	Peer();
-	int Init(sockaddr_in * addr, const TorrentPtr & torrent, PEER_ADD peer_add = PEER_ADD_TRACKER);
-	int Init(network::Socket & sock, const TorrentPtr & torrent, PEER_ADD peer_add = PEER_ADD_TRACKER);
+	int Init(sockaddr_in * addr, const TorrentBasePtr & torrent, PEER_ADD peer_add = PEER_ADD_TRACKER);
+	int Init(network::Socket & sock, const TorrentBasePtr & torrent, PEER_ADD peer_add = PEER_ADD_TRACKER);
 	int event_sock_ready2read(network::Socket sock);
 	int event_sock_closed(network::Socket sock);
 	int event_sock_sended(network::Socket sock);
@@ -292,7 +261,7 @@ class TorrentFile : public fs::FileAssociation
 {
 private:
 	fs::FileManager * m_fm;
-	TorrentPtr m_torrent;
+	TorrentBasePtr m_torrent;
 	file_info * m_files;
 	uint64_t m_length;
 	uint32_t m_files_count;
@@ -305,7 +274,7 @@ private:
 public:
 	std::vector<piece_info> m_piece_info;
 	TorrentFile();
-	int Init(const TorrentPtr & t, std::string & path, bool _new);
+	int Init(const TorrentBasePtr & t, std::string & path, bool _new);
 	int save_block(uint32_t piece, uint32_t block_offset, uint32_t block_length, char * block);
 	int read_block(uint32_t piece, uint32_t block_index, char * block, uint32_t * block_length);
 	int read_piece(uint32_t piece_index);
@@ -351,8 +320,40 @@ public:
 	int progress;
 };
 
-class Torrent : public boost::enable_shared_from_this<Torrent>
+class TorrentBase : public boost::enable_shared_from_this<TorrentBase>
 {
+private:
+	enum TORRENT_STATE
+	{
+		TORRENT_STATE_NONE,
+		TORRENT_STATE_STARTED,
+		TORRENT_STATE_STOPPED,
+		TORRENT_STATE_PAUSED,
+		TORRENT_STATE_CHECKING
+	};
+
+	enum TORRENT_TASKS
+	{
+			TORRENT_TASK_DOWNLOAD_PIECE,
+			TORRENT_TASK_CHECK_HASH
+	};
+
+	struct TORRENT_TASK
+	{
+			TORRENT_TASKS task;
+			uint64_t task_data;//здесь будем хранить например номер куска для проверки
+	};
+
+	//так выглядит файл состояний
+	struct state_file
+	{
+		int version;
+		char download_directory[MAX_FILENAME_LENGTH];
+		//uint64_t downloaded;
+		uint64_t uploaded;
+		char future_use[256];
+		char bitfield[131072];
+	};
 private:
 	network::NetworkManager * m_nm;
 	bencode::be_node * m_metafile;
@@ -379,7 +380,8 @@ private:
 	unsigned char m_info_hash_bin[SHA1_LENGTH];
 	char m_info_hash_hex[SHA1_LENGTH * 2 + 1];
 	tracker_map m_trackers;
-	peer_map m_peers;
+	peer_map m_seeders;
+	peer_map m_leechers;
 	bool m_new;
 	bool m_multifile;
 	uint64_t m_downloaded;
@@ -408,16 +410,13 @@ private:
 	int handle_download_task();
 public:
 	boost::shared_ptr<TorrentFile> m_torrent_file;
-	void take_peers(int count, sockaddr_in * addrs);
-	void delete_peer(PeerPtr & peer);
+	void add_seeders(int count, sockaddr_in * addrs);
+	int add_leecher(network::Socket & sock);
 public:
-	Torrent();
+	TorrentBase();
 	int Init(std::string metafile, network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc,
 			std::string & work_directory, bool is_new);
-	std::string get_error()
-	{
-		return m_error;
-	}
+	std::string get_error();
 	int start(std::string & download_directory);
 	int stop();
 	int pause();
@@ -426,15 +425,11 @@ public:
 	bool is_downloaded();
 	int event_piece_hash(uint32_t piece_index, bool ok, bool error);
 	int clock();
-	//добавляет пира либо от пользователя, либо от входящего соединения
-	//если от пользователя то требуемое состояние PEER_STATE_WAIT_HANDSHAKE
-	//если вх. соединение
-	int add_incoming_peer(network::Socket & sock);
 	int get_info(torrent_info * info);
 	int save_meta2file(const char * filepath);
 	int erase_state();
 	void Prepare2Release();
-	virtual ~Torrent();
+	virtual ~TorrentBase();
 	friend class Tracker;
 	friend class Peer;
 	friend class TorrentFile;
