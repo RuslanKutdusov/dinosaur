@@ -282,7 +282,7 @@ int Peer::process_messages()
 					return ERR_INTERNAL;
 				m_peer_choking = true;
 				if (m_state == PEER_STATE_WAIT_UNCHOKE)
-					m_state = PEER_STATE_GENERAL_READY;
+					return ERR_INTERNAL;//m_state = PEER_STATE_GENERAL_READY; иначе зацикливаемся
 				break;
 			case '\x01'://unchoke: <len=0001><id=1>
 				if ( m_state == PEER_STATE_WAIT_HANDSHAKE)
