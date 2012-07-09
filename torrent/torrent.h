@@ -181,12 +181,11 @@ private:
 	bool m_am_choking;//я блокирую пира
 	bool m_am_interested;//я заинтересован в пире
 	int m_state;
-	//bool m_connection_closed;
 	unsigned char * m_bitfield;
 	std::set<uint64_t> m_requested_blocks;//блоки, которые мы запросили
 	std::set<uint64_t> m_requests_queue;//блоки, которые у нас запросили(очередь запросов)
 	int process_messages();
-	//void init(network::Socket sock, TorrentBase * torrent, PEER_ADD peer_add);
+	void goto_sleep();
 	time_t m_sleep_time;
 public:
 	Peer();
@@ -199,7 +198,6 @@ public:
 	int event_sock_accepted(network::Socket sock, network::Socket accepted_sock);
 	int event_sock_timeout(network::Socket sock);
 	int event_sock_unresolved(network::Socket sock);
-	//int download_piece(uint32_t piece_index);
 	int send_have(uint32_t piece_index);
 	int send_handshake();
 	int send_bitfield();
@@ -211,12 +209,8 @@ public:
 	int send_piece(uint32_t piece, uint32_t offset, uint32_t length,  char * block);
 	bool have_piece(uint32_t piece_index);
 	int clock();
-	void goto_sleep();
-	int wake_up(network::Socket & sock, PEER_ADD peer_add);
-	bool is_sleep()
-	{
-		return m_state == PEER_STATE_SLEEP;
-	}
+	//int wake_up(network::Socket & sock, PEER_ADD peer_add);
+	bool is_sleep();
 	bool may_request();
 	bool request_limit();
 	bool no_requested_blocks();
@@ -264,6 +258,9 @@ typedef std::map<std::string, TrackerPtr> tracker_map;
 typedef tracker_map::iterator tracker_map_iter;
 typedef std::map<std::string, PeerPtr> peer_map;
 typedef peer_map::iterator peer_map_iter;
+
+typedef std::list<PeerPtr> peer_list;
+typedef peer_list::iterator peer_list_iter;
 
 class TorrentFile : public fs::FileAssociation
 {
@@ -390,6 +387,8 @@ protected:
 	char m_info_hash_hex[SHA1_LENGTH * 2 + 1];
 	tracker_map m_trackers;
 	peer_map m_seeders;
+	peer_list m_waiting_seeders;
+	peer_list m_active_seeders;
 	peer_map m_leechers;
 	TorrentFilePtr m_torrent_file;
 	bool m_new;
@@ -417,7 +416,7 @@ protected:
 	virtual int get_state();
 	virtual int save_state();
 	virtual int handle_download_task();
-	virtual void add_seeders(int count, sockaddr_in * addrs);
+	virtual void add_seeders(uint32_t count, sockaddr_in * addrs);
 	virtual int add_leecher(network::Socket & sock);
 	virtual int Init(std::string metafile, network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc,
 			std::string & work_directory, bool is_new);
@@ -490,7 +489,7 @@ class TorrentInterfaceForTracker : public TorrentInterfaceBase
 {
 public:
 	virtual ~TorrentInterfaceForTracker() {}
-	virtual void add_seeders(int count, sockaddr_in * addrs) = 0;
+	virtual void add_seeders(uint32_t count, sockaddr_in * addrs) = 0;
 };
 
 class TorrentInterfaceForTorrentFile : public TorrentInterfaceBase

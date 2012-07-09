@@ -496,21 +496,6 @@ bool Peer::have_piece(uint32_t piece_index)
 
 int Peer::clock()
 {
-	//крутим автомат
-	if (m_state == PEER_STATE_SLEEP && time(NULL) - m_sleep_time > PEER_SLEEP_TIME)
-	{
-		if (m_torrent->is_downloaded())
-			return ERR_NO_ERROR;
-		//m_sock = m_nm->Socket_add(&m_addr,m_torrent);
-		m_sock.reset();
-		m_nm->Socket_add(&m_addr, shared_from_this(), m_sock);
-		if (m_sock == NULL)
-		{
-			goto_sleep();
-			return ERR_INTERNAL;
-		}
-		m_state = PEER_STATE_SEND_HANDSHAKE;
-	}
 	if (m_state == PEER_STATE_SEND_HANDSHAKE)
 	{
 		if (m_sock == NULL)
@@ -554,7 +539,6 @@ int Peer::clock()
 				send_piece(piece_index, BLOCK_LENGTH * block_index, block_length, block) == ERR_NO_ERROR)
 		{
 			m_requests_queue.erase(iter);
-			//m_torrent->m_uploaded += block_length;
 			m_torrent->inc_uploaded(block_length);
 			m_uploaded += block_length;
 			//printf("rx=%f tx=%f\n", get_rx_speed(), get_tx_speed());
@@ -563,8 +547,22 @@ int Peer::clock()
 	return ERR_NO_ERROR;
 }
 
+
+bool Peer::is_sleep()
+{
+	if (m_state == PEER_STATE_SLEEP)
+	{
+		if (time(NULL) - m_sleep_time < PEER_SLEEP_TIME)
+			return true;
+		m_state = PEER_STATE_SEND_HANDSHAKE;
+		return false;
+	}
+	return false;
+}
+
 void Peer::goto_sleep()
 {
+	m_sleep_time = time(NULL);
 	if (m_state == PEER_STATE_SLEEP)
 		return;
 	m_nm->Socket_delete(m_sock);
@@ -574,37 +572,7 @@ void Peer::goto_sleep()
 	m_am_interested = false;//
 	memset(&m_buf, 0, sizeof(network::buffer));
 	//memset(m_bitfield, 0, m_torrent->m_bitfield_len);
-	m_sleep_time = time(NULL);
 	m_state = PEER_STATE_SLEEP;
-}
-
-int Peer::wake_up(network::Socket & sock, PEER_ADD peer_add)
-{
-	//если не спит
-	if (m_state != PEER_STATE_SLEEP)
-		return ERR_INTERNAL;
-	m_sock = sock;
-	if (peer_add == PEER_ADD_INCOMING)
-	{
-		printf("PEER_ADD_INCOMING %s\n", m_ip.c_str());
-		if (send_handshake() != ERR_NO_ERROR)
-			goto_sleep();
-		if (send_bitfield() != ERR_NO_ERROR)
-			goto_sleep();
-		m_state = PEER_STATE_GENERAL_READY;
-	}
-	if (peer_add == PEER_ADD_TRACKER)
-	{
-		m_sock.reset();
-		m_nm->Socket_add(&m_addr,shared_from_this(), m_sock);
-		if (m_sock == NULL)
-		{
-			goto_sleep();
-			return ERR_INTERNAL;
-		}
-		m_state = PEER_STATE_SEND_HANDSHAKE;
-	}
-	return ERR_NO_ERROR;
 }
 
 bool Peer::no_requested_blocks()

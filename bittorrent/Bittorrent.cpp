@@ -62,6 +62,7 @@ Bittorrent::~Bittorrent() {
 		(*iter).second->prepare2release();
 	}
 	pthread_mutex_unlock(&m_mutex);
+	time_t release_start = time(NULL);
 	while(m_torrents.size() != 0)
 	{
 		for(torrent_map_iter iter = m_torrents.begin(); iter != m_torrents.end(); ++iter)
@@ -70,6 +71,8 @@ Bittorrent::~Bittorrent() {
 				m_torrents.erase(iter);
 		}
 		usleep(100000);
+		if (time(NULL) - release_start > MAX_RELEASE_TIME)
+			break;
 	}
 	if (m_thread != 0)
 	{

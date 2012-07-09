@@ -115,6 +115,8 @@ void TorrentBase::prepare2release()
 		(*iter).second->prepare2release();
 	}
 	m_seeders.clear();
+	m_active_seeders.clear();
+	m_waiting_seeders.clear();
 	m_leechers.clear();
 	m_torrent_file->ReleaseFiles();
 	m_torrent_file.reset();
@@ -541,9 +543,10 @@ int TorrentBase::save_state()
 	return save_state_file(&sf);
 }
 
-void TorrentBase::add_seeders(int count, sockaddr_in * addrs)
+void TorrentBase::add_seeders(uint32_t count, sockaddr_in * addrs)
 {
-	for(int i = 0; i < count; i++)
+	count = count > m_g_cfg->get_tracker_numwant() ? m_g_cfg->get_tracker_numwant() : count;
+	for(uint32_t i = 0;	i < count;	i++)
 	{
 		try
 		{
@@ -555,9 +558,11 @@ void TorrentBase::add_seeders(int count, sockaddr_in * addrs)
 				PeerPtr peer(new Peer());
 				peer->Init(&addrs[i], boost::static_pointer_cast<TorrentInterfaceForPeer>(shared_from_this()));
 				m_seeders[key] = peer;
+				m_waiting_seeders.push_back(peer);
 			}
+
 		}
-		catch(NoneCriticalException & e)
+		catch(...)
 		{
 
 		}
@@ -573,7 +578,7 @@ int TorrentBase::add_leecher(network::Socket & sock)
 		std::string key;
 		get_peer_key(&sock->m_peer, &key);
 		//printf("add incoming peer %s\n", key.c_str());
-		if (m_leechers.count(key) == 0 || m_leechers[key] == NULL)
+		if ((m_leechers.count(key) == 0 || m_leechers[key] == NULL) && m_leechers.size() < m_g_cfg->get_max_active_leechers())
 		{
 			PeerPtr peer(new Peer());
 			peer->Init(sock, boost::static_pointer_cast<TorrentInterfaceForPeer>(shared_from_this()), PEER_ADD_INCOMING);
@@ -581,29 +586,19 @@ int TorrentBase::add_leecher(network::Socket & sock)
 		}
 		else
 		{
-			m_leechers[key]->wake_up(sock, PEER_ADD_INCOMING);
+			network::Socket s = sock;
+			m_nm->Socket_delete(s);
 		}
 		return ERR_NO_ERROR;
 	}
-	catch(NoneCriticalException & e)
+	catch(...)
 	{
-		//e.print();
+		network::Socket s = sock;
+		m_nm->Socket_delete(s);
 		return ERR_INTERNAL;
-		//continue;
 	}
 	return ERR_NO_ERROR;
 }
-
-/*void Torrent::delete_peer(PeerPtr & peer)
-{
-	if (peer != NULL)
-	{
-		//m_sockets.erase(peer->get_sock_id());
-		//peer->DeleteSocket();
-		m_peers.erase(peer->get_ip_str());
-		peer.reset();
-	}
-}*/
 
 int TorrentBase::start(std::string & download_directory)
 {
@@ -629,7 +624,9 @@ int TorrentBase::start(std::string & download_directory)
 			}
 			catch(NoneCriticalException & e)
 			{
+#ifdef BITTORRENT_DEBUG
 				e.print();
+#endif
 				continue;
 			}
 		}
@@ -652,10 +649,11 @@ int TorrentBase::stop()
 {
 	if (m_state == TORRENT_STATE_NONE && m_state != TORRENT_STATE_CHECKING)
 		return ERR_INTERNAL;
-	for(peer_map_iter p = m_seeders.begin(); p != m_seeders.end(); ++p)
+	for(peer_list_iter p = m_active_seeders.begin(); p != m_active_seeders.end(); ++p)
 	{
-		(*p).second->goto_sleep();
+		m_waiting_seeders.push_back(*p);
 	}
+	m_active_seeders.clear();
 	for(peer_map_iter p = m_leechers.begin(); p != m_leechers.end(); ++p)
 	{
 		(*p).second->prepare2release();
@@ -674,10 +672,11 @@ int TorrentBase::pause()
 {
 	if (m_state != TORRENT_STATE_STARTED && m_state != TORRENT_STATE_CHECKING)
 		return ERR_INTERNAL;
-	for(peer_map_iter p = m_seeders.begin(); p != m_seeders.end(); ++p)
+	for(peer_list_iter p = m_active_seeders.begin(); p != m_active_seeders.end(); ++p)
 	{
-		(*p).second->goto_sleep();
+		m_waiting_seeders.push_back(*p);
 	}
+	m_active_seeders.clear();
 	for(peer_map_iter p = m_leechers.begin(); p != m_leechers.end(); ++p)
 	{
 		(*p).second->prepare2release();
@@ -696,11 +695,6 @@ int TorrentBase::continue_()
 {
 	if (m_state != TORRENT_STATE_PAUSED && m_state != TORRENT_STATE_CHECKING)
 		return ERR_INTERNAL;
-	for(peer_map_iter p = m_seeders.begin(); p != m_seeders.end(); ++p)
-	{
-		network::Socket sock;
-		(*p).second->wake_up(sock, PEER_ADD_TRACKER);
-	}
 	for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
 	{
 		(*iter).second->send_started();
@@ -728,10 +722,11 @@ int TorrentBase::check()
 {
 	if (m_state == TORRENT_STATE_NONE)
 		return ERR_INTERNAL;
-	for(peer_map_iter p = m_seeders.begin(); p != m_seeders.end(); ++p)
+	for(peer_list_iter p = m_active_seeders.begin(); p != m_active_seeders.end(); ++p)
 	{
-		(*p).second->goto_sleep();
+		m_waiting_seeders.push_back(*p);
 	}
+	m_active_seeders.clear();
 	for(peer_map_iter p = m_leechers.begin(); p != m_leechers.end(); ++p)
 	{
 		(*p).second->prepare2release();
@@ -826,25 +821,80 @@ int TorrentBase::clock()
 	//printf("CLOCK\n");
 	m_rx_speed = 0.0f;
 	m_tx_speed = 0.0f;
-	if (m_state != TORRENT_STATE_STARTED && m_state != TORRENT_STATE_CHECKING)
-		return ERR_NO_ERROR;
-	for(peer_map_iter p = m_seeders.begin(); p != m_seeders.end(); ++p)
-	{
-		PeerPtr peer = (*p).second;
-		m_rx_speed += peer->get_rx_speed();
-		m_tx_speed += peer->get_tx_speed();
-		for(std::list<uint32_t>::iterator iter = m_have_list.begin();
-				iter != m_have_list.end();
-				++iter)
-		{
-			peer->send_have(*iter);
-		}
-		if (m_state == TORRENT_STATE_STARTED)
-			peer->clock();
-	}
-	m_have_list.clear();
 
-	if (m_task_queue.front().task == TORRENT_TASK_DOWNLOAD_PIECE)
+	if (m_state == TORRENT_STATE_STARTED)
+	{
+		if (m_active_seeders.size() < m_g_cfg->get_max_active_seeders() &&
+				m_waiting_seeders.size() > 0)
+		{
+			PeerPtr seed = m_waiting_seeders.front();
+			m_waiting_seeders.pop_front();
+			if (seed->is_sleep())
+				m_waiting_seeders.push_back(seed);
+			else
+				m_active_seeders.push_back(seed);
+		}
+		for(peer_list_iter seed_iter = m_active_seeders.begin(),
+							seed_iter_add = m_active_seeders.begin(); seed_iter != m_active_seeders.end(); seed_iter = seed_iter_add)
+		{
+			++seed_iter_add;
+			PeerPtr seed = *seed_iter;
+			seed->clock();
+			if (seed->is_sleep())
+			{
+				m_active_seeders.erase(seed_iter);
+				m_waiting_seeders.push_back(seed);
+			}
+			else
+			{
+				m_rx_speed += seed->get_rx_speed();
+				m_tx_speed += seed->get_tx_speed();
+				for(std::list<uint32_t>::iterator have_iter = m_have_list.begin();
+						have_iter != m_have_list.end();
+						++have_iter)
+				{
+					seed->send_have(*have_iter);
+				}
+			}
+		}
+
+		for(peer_map_iter leecher_iter = m_leechers.begin(); leecher_iter != m_leechers.end(); ++leecher_iter)
+		{
+			PeerPtr leecher = leecher_iter->second;
+			leecher->clock();
+			if (leecher->is_sleep())
+			{
+				leecher->prepare2release();
+				m_leechers.erase(leecher_iter);
+			}
+			else
+			{
+				m_rx_speed += leecher->get_rx_speed();
+				m_tx_speed += leecher->get_tx_speed();
+				for(std::list<uint32_t>::iterator have_iter = m_have_list.begin();
+						have_iter != m_have_list.end();
+						++have_iter)
+				{
+					leecher->send_have(*have_iter);
+				}
+			}
+		}
+		m_have_list.clear();
+
+		for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
+		{
+			bool release_tracker_instance;
+			(*iter).second->clock(release_tracker_instance);
+			if (release_tracker_instance)
+				m_trackers.erase(iter);
+		}
+	}
+	if (m_state == TORRENT_STATE_CHECKING)
+	{
+
+	}
+
+	/*if (m_task_queue.front().task == TORRENT_TASK_DOWNLOAD_PIECE)
 		handle_download_task();
 
 	if (m_task_queue.front().task == TORRENT_TASK_CHECK_HASH)
@@ -854,16 +904,8 @@ int TorrentBase::clock()
 		m_task_queue.pop_front();
 		if (m_task_queue.empty())
 			continue_();
-	}
+	}*/
 
-	if (m_state == TORRENT_STATE_STARTED)
-		for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
-		{
-			bool release_tracker_instance;
-			(*iter).second->clock(release_tracker_instance);
-			if (release_tracker_instance)
-				m_trackers.erase(iter);
-		}
 	return 0;
 }
 
@@ -916,23 +958,20 @@ int TorrentBase::get_info(torrent_info * info)
 	info->tx_speed = m_tx_speed;
 	info->uploaded = m_uploaded;
 	memcpy(info->info_hash_hex, m_info_hash_hex, SHA1_LENGTH * 2 + 1);
-	for(peer_map_iter iter = m_seeders.begin(); iter != m_seeders.end(); ++iter)
+	for(peer_list_iter iter = m_active_seeders.begin(); iter != m_active_seeders.end(); ++iter)
 	{
-		PeerPtr peer = (*iter).second;
-		if (!peer->is_sleep())
-		{
-			peer_info pi;
-			peer->get_info(&pi);
-			info->peers.push_back(pi);
-		}
+		PeerPtr seeder = *iter;
+		peer_info pi;
+		seeder->get_info(&pi);
+		info->peers.push_back(pi);
 	}
 	for(peer_map_iter iter = m_leechers.begin(); iter != m_leechers.end(); ++iter)
 	{
-		PeerPtr peer = (*iter).second;
-		if (!peer->is_sleep())
+		PeerPtr leecher = (*iter).second;
+		if (!leecher->is_sleep())
 		{
 			peer_info pi;
-			peer->get_info(&pi);
+			leecher->get_info(&pi);
 			info->peers.push_back(pi);
 		}
 	}
