@@ -248,7 +248,6 @@ struct piece_info
 	int file_index;//индекс файла, в котором начинается кусок
 	uint32_t length;//его длина
 	uint64_t offset;//смещение внутри файла до начала куска
-	uint32_t remain;//сколько осталось скачать
 	uint32_t block_count;//кол-во блоков в куске
 };
 
@@ -284,7 +283,6 @@ public:
 	int read_block(uint32_t piece, uint32_t block_index, char * block, uint32_t * block_length);
 	int read_piece(uint32_t piece_index);
 	bool check_piece_hash(uint32_t piece_index);
-	bool piece_is_done(uint32_t piece_index);
 	int event_file_write(fs::write_event * eo);
 	uint32_t get_blocks_count_in_piece(uint32_t piece);
 	uint32_t get_piece_length(uint32_t piece);

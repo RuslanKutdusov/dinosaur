@@ -51,7 +51,7 @@ int Peer::Init(sockaddr_in * addr, const TorrentInterfaceForPeerPtr & torrent)
 		return ERR_BAD_ARG;
 	memcpy(&m_addr, addr, sizeof(sockaddr_in));
 	m_state = PEER_STATE_SEND_HANDSHAKE;
-	get_peer_key(&m_sock->m_peer, &m_ip);//inet_ntoa(m_sock->m_peer.sin_addr);
+	get_peer_key(addr, &m_ip);//inet_ntoa(m_sock->m_peer.sin_addr);
 	return ERR_NO_ERROR;
 }
 

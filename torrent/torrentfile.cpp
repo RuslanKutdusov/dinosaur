@@ -154,7 +154,6 @@ void TorrentFile::build_piece_offset_table()
 		m_piece_info[i].file_index = file_index;
 		m_piece_info[i].length = piece_length;
 		m_piece_info[i].offset = abs_offset - file_offset;//смещение до начала куска внутри файла
-		m_piece_info[i].remain = piece_length;
 		m_piece_info[i].block_count = (uint32_t)ceil((double)piece_length / (double)BLOCK_LENGTH);
 	}
 }
@@ -287,13 +286,6 @@ int TorrentFile::read_piece(uint32_t piece_index)
 	return ERR_NO_ERROR;
 }
 
-bool TorrentFile::piece_is_done(uint32_t piece_index)
-{
-	if (piece_index >= m_pieces_count)
-		return false;
-	return m_piece_info[piece_index].remain == 0;
-}
-
 uint32_t TorrentFile::get_blocks_count_in_piece(uint32_t piece)
 {
 	if (piece >= m_pieces_count)
@@ -336,7 +328,7 @@ int TorrentFile::get_block_length_by_index(uint32_t piece_index, uint32_t block_
 
 int TorrentFile::event_file_write(fs::write_event * eo)
 {
-	if (eo->writted >= 0)
+	/*if (eo->writted >= 0)
 	{
 		uint32_t block_index = get_block_from_id(eo->block_id);//(eo->id & (uint32_t)4294967295);
 		uint32_t piece = get_piece_from_id(eo->block_id);//(eo->id - block_index)>>32;
@@ -356,7 +348,7 @@ int TorrentFile::event_file_write(fs::write_event * eo)
 		uint32_t block_index = get_block_from_id(eo->block_id);//(eo->id & (uint32_t)4294967295);
 		uint32_t piece = get_piece_from_id(eo->block_id);//(eo->id - block_index)>>32;
 
-	}
+	}*/
 	return ERR_NO_ERROR;
 }
 
