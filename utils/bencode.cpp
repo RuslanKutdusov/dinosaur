@@ -670,4 +670,96 @@ void _free(be_node * data)
 	delete data;
 }
 
+void copy_str(be_str * dst, be_str * src)
+{
+	dst->len = src->len;
+	if (src->len == 0)
+		dst->ptr = NULL;
+	else
+	{
+		dst->ptr = new char[src->len];
+		memcpy(dst->ptr, src->ptr, src->len);
+	}
+}
+
+be_node * copy(be_node * src)
+{
+	if (src == NULL)
+		return NULL;
+	if (src->type == BE_STR)
+	{
+		if (src->val.s.len < 0)
+			return NULL;
+		be_node * node = new be_node;
+		node->type = BE_STR;
+		copy_str(&node->val.s, &src->val.s);
+		/*node->val.s.len = src->val.s.len;
+		if (src->val.s.len == 0)
+			node->val.s.ptr = NULL;
+		else
+		{
+			node->val.s.ptr = new char[src->val.s.len];
+			memcpy(node->val.s.ptr, src->val.s.ptr, src->val.s.len);
+		}*/
+		return node;
+	}
+	if (src->type == BE_INT)
+	{
+		be_node * node = new be_node;
+		node->type = BE_INT;
+		node->val.i = src->val.i;
+		return node;
+	}
+	if (src->type == BE_LIST)
+	{
+		if (src->val.l.count < 0)
+			return NULL;
+		be_node * node = new be_node;
+		node->type = BE_LIST;
+		node->val.l.count = src->val.l.count;
+		if (node->val.l.count == 0)
+			node->val.l.elements = NULL;
+		else
+		{
+			node->val.l.elements = new be_node[node->val.l.count];
+			for(int i = 0; i< node->val.l.count; i++)
+			{
+				be_node * list_node =  copy(&src->val.l.elements[i]);
+				node->val.l.elements[i].type = list_node->type;
+				node->val.l.elements[i].val = list_node->val;
+				delete list_node;
+			}
+		}
+		return node;
+	}
+	if (src->type == BE_DICT)
+	{
+		if (src->val.d.count < 0)
+			return NULL;
+		be_node * node = new be_node;
+		node->type = BE_DICT;
+		node->val.d.count = src->val.d.count;
+		if (node->val.d.count == 0)
+		{
+			node->val.d.keys = NULL;
+			node->val.d.vals = NULL;
+		}
+		else
+		{
+			node->val.d.keys = new be_str[node->val.d.count];
+			node->val.d.vals = new be_node[node->val.d.count];
+			for(int i = 0; i < src->val.d.count; i++)
+			{
+				copy_str(&node->val.d.keys[i], &src->val.d.keys[i]);
+				be_node * val =  copy(&src->val.d.vals[i]);
+				node->val.d.vals[i].type = val->type;
+				node->val.d.vals[i].val = val->val;
+				delete val;
+			}
+		}
+		return node;
+	}
+	return NULL;
+}
+
 }

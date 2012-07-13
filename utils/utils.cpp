@@ -23,6 +23,12 @@ uint32_t get_block_from_id(uint64_t id)
 	return (id & (uint32_t)4294967295);
 }
 
+void get_piece_block_from_id(uint64_t id, uint32_t & piece, uint32_t & block)
+{
+	block = get_block_from_id(id);
+	piece = (id - block)>>32;
+}
+
 char *read_file(const char *file, uint64_t *len, uint64_t max_len)
 {
 	struct stat st;

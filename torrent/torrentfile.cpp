@@ -38,27 +38,8 @@ int TorrentFile::Init(const TorrentInterfaceForTorrentFilePtr & t, std::string &
 
 	m_torrent = t;
 	m_fm = t->get_fm();
-	m_pieces_count = t->get_piece_count();
-	m_piece_length = t->get_piece_length();
 	m_files_count  = t->get_files_count();
 	m_length = t->get_length();
-	m_pieces = new(std::nothrow) unsigned char*[m_pieces_count];
-	if (m_pieces == NULL)
-	{
-		t->set_error(GENERAL_ERROR_NO_MEMORY_AVAILABLE);
-		return ERR_SYSCALL_ERROR;
-	}
-	for(uint32_t i = 0; i < m_pieces_count; i++)
-	{
-		m_pieces[i]=new(std::nothrow) unsigned char[SHA1_LENGTH];
-		if (m_pieces[i] == NULL)
-		{
-			t->set_error(GENERAL_ERROR_NO_MEMORY_AVAILABLE);
-			return ERR_SYSCALL_ERROR;
-		}
-		//memcpy(m_pieces[i], &t->m_pieces[i*20], 20);
-		t->copy_piece_hash(m_pieces[i], i);
-	}
 
 	m_files = new file_info[m_files_count];
 	if (m_files == NULL)
@@ -108,14 +89,6 @@ TorrentFile::~TorrentFile()
 #ifdef BITTORRENT_DEBUG
 	printf("TorrentFile destructor\n");
 #endif
-	if (m_pieces != NULL)
-	{
-		for(uint32_t i=0;i<m_pieces_count;i++)
-		{
-			delete[] m_pieces[i];
-		}
-		delete[] m_pieces;
-	}
 	if (m_files != NULL)
 	{
 		for (uint32_t i = 0; i < m_files_count; i++)
@@ -130,32 +103,6 @@ TorrentFile::~TorrentFile()
 #ifdef BITTORRENT_DEBUG
 	printf("TorrentFile destroyed\n");
 #endif
-}
-
-void TorrentFile::build_piece_offset_table()
-{
-	m_piece_info.resize(m_pieces_count);
-	for (uint32_t i = 0; i < m_pieces_count; i++)
-	{
-		uint64_t abs_offset = i * m_piece_length;//смещение до начала куска
-		uint64_t piece_length = (i == m_pieces_count - 1) ? m_length - m_piece_length * i : m_piece_length; //размер последнего куска может быть меньше m_piece_length
-		int file_index = 0;
-		uint64_t last_files_length = 0;
-		for(uint32_t j = 0; j < m_files_count; j++)
-		{
-			last_files_length += m_files[j].length;//считает размер файлов, когда он станет больше смещения => кусок начинается в j-ом файле
-			if (last_files_length >= abs_offset)
-			{
-				file_index = j;
-				break;
-			}
-		}
-		uint64_t file_offset = last_files_length - m_files[file_index].length;//смещение до file_index файла
-		m_piece_info[i].file_index = file_index;
-		m_piece_info[i].length = piece_length;
-		m_piece_info[i].offset = abs_offset - file_offset;//смещение до начала куска внутри файла
-		m_piece_info[i].block_count = (uint32_t)ceil((double)piece_length / (double)BLOCK_LENGTH);
-	}
 }
 
 int TorrentFile::save_block(uint32_t piece, uint32_t block_offset, uint32_t block_length, char * block)
@@ -187,12 +134,9 @@ int TorrentFile::save_block(uint32_t piece, uint32_t block_offset, uint32_t bloc
 		uint32_t remain = m_files[file_index].length - offset;
 		//если данных для записи больше,чем это возможно, пишем в файл сколько можем(remain), иначе пишем все что есть
 		uint32_t to_write = block_length - pos > remain ? remain : block_length - pos;
-		//bad arg на этом этапе получить не реально, ошибку нехватки места в кэше не прокидываем,
-		//т.к блок сможем скачать позже у кого угодно
 		if (m_fm->File_write(m_files[file_index++].file, &block[pos], to_write, offset, id) != ERR_NO_ERROR)
 		{
-			//printf("can not save block %u %u\n", piece, block_index);
-
+			return ERR_INTERNAL;
 		}
 		pos += to_write;
 		offset = 0;
@@ -282,46 +226,6 @@ int TorrentFile::read_piece(uint32_t piece_index)
 		pos += r;
 		to_read -= r;
 		offset = 0;
-	}
-	return ERR_NO_ERROR;
-}
-
-uint32_t TorrentFile::get_blocks_count_in_piece(uint32_t piece)
-{
-	if (piece >= m_pieces_count)
-		return 0;
-	return m_piece_info[piece].block_count;
-}
-
-uint32_t TorrentFile::get_piece_length(uint32_t piece)
-{
-	if (piece >= m_pieces_count)
-		return 0;
-	return m_piece_info[piece].length;
-}
-
-
-int TorrentFile::get_block_index_by_offset(uint32_t piece_index, uint32_t block_offset, uint32_t * index)
-{
-	if (piece_index >= m_pieces_count)
-		return ERR_BAD_ARG;
-	uint32_t block_index = block_offset / BLOCK_LENGTH;
-	if (block_index >= m_piece_info[piece_index].block_count)
-		return ERR_BAD_ARG;
-	*index = block_index;
-	return ERR_NO_ERROR;
-}
-
-int TorrentFile::get_block_length_by_index(uint32_t piece_index, uint32_t block_index, uint32_t * block_length)
-{
-	if (piece_index >= m_pieces_count)
-		return ERR_BAD_ARG;
-	if (block_index >= m_piece_info[piece_index].block_count)
-		return ERR_BAD_ARG;
-	*block_length = BLOCK_LENGTH;
-	if (piece_index == m_pieces_count - 1 && block_index == m_piece_info[piece_index].block_count - 1)
-	{
-		*block_length = m_piece_info[piece_index].length - BLOCK_LENGTH * block_index;
 	}
 	return ERR_NO_ERROR;
 }

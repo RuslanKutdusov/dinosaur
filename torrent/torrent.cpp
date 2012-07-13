@@ -61,19 +61,9 @@ TorrentBase::TorrentBase()
 	std::string t = "";
 	init_members(NULL, NULL, NULL, NULL, t);
 	m_nm = NULL;
-	m_metafile = NULL;
-	m_creation_date = 0;
-	m_private = 0;
-	m_length = 0;
-	m_files = NULL;
-	m_files_count = 0;
-	m_piece_length = 0;
-	m_piece_count = 0;
-	m_pieces = NULL;
 	m_g_cfg = NULL;
 	m_downloaded = 0;
 	m_uploaded = 0;
-	m_bitfield = NULL;
 	m_fm = NULL;
 	m_bc = NULL;
 	m_rx_speed = 0.0f;
@@ -81,6 +71,7 @@ TorrentBase::TorrentBase()
 	m_state = TORRENT_STATE_NONE;
 	m_error = TORRENT_ERROR_NO_ERROR;
 	m_torrent_file.reset(new TorrentFile());
+	m_piece_manager.reset(new PieceManager());
 }
 
 TorrentBase::~TorrentBase()
@@ -101,6 +92,7 @@ std::string TorrentBase::get_error()
 
 void TorrentBase::prepare2release()
 {
+	m_state = TORRENT_STATE_RELEASING;
 	for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
 	{
 		if ((*iter).second->prepare2release() != ERR_NO_ERROR)
@@ -114,300 +106,38 @@ void TorrentBase::prepare2release()
 	{
 		(*iter).second->prepare2release();
 	}
+	m_piece_states.clear();
 	m_seeders.clear();
 	m_active_seeders.clear();
 	m_waiting_seeders.clear();
 	m_leechers.clear();
 	m_torrent_file->ReleaseFiles();
 	m_torrent_file.reset();
+	m_piece_manager.reset();
 }
 
 void TorrentBase::release()
 {
 	// TODO Auto-generated destructor stub
-	if (m_metafile != NULL)
-		bencode::_free(m_metafile);
-	for (int i = 0; i < m_files_count; i++)
-	{
-		if (m_files[i].name != NULL)
-			delete[] m_files[i].name;
-	}
-	if (m_files != NULL)
-		delete[] m_files;
-	if (m_bitfield != NULL)
-		delete[] m_bitfield;
-	if (m_dir_tree != NULL)
-		delete m_dir_tree;
+
 	//std::cout<<"Torrent released\n";
 }
 
 void TorrentBase::init_members(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc, std::string & work_directory)
 {
 	m_nm = nm;
-	m_metafile = NULL;
 	m_g_cfg = g_cfg;
 	m_fm = fm;
 	m_bc = bc;
 	m_work_directory = work_directory;
-	m_creation_date = 0;
-	m_private = 0;
-	m_length = 0;
-	m_files = NULL;
-	m_files_count = 0;
-	m_dir_tree = NULL;
-	m_piece_length = 0;
-	m_piece_count = 0;
-	m_pieces = NULL;
 	m_downloaded  = 0;
 	m_uploaded = 0;
-	m_bitfield = NULL;
-	m_bitfield_len = 0;
 	m_rx_speed = 0;
 	m_tx_speed = 0;
 	m_state = TORRENT_STATE_NONE;
 }
 
-int TorrentBase::get_announces_from_metafile()
-{
-	if (m_metafile == NULL)
-		return ERR_NULL_REF;
-	bencode::be_node * node;
-
-	if (bencode::get_node(m_metafile,"announce-list",&node) == 0 && bencode::is_list(node))
-	{
-		bencode::be_node * l;
-		for(int i = 0; bencode::get_node(node, i, &l) == 0; i++)
-		{
-			if (!bencode::is_list(l))
-			{
-				m_error = TORRENT_ERROR_INVALID_METAFILE;
-				return ERR_INTERNAL; //throw Exception("Invalid metafile, bad announce-list");
-			}
-			bencode::be_str * str;
-			for(int j = 0; bencode::get_str(l, j, &str) == 0; j++)
-			{
-				char *c_str = bencode::str2c_str(str);
-				m_announces.push_back(c_str);
-				delete[] c_str;
-			}
-		}
-	}
-	else
-	{
-		bencode::be_str * str;
-		//отсутствие трекеров не ошибка
-		if (bencode::get_str(m_metafile,"announce",&str) == ERR_NO_ERROR)
-		{
-			char *c_str = bencode::str2c_str(str);
-			m_announces.push_back(c_str);
-			delete[] c_str;
-		}
-	}
-	return ERR_NO_ERROR;
-}
-
-void TorrentBase::get_additional_info_from_metafile()
-{
-	if (m_metafile == NULL)
-		return;
-	bencode::be_str * str;
-	char * c_str;
-	if (bencode::get_str(m_metafile,"comment",&str) == 0)
-	{
-		c_str = bencode::str2c_str(str);
-		m_comment        = c_str;
-		delete[] c_str;
-	}
-
-	if (bencode::get_str(m_metafile,"created by",&str) == 0)
-	{
-		c_str = bencode::str2c_str(str);
-		m_created_by        = c_str;
-		delete[] c_str;
-	}
-
-	bencode::get_int(m_metafile,"creation date",&m_creation_date);
-}
-
-int TorrentBase::get_files_info_from_metafile(bencode::be_node * info)
-{
-	if (m_metafile == NULL || info == NULL)
-		return ERR_NULL_REF;
-	m_dir_tree = new dir_tree::DirTree(m_name);
-	bencode::be_node * files_node;
-	if (bencode::get_node(info,"files",&files_node) == -1 || !bencode::is_list(files_node))
-	{
-		if (bencode::get_int(info,"length",&m_length) == -1 || m_length <= 0)
-		{
-			m_error = TORRENT_ERROR_INVALID_METAFILE;
-			return ERR_INTERNAL; //throw Exception("Invalid metafile, can not get key length");
-		}
-		m_files = new file_info[1];
-		m_files[0].length = m_length;
-		ssize_t sl = m_name.length();
-		//std::cout<<sl<<std::endl;
-		m_files[0].name = new char[sl + 1];
-		memset(m_files[0].name, 0, sl + 1);
-		strncpy(m_files[0].name, m_name.c_str(), sl);
-		//m_files->name[sl] = '\0';
-		m_files[0].download = true;
-		m_files_count = 1;
-	}
-	else
-	{//определяем кол-во файлов
-		m_files_count = get_list_size(files_node);
-		//std::cout<<m_files_count<<std::endl;
-		if (m_files_count <= 0)
-		{
-			m_error = TORRENT_ERROR_INVALID_METAFILE;
-			return ERR_INTERNAL; //throw Exception("Invalid metafile, can not get list size");
-		}
-		//выделяем память
-		m_files = new file_info[m_files_count];
-		//memset(m_files, 0, sizeof(file_info) * m_files_count);
-		m_length = 0;
-		for(int i = 0; i < m_files_count; i++)
-		{
-			bencode::be_node * file_node;// = temp.val.l[i];
-			if ( bencode::get_node(files_node, i, &file_node) == -1 || !bencode::is_dict(file_node))
-			{
-				m_error = TORRENT_ERROR_INVALID_METAFILE;
-				return ERR_INTERNAL; //throw Exception("Invalid metafile, can not get files dictionary");
-			}
-
-			bencode::be_node * path_node;
-			if (bencode::get_node(file_node, "path", &path_node) == -1 || !bencode::is_list(path_node))
-			{
-				m_error = TORRENT_ERROR_INVALID_METAFILE;
-				return ERR_INTERNAL; //throw Exception("Invalid metafile, can not get files dictionary");
-			}
-			if (bencode::get_int(file_node, "length", &m_files[i].length) == -1)
-			{
-				m_error = TORRENT_ERROR_INVALID_METAFILE;
-				return ERR_INTERNAL; //throw Exception("Invalid metafile, can not get files dictionary");
-			}
-
-			m_dir_tree->reset();
-			int path_length = 0;
-			int path_list_size = bencode::get_list_size(path_node);
-			for(int j = 0; j < path_list_size; j++)
-			{
-				bencode::be_str * str;
-				if (bencode::get_str(path_node, j, &str) == -1)
-				{
-					m_error = TORRENT_ERROR_INVALID_METAFILE;
-					return ERR_INTERNAL; //throw Exception("Invalid metafile, can not get files dictionary");
-				}
-				path_length += str->len + 1;// 1 for slash and \0 at the end;
-			}
-			m_files[i].name = new char[path_length];
-			int substring_offset = 0;
-			for(int j = 0; j < path_list_size; j++)
-			{
-				bencode::be_str * str;
-				if (bencode::get_str(path_node, j, &str) == -1)
-				{
-					m_error = TORRENT_ERROR_INVALID_METAFILE;
-					return ERR_INTERNAL; //throw Exception("Invalid metafile, can not get files dictionary");
-				}
-				strncpy(&m_files[i].name[substring_offset], str->ptr, str->len);
-				if (j < path_list_size - 1)
-				{
-					m_files[i].name[substring_offset + str->len] = '\0';
-					if (m_dir_tree->put(&m_files[i].name[substring_offset]) != ERR_NO_ERROR)
-					{
-						m_error = GENERAL_ERROR_UNDEF_ERROR;
-						return ERR_INTERNAL;
-					}
-				}
-
-				substring_offset += str->len;
-				m_files[i].name[substring_offset++] = '/';
-			}
-			m_files[i].name[path_length - 1] = '\0';
-			m_files[i].download = true;
-			m_length += m_files[i].length;
-		}
-	}
-	return ERR_NO_ERROR;
-}
-
-int TorrentBase::get_main_info_from_metafile( uint64_t metafile_len)
-{
-	if (m_metafile == NULL)
-		return ERR_NULL_REF;
-
-	bencode::be_node * info;// = bencode::get_info_dict(m_metafile);
-	bencode::be_str * str;
-	if (bencode::get_node(m_metafile, "info", &info) == -1)
-	{
-		m_error = TORRENT_ERROR_INVALID_METAFILE;
-		return ERR_INTERNAL; //throw Exception("Invalid metafile, can not get info dictionary");
-	}
-
-	if (bencode::get_str(info,"name",&str) == -1)
-	{
-		m_error = TORRENT_ERROR_INVALID_METAFILE;
-		return ERR_INTERNAL; //throw Exception("Invalid metafile, can not get key name");
-	}
-	char * c_str = bencode::str2c_str(str);
-	m_name        = c_str;
-	delete[] c_str;
-
-	get_files_info_from_metafile(info);
-
-	if (bencode::get_int(info,"piece length",&m_piece_length) == -1 || m_piece_length == 0)
-	{
-		m_error = TORRENT_ERROR_INVALID_METAFILE;
-		return ERR_INTERNAL; //throw Exception("Invalid metafile");
-	}
-
-	if (bencode::get_str(info,"pieces",&str) == -1 || str->len % 20 != 0)
-	{
-		m_error = TORRENT_ERROR_INVALID_METAFILE;
-		return ERR_INTERNAL; //throw Exception("Invalid metafile");
-	}
-	m_pieces	 = str->ptr;
-	m_piece_count = str->len / 20;
-
-	if (bencode::get_int(m_metafile,"private",&m_private) == -1)
-		bencode::get_int(info,"private",&m_private);
-
-	return calculate_info_hash(info, metafile_len);
-}
-
-int TorrentBase::calculate_info_hash(bencode::be_node * info, uint64_t metafile_len)
-{
-	if (info == NULL || metafile_len == 0)
-		return ERR_BAD_ARG;
-	memset(m_info_hash_bin,0,20);
-	memset(m_info_hash_hex,0,41);
-	char * bencoded_info = new char[metafile_len];
-	uint32_t bencoded_info_len = 0;
-	if (bencode::encode(info, &bencoded_info, metafile_len, &bencoded_info_len) != ERR_NO_ERROR)
-	{
-		delete[] bencoded_info;
-		m_error = TORRENT_ERROR_INVALID_METAFILE;
-		return ERR_INTERNAL;
-	}
-	bencode::dump(info);
-	CSHA1 csha1;
-	csha1.Update((unsigned char*)bencoded_info,bencoded_info_len);
-	csha1.Final();
-	csha1.ReportHash(m_info_hash_hex,CSHA1::REPORT_HEX);
-	csha1.GetHash(m_info_hash_bin);
-	delete[] bencoded_info;
-	return ERR_NO_ERROR;
-}
-
-void TorrentBase::init_bitfield()
-{
-	m_bitfield_len = ceil(m_piece_count / 8.0f);
-	m_bitfield = new unsigned char[m_bitfield_len];
-	memset(m_bitfield, 0, m_bitfield_len);
-}
-
-int TorrentBase::Init(std::string metafile, network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc,
+int TorrentBase::Init(const Metafile & metafile, network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc,
 		std::string & work_directory, bool is_new)
 {
 	if (nm == NULL || g_cfg == NULL || fm == NULL || bc == NULL || work_directory.length() == 0)
@@ -418,52 +148,17 @@ int TorrentBase::Init(std::string metafile, network::NetworkManager * nm, cfg::G
 	init_members(nm, g_cfg, fm, bc, work_directory);
 	m_new = is_new;
 	try{
-		char * buf = read_file(metafile.c_str(), &m_metafile_len, MAX_TORRENT_FILE_LENGTH);
-		if (buf == NULL)
-		{
-			m_error = TORRENT_ERROR_IO_ERROR;
-			return ERR_NULL_REF; //throw FileException(errno);
-		}
-		m_metafile = bencode::decode(buf, m_metafile_len, true);
-#ifdef BITTORRENT_DEBUG
-		bencode::dump(m_metafile);
-#endif
-		free(buf);
-		if (!m_metafile)
-		{
-			m_error = TORRENT_ERROR_INVALID_METAFILE;
-			return ERR_INTERNAL; //throw Exception("Invalid metafile, parse error");
-		}
 
-		if (get_announces_from_metafile() != ERR_NO_ERROR)
-			return ERR_INTERNAL;
-
-		get_additional_info_from_metafile();
-
-		if (get_main_info_from_metafile(m_metafile_len) != ERR_NO_ERROR)
-			return ERR_INTERNAL;
-
-		init_bitfield();
-
+		m_metafile = metafile;
 		//формируем путь к файлу вида $HOME/.dinosaur/$INFOHASH_HEX
 		m_state_file_name = m_work_directory;
 		m_state_file_name.append(m_info_hash_hex);
-		if (!is_new)
-			if (get_state() != ERR_NO_ERROR)
-			{
-				m_error = TORRENT_ERROR_NO_STATE_FILE;
-				return ERR_INTERNAL;
-			}
-		for(uint32_t i = 0; i < m_piece_count; i++)
-		{
-			if (!bit_in_bitfield(i, m_piece_count, m_bitfield))
-				m_pieces_to_download.insert(i);
-			else
-			{
-				uint32_t piece_length = (i == m_piece_count - 1) ? m_length - m_piece_length * i : m_piece_length;
-				m_downloaded += piece_length;
-			}
-		}
+
+
+		m_waiting_seeders.clear();
+		m_active_seeders.clear();
+		m_seeders.clear();
+		m_leechers.clear();
 	}
 	catch( std::bad_alloc & e)
 	{
@@ -475,72 +170,6 @@ int TorrentBase::Init(std::string metafile, network::NetworkManager * nm, cfg::G
 		return ERR_INTERNAL;
 	}
 	return ERR_NO_ERROR;
-}
-
-int TorrentBase::read_state_file(state_file * sf)
-{
-	struct stat st;
-	if (sf == NULL)
-		return ERR_NULL_REF;
-	if (stat(m_state_file_name.c_str(), &st) == -1 || (uint64_t)st.st_size != sizeof(state_file))
-		return ERR_INTERNAL;
-	int fd = open(m_state_file_name.c_str(), O_RDWR | O_CREAT, S_IRWXU);
-	if (fd == -1)
-		return ERR_SYSCALL_ERROR;
-	ssize_t ret = read(fd, (void*)sf, sizeof(state_file));
-	if (ret == -1)
-	{
-		close(fd);
-		return ERR_SYSCALL_ERROR;
-	}
-	close(fd);
-	return ERR_NO_ERROR;
-}
-
-int TorrentBase::save_state_file(state_file * sf)
-{
-	if (sf == NULL)
-		return ERR_NULL_REF;
-	int fd = open(m_state_file_name.c_str(), O_RDWR | O_CREAT, S_IRWXU);
-	if (fd == -1)
-		return ERR_SYSCALL_ERROR;
-	ssize_t ret = write(fd, sf, sizeof(state_file));
-	if (ret == -1)
-	{
-		close(fd);
-		return ERR_SYSCALL_ERROR;
-	}
-	close(fd);
-	return ERR_NO_ERROR;
-}
-
-int TorrentBase::get_state()
-{
-	state_file sf;
-	if (read_state_file(&sf) == ERR_NO_ERROR)
-	{
-		memcpy(m_bitfield, sf.bitfield, m_bitfield_len);
-		m_download_directory = sf.download_directory;
-		m_uploaded = sf.uploaded;
-		return ERR_NO_ERROR;
-	}
-	else
-		return ERR_FILE_ERROR;
-}
-
-
-int TorrentBase::save_state()
-{
-	state_file sf;
-	memset(&sf, 0, sizeof(state_file));
-	sf.version = STATE_FILE_VERSION;
-	if (m_download_directory.length() > MAX_FILENAME_LENGTH)
-		return ERR_INTERNAL;
-	strncpy(sf.download_directory, m_download_directory.c_str(), m_download_directory.length());
-	memcpy(sf.bitfield, m_bitfield, m_bitfield_len);
-	//sf.downloaded = m_downloaded;
-	sf.uploaded = m_uploaded;
-	return save_state_file(&sf);
 }
 
 void TorrentBase::add_seeders(uint32_t count, sockaddr_in * addrs)
@@ -604,18 +233,33 @@ int TorrentBase::start(std::string & download_directory)
 {
 	if (m_state == TORRENT_STATE_NONE)
 	{
-		if (m_new)
+		m_active_seeders.clear();
+
+		size_t bitfield_len = ceil(m_piece_count / 8.0f);
+		StateSerializator s(bitfield_len);
+		unsigned char * bitfield = new unsigned char[bitfield_len];
+		if (s.deserialize(m_uploaded, m_download_directory, bitfield, bitfield_len) == -1)
 		{
 			m_download_directory = download_directory;
 			if (m_download_directory[m_download_directory.length() - 1] != '/')
 				m_download_directory.append("/");
-			save_state();
+			m_uploaded = 0;
+			memset(bitfield, 0, bitfield_len);
+			s.serialize(m_uploaded, m_download_directory, bitfield, bitfield_len);
+			delete[] bitfield;
+			bitfield = NULL;
 		}
 		if (m_torrent_file->Init(boost::static_pointer_cast<TorrentInterfaceForTorrentFile>(shared_from_this()), m_download_directory, m_new) != ERR_NO_ERROR)
 			return ERR_FILE_ERROR;
+
+		if (m_piece_manager->Init(boost::static_pointer_cast<TorrentInterfaceForPieceManager>(shared_from_this()), bitfield) != ERR_NO_ERROR)
+			return ERR_INTERNAL;
+
+		if (bitfield != NULL)
+			delete[] bitfield;
+
 		for (std::vector<std::string>::iterator iter = m_announces.begin(); iter != m_announces.end(); ++iter)
 		{
-			//std::cout<<*iter<<std::endl;
 			TrackerPtr temp;
 			try
 			{
@@ -630,6 +274,11 @@ int TorrentBase::start(std::string & download_directory)
 				continue;
 			}
 		}
+		sockaddr_in addr;
+		addr.sin_family = AF_INET;
+		inet_aton("127.0.0.1", &addr.sin_addr);
+		addr.sin_port = htons(62651);
+		add_seeders(1, &addr);
 		for(std::set<uint32_t>::iterator i = m_pieces_to_download.begin();
 					i != m_pieces_to_download.end(); ++i)
 		{
@@ -734,15 +383,13 @@ int TorrentBase::check()
 	m_leechers.clear();
 	m_task_queue.clear();
 	m_downloaded = 0;
-	m_pieces_to_download.clear();
-	memset(m_bitfield, 0, m_bitfield_len);
+	m_piece_manager->reset();
 	for(uint32_t i = 0; i < m_piece_count; i++)
 	{
 		TORRENT_TASK task;
 		task.task = TORRENT_TASK_CHECK_HASH;
 		task.task_data = i;
 		m_task_queue.push_back(task);
-		m_pieces_to_download.insert(i);
 	}
 	m_state = TORRENT_STATE_CHECKING;
 	return ERR_NO_ERROR;
@@ -751,68 +398,6 @@ int TorrentBase::check()
 
 int TorrentBase::handle_download_task()
 {
-	/*for(peer_map_iter p = m_peers.begin(); p != m_peers.end(); ++p)
-	{
-		Peer * peer = (*p).second;
-		if(peer->may_request() && !peer->request_limit() && m_state == TORRENT_STATE_STARTED)
-		{
-			for(std::list<TORRENT_TASK>::iterator task_iter = m_task_queue.begin(), task_iter_;
-													task_iter != m_task_queue.end();
-													task_iter = task_iter_)
-			{
-				uint32_t piece = (*task_iter).task_data;
-				if (!peer->have_piece(piece))
-				{
-					task_iter_ = task_iter;
-					++task_iter_;
-				}
-				if (peer->request_limit())
-					break;
-
-				uint32_t blocks_count = m_torrent_file->get_blocks_count_in_piece(piece);
-				if (blocks_count == 0)
-				{
-					task_iter_ = task_iter;
-					++task_iter_;
-				}
-
-				for(std::map<uint32_t, Peer*>::iterator iter = m_torrent_file->m_piece_info[piece].blocks2download.begin();
-					iter != m_torrent_file->m_piece_info[piece].blocks2download.end(); ++iter)
-				{
-					if ((*iter).second == NULL)//если блок не помечен
-					{
-						//printf("Unmarked piece %u %d block2download.size=%d\n", piece, (*iter).first, m_torrent_file->m_piece_info[piece].blocks2download.size());
-						if (peer->request_limit())
-							break;
-						uint32_t block_length;
-						m_torrent_file->get_block_length_by_index(piece, (*iter).first, &block_length);
-						if (peer->send_request(piece, (*iter).first, block_length) == ERR_NO_ERROR)
-							m_torrent_file->mark_block(piece, (*iter).first, peer);
-					}
-				}
-
-				task_iter_ = task_iter;
-				++task_iter_;
-
-				if (m_torrent_file->blocks_in_progress(piece) == 0)
-				{
-					m_pieces_to_download.erase(piece);
-					m_task_queue.erase(task_iter);
-				}
-			}
-		}
-		//если заснул, снимаем метки с запрошенных блоков
-		if (peer->is_sleep())
-		{
-			while(!peer->no_requested_blocks())
-			{
-				uint64_t id = peer->get_requested_block();
-				uint32_t block_index = get_block_from_id(id);//(id & (uint32_t)4294967295);
-				uint32_t piece = get_piece_from_id(id);//(id - block_index)>>32;
-				m_torrent_file->unmark_if_match(piece,block_index, peer);
-			}
-		}
-	}*/
 	return ERR_NO_ERROR;
 }
 
@@ -821,6 +406,15 @@ int TorrentBase::clock()
 	//printf("CLOCK\n");
 	m_rx_speed = 0.0f;
 	m_tx_speed = 0.0f;
+
+	if (m_state == TORRENT_STATE_RELEASING)
+		for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
+		{
+			bool release_tracker_instance;
+			(*iter).second->clock(release_tracker_instance);
+			if (release_tracker_instance)
+				m_trackers.erase(iter);
+		}
 
 	if (m_state == TORRENT_STATE_STARTED)
 	{
@@ -834,6 +428,7 @@ int TorrentBase::clock()
 			else
 				m_active_seeders.push_back(seed);
 		}
+		std::map<uint32_t, uint32_t> requested_blocks_num;
 		for(peer_list_iter seed_iter = m_active_seeders.begin(),
 							seed_iter_add = m_active_seeders.begin(); seed_iter != m_active_seeders.end(); seed_iter = seed_iter_add)
 		{
@@ -842,6 +437,14 @@ int TorrentBase::clock()
 			seed->clock();
 			if (seed->is_sleep())
 			{
+				while(!seed->no_requested_blocks())
+				{
+					uint64_t block_id = seed->get_requested_block();
+					uint32_t piece, block;
+					get_piece_block_from_id(block_id, piece, block);
+					m_piece_states[piece].block2download.push_back(block);
+					m_piece_states[piece].taken_from.erase(seed);
+				}
 				m_active_seeders.erase(seed_iter);
 				m_waiting_seeders.push_back(seed);
 			}
@@ -855,6 +458,53 @@ int TorrentBase::clock()
 				{
 					seed->send_have(*have_iter);
 				}
+				if (m_downloadable_pieces.size() < m_active_seeders.size() &&
+						m_task_queue.size() > 0 &&
+						m_task_queue.front().task == TORRENT_TASK_DOWNLOAD_PIECE)
+				{
+					uint32_t piece = m_task_queue.front().task_data;
+					m_task_queue.pop_front();
+					m_downloadable_pieces.push_back(piece);
+				}
+				if (m_downloadable_pieces.size() > 0)
+				{
+					uint32_t piece  = m_downloadable_pieces.front();
+					m_downloadable_pieces.pop_front();
+					m_downloadable_pieces.push_back(piece);
+					if (seed->have_piece(piece) && seed->may_request())
+					{
+						requested_blocks_num[piece] = 0;
+						while(!seed->request_limit() && !m_piece_states[piece].block2download.empty())
+						{
+							uint32_t block = m_piece_states[piece].block2download.front();
+							uint32_t block_length;
+							m_torrent_file->get_block_length_by_index(piece, block, &block_length);
+							if (seed->send_request(piece, block, block_length) != ERR_NO_ERROR)
+								break;
+							m_piece_states[piece].block2download.pop_front();
+							m_piece_states[piece].taken_from.insert(seed);
+							requested_blocks_num[piece]++;
+						}
+					}
+				}
+
+			}
+		}
+
+		for(std::list<uint32_t>::iterator piece_iter = m_downloadable_pieces.begin(),
+				piece_iter_add = m_downloadable_pieces.begin(); piece_iter != m_downloadable_pieces.end(); piece_iter = piece_iter_add)
+		{
+			++piece_iter_add;
+			uint32_t piece = *piece_iter;
+
+			if (m_piece_states[piece].block2download.size() == m_torrent_file->get_blocks_count_in_piece(piece))
+			{
+				m_downloadable_pieces.erase(piece_iter);
+				TORRENT_TASK task;
+				task.task = TORRENT_TASK_DOWNLOAD_PIECE;
+				task.task_data = piece;
+				m_task_queue.push_back(task);
+				m_piece_states[piece].taken_from.clear();//на пожарный случай
 			}
 		}
 
@@ -916,15 +566,13 @@ int TorrentBase::event_piece_hash(uint32_t piece_index, bool ok, bool error)
 	{
 		m_have_list.push_back(piece_index);
 		m_downloaded +=m_torrent_file->m_piece_info[piece_index].length;
-		set_bitfield(piece_index, m_piece_count, m_bitfield);
-		save_state();
-		m_pieces_to_download.erase(piece_index);
+		//save_state();
+		m_piece_manager->piece_good(piece_index);
 		printf("Piece %d OK\n", piece_index);
 		//printf("rx=%f tx=%f done=%d downloaded=%llu\n", m_rx_speed, m_tx_speed, m_pieces_to_download.size(), m_downloaded);
 	}
 	if (!ok || error)
 	{
-		m_pieces_to_download.insert(piece_index);
 		if (m_state == TORRENT_STATE_STARTED)
 		{
 			TORRENT_TASK task;
@@ -932,8 +580,8 @@ int TorrentBase::event_piece_hash(uint32_t piece_index, bool ok, bool error)
 			task.task_data = piece_index;
 			m_task_queue.push_back(task);
 		}
-		reset_bitfield(piece_index, m_piece_count, m_bitfield);
-		save_state();
+		//save_state();
+		m_piece_manager->piece_bad(piece_index);
 		printf("Piece %d BAD\n", piece_index);
 		//printf("rx=%f tx=%f done=%d downloaded=%llu\n", m_rx_speed, m_tx_speed, m_pieces_to_download.size(), m_downloaded);
 	}
@@ -992,54 +640,6 @@ int TorrentBase::get_info(torrent_info * info)
 		info->progress = ((m_piece_count - m_task_queue.size()) * 100) / m_piece_count;
 	else
 		info->progress = (m_downloaded * 100) / m_length;
-	return ERR_NO_ERROR;
-}
-
-int TorrentBase::save_meta2file(const char * filepath)
-{
-	if (filepath == NULL)
-	{
-		m_error = GENERAL_ERROR_UNDEF_ERROR;
-		return ERR_BAD_ARG;
-	}
-
-	if (m_metafile == NULL)
-	{
-		m_error = GENERAL_ERROR_UNDEF_ERROR;
-		return ERR_NULL_REF;
-	}
-
-	char * bencoded_metafile = new(std::nothrow) char[m_metafile_len];
-	if (bencoded_metafile == NULL)
-	{
-		m_error = GENERAL_ERROR_NO_MEMORY_AVAILABLE;
-		return ERR_INTERNAL;
-	}
-	uint32_t bencoded_metafile_len = 0;
-	if (bencode::encode(m_metafile, &bencoded_metafile, m_metafile_len, &bencoded_metafile_len) != ERR_NO_ERROR)
-	{
-		delete[] bencoded_metafile;
-		m_error = TORRENT_ERROR_INVALID_METAFILE;
-		return ERR_INTERNAL;
-	}
-	int fd = open(filepath, O_RDWR | O_CREAT, S_IRWXU);
-	if (fd == -1)
-	{
-		delete[] bencoded_metafile;
-		m_error = TORRENT_ERROR_IO_ERROR;
-		return ERR_SYSCALL_ERROR;
-	}
-	ssize_t ret = write(fd, bencoded_metafile, bencoded_metafile_len);
-	if (ret == -1)
-	{
-		delete[] bencoded_metafile;
-		m_error = TORRENT_ERROR_IO_ERROR;
-		return ERR_SYSCALL_ERROR;
-		close(fd);
-		return ERR_SYSCALL_ERROR;
-	}
-	close(fd);
-	delete[] bencoded_metafile;
 	return ERR_NO_ERROR;
 }
 

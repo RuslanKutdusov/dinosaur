@@ -132,7 +132,7 @@ int Peer::send_bitfield()
 
 int Peer::send_request(uint32_t piece, uint32_t block, uint32_t block_length)
 {
-	if (m_peer_choking || m_state == PEER_STATE_WAIT_HANDSHAKE || m_state == PEER_STATE_SEND_HANDSHAKE || m_state == PEER_STATE_SLEEP)
+	if (m_peer_choking || m_state == PEER_STATE_WAIT_HANDSHAKE || m_state == PEER_STATE_SEND_HANDSHAKE || m_state == PEER_STATE_SLEEP || request_limit())
 			return ERR_INTERNAL;
 	//<len=0013><id=6><index><begin><length>
 	char request[17];
@@ -386,6 +386,8 @@ int Peer::process_messages()
 				m_downloaded += block_length;
 				if (tfp->save_block(index, offset, block_length, &m_buf.data[m_buf.pos + 8]) != ERR_NO_ERROR)
 					return ERR_INTERNAL;
+				uint64_t id = generate_block_id(index, offset / BLOCK_LENGTH);
+				m_requested_blocks.erase(id);
 				break;
 			}
 			case '\x08'://cancel: <len=0013><id=8><index><begin><length>
