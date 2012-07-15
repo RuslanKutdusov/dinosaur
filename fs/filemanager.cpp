@@ -114,7 +114,7 @@ int FileManager::File_add(const char * fn, uint64_t length, bool fictive, const 
 
 int File_add(const std::string & fn, uint64_t length, bool fictive, const FileAssociation::ptr & assoc, File & file)
 {
-	return File_add(fn, length, fictive, assoc, file);
+	return File_add(fn.c_str(), length, fictive, assoc, file);
 }
 
 int FileManager::prepare_file(File & file)
