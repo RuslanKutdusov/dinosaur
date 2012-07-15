@@ -29,7 +29,7 @@ fs::FileManager * TorrentInterfaceInternal::get_fm()
 
 uint32_t TorrentInterfaceInternal::get_piece_count()
 {
-	return m_piece_count;
+	return m_metafile.piece_count;
 }
 
 block_cache::Block_cache * TorrentInterfaceInternal::get_bc()
@@ -39,23 +39,23 @@ block_cache::Block_cache * TorrentInterfaceInternal::get_bc()
 
 uint32_t TorrentInterfaceInternal::get_piece_length()
 {
-	return m_piece_length;
+	return m_metafile.piece_length;
 }
 
 
 int TorrentInterfaceInternal::get_files_count()
 {
-	return m_files_count;
+	return m_metafile.files.size();
 }
 
 uint64_t TorrentInterfaceInternal::get_length()
 {
-	return m_length;
+	return m_metafile.length;
 }
 
 std::string TorrentInterfaceInternal::get_name()
 {
-	return m_name;
+	return m_metafile.name;
 }
 
 uint64_t TorrentInterfaceInternal::get_downloaded()
@@ -73,24 +73,24 @@ size_t TorrentInterfaceInternal::get_bitfield_length()
 	return m_piece_manager->get_bitfield_length();
 }
 
-file_info * TorrentInterfaceInternal::get_file_info(int file_index)
+base_file_info * TorrentInterfaceInternal::get_file_info(uint32_t file_index)
 {
-	return &m_files[file_index];
+	return file_index >= m_metafile.files.size() ? NULL : &m_metafile.files[file_index];
 }
 
 dir_tree::DirTree * TorrentInterfaceInternal::get_dirtree()
 {
-	return m_dir_tree;
+	return &m_metafile.dir_tree;
 }
 
-uint32_t TorrentInterfaceInternal::get_blocks_count_in_piece(uint32_t piece)
+int TorrentInterfaceInternal::get_blocks_count_in_piece(uint32_t piece, uint32_t & blocks_count)
 {
-	return m_piece_manager->get_blocks_count_in_piece(piece);
+	return m_piece_manager->get_blocks_count_in_piece(piece, blocks_count);
 }
 
-uint32_t TorrentInterfaceInternal::get_piece_length(uint32_t piece)
+int TorrentInterfaceInternal::get_piece_length(uint32_t piece, uint32_t & piece_length)
 {
-	return m_piece_manager->get_piece_length(piece);
+	return m_piece_manager->get_piece_length(piece, piece_length);
 }
 
 int TorrentInterfaceInternal::get_block_index_by_offset(uint32_t piece_index, uint32_t block_offset, uint32_t & index)
@@ -103,15 +103,24 @@ int TorrentInterfaceInternal::get_block_length_by_index(uint32_t piece_index, ui
 	return m_piece_manager->get_block_length_by_index(piece_index, block_index, block_length);
 }
 
+int TorrentInterfaceInternal::get_piece_offset(uint32_t piece_index, uint64_t & offset)
+{
+	return m_piece_manager->get_piece_offset(piece_index, offset);
+}
+
+int TorrentInterfaceInternal::get_file_index_by_piece(uint32_t piece_index, int & index)
+{
+	return m_piece_manager->get_file_index_by_piece(piece_index, index);
+}
 
 void TorrentInterfaceInternal::copy_infohash_bin(SHA1_HASH dst)
 {
-	memcpy(dst, m_info_hash_bin, SHA1_LENGTH);
+	memcpy(dst, m_metafile.info_hash_bin, SHA1_LENGTH);
 }
 
 int TorrentInterfaceInternal::memcmp_infohash_bin(SHA1_HASH mem)
 {
-	return memcmp(mem, m_info_hash_bin, SHA1_LENGTH);
+	return memcmp(mem, m_metafile.info_hash_bin, SHA1_LENGTH);
 }
 
 void TorrentInterfaceInternal::copy_bitfield(BITFIELD dst)
@@ -136,7 +145,7 @@ void TorrentInterfaceInternal::set_error(std::string err)
 
 void TorrentInterfaceInternal::copy_piece_hash(SHA1_HASH dst, uint32_t piece_index)
 {
-	memcpy(dst, &m_pieces[piece_index * SHA1_LENGTH], SHA1_LENGTH);
+	memcpy(dst, &m_metafile.pieces[piece_index * SHA1_LENGTH], SHA1_LENGTH);
 }
 
 int TorrentInterfaceInternal::save_block(uint32_t piece, uint32_t block_offset, uint32_t block_length, char * block)
@@ -144,7 +153,7 @@ int TorrentInterfaceInternal::save_block(uint32_t piece, uint32_t block_offset, 
 	return m_torrent_file->save_block(piece, block_offset, block_length, block);
 }
 
-int TorrentInterfaceInternal::read_block(uint32_t piece, uint32_t block_index, char * block, uint32_t * block_length)
+int TorrentInterfaceInternal::read_block(uint32_t piece, uint32_t block_index, char * block, uint32_t & block_length)
 {
 	return m_torrent_file->read_block(piece, block_index, block, block_length);
 }

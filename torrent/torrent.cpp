@@ -106,7 +106,6 @@ void TorrentBase::prepare2release()
 	{
 		(*iter).second->prepare2release();
 	}
-	m_piece_states.clear();
 	m_seeders.clear();
 	m_active_seeders.clear();
 	m_waiting_seeders.clear();
@@ -138,7 +137,7 @@ void TorrentBase::init_members(network::NetworkManager * nm, cfg::Glob_cfg * g_c
 }
 
 int TorrentBase::Init(const Metafile & metafile, network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc,
-		std::string & work_directory, bool is_new)
+		std::string & work_directory)
 {
 	if (nm == NULL || g_cfg == NULL || fm == NULL || bc == NULL || work_directory.length() == 0)
 	{
@@ -146,13 +145,12 @@ int TorrentBase::Init(const Metafile & metafile, network::NetworkManager * nm, c
 		return ERR_BAD_ARG;
 	}
 	init_members(nm, g_cfg, fm, bc, work_directory);
-	m_new = is_new;
 	try{
 
 		m_metafile = metafile;
 		//формируем путь к файлу вида $HOME/.dinosaur/$INFOHASH_HEX
 		m_state_file_name = m_work_directory;
-		m_state_file_name.append(m_info_hash_hex);
+		m_state_file_name.append(m_metafile.info_hash_hex);
 
 
 		m_waiting_seeders.clear();
@@ -185,7 +183,7 @@ void TorrentBase::add_seeders(uint32_t count, sockaddr_in * addrs)
 			if (m_seeders.count(key) == 0)
 			{
 				PeerPtr peer(new Peer());
-				peer->Init(&addrs[i], boost::static_pointer_cast<TorrentInterfaceForPeer>(shared_from_this()));
+				peer->Init(&addrs[i], boost::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()));
 				m_seeders[key] = peer;
 				m_waiting_seeders.push_back(peer);
 			}
@@ -210,7 +208,7 @@ int TorrentBase::add_leecher(network::Socket & sock)
 		if ((m_leechers.count(key) == 0 || m_leechers[key] == NULL) && m_leechers.size() < m_g_cfg->get_max_active_leechers())
 		{
 			PeerPtr peer(new Peer());
-			peer->Init(sock, boost::static_pointer_cast<TorrentInterfaceForPeer>(shared_from_this()), PEER_ADD_INCOMING);
+			peer->Init(sock, boost::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()), PEER_ADD_INCOMING);
 			m_leechers[key] = peer;
 		}
 		else
@@ -235,8 +233,8 @@ int TorrentBase::start(std::string & download_directory)
 	{
 		m_active_seeders.clear();
 
-		size_t bitfield_len = ceil(m_piece_count / 8.0f);
-		StateSerializator s(bitfield_len);
+		StateSerializator s(m_state_file_name);
+		size_t bitfield_len = ceil(m_metafile.piece_count / 8.0f);
 		unsigned char * bitfield = new unsigned char[bitfield_len];
 		if (s.deserialize(m_uploaded, m_download_directory, bitfield, bitfield_len) == -1)
 		{
@@ -249,21 +247,21 @@ int TorrentBase::start(std::string & download_directory)
 			delete[] bitfield;
 			bitfield = NULL;
 		}
-		if (m_torrent_file->Init(boost::static_pointer_cast<TorrentInterfaceForTorrentFile>(shared_from_this()), m_download_directory, m_new) != ERR_NO_ERROR)
+		if (m_torrent_file->Init(boost::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()), m_download_directory) != ERR_NO_ERROR)
 			return ERR_FILE_ERROR;
 
-		if (m_piece_manager->Init(boost::static_pointer_cast<TorrentInterfaceForPieceManager>(shared_from_this()), bitfield) != ERR_NO_ERROR)
+		if (m_piece_manager->Init(boost::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()), bitfield) != ERR_NO_ERROR)
 			return ERR_INTERNAL;
 
 		if (bitfield != NULL)
 			delete[] bitfield;
 
-		for (std::vector<std::string>::iterator iter = m_announces.begin(); iter != m_announces.end(); ++iter)
+		for (std::vector<std::string>::iterator iter = m_metafile.announces.begin(); iter != m_metafile.announces.end(); ++iter)
 		{
 			TrackerPtr temp;
 			try
 			{
-				temp.reset(new Tracker(boost::static_pointer_cast<TorrentInterfaceForTracker>(shared_from_this()), *iter));
+				temp.reset(new Tracker(boost::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()), *iter));
 				m_trackers[*iter] = temp;
 			}
 			catch(NoneCriticalException & e)
@@ -279,14 +277,14 @@ int TorrentBase::start(std::string & download_directory)
 		inet_aton("127.0.0.1", &addr.sin_addr);
 		addr.sin_port = htons(62651);
 		add_seeders(1, &addr);
-		for(std::set<uint32_t>::iterator i = m_pieces_to_download.begin();
+		/*for(std::set<uint32_t>::iterator i = m_piece_manager.m_pieces_to_download.begin();
 					i != m_pieces_to_download.end(); ++i)
 		{
 			TORRENT_TASK task;
 			task.task = TORRENT_TASK_DOWNLOAD_PIECE;
 			task.task_data = *i;
 			m_task_queue.push_back(task);
-		}
+		}*/
 		m_state = TORRENT_STATE_STARTED;
 	}
 	else
@@ -349,14 +347,14 @@ int TorrentBase::continue_()
 		(*iter).second->send_started();
 	}
 	m_task_queue.clear();
-	for(std::set<uint32_t>::iterator i = m_pieces_to_download.begin();
+	/*for(std::set<uint32_t>::iterator i = m_pieces_to_download.begin();
 						i != m_pieces_to_download.end(); ++i)
 	{
 		TORRENT_TASK task;
 		task.task = TORRENT_TASK_DOWNLOAD_PIECE;
 		task.task_data = *i;
 		m_task_queue.push_back(task);
-	}
+	}*/
 	m_state = TORRENT_STATE_STARTED;
 	return ERR_NO_ERROR;
 }
@@ -364,7 +362,7 @@ int TorrentBase::continue_()
 
 bool TorrentBase::is_downloaded()
 {
-	return m_downloaded == m_length;
+	return m_downloaded == m_metafile.length;
 }
 
 int TorrentBase::check()
@@ -384,13 +382,13 @@ int TorrentBase::check()
 	m_task_queue.clear();
 	m_downloaded = 0;
 	m_piece_manager->reset();
-	for(uint32_t i = 0; i < m_piece_count; i++)
+	/*for(uint32_t i = 0; i < m_piece_count; i++)
 	{
 		TORRENT_TASK task;
 		task.task = TORRENT_TASK_CHECK_HASH;
 		task.task_data = i;
 		m_task_queue.push_back(task);
-	}
+	}*/
 	m_state = TORRENT_STATE_CHECKING;
 	return ERR_NO_ERROR;
 }
@@ -442,8 +440,8 @@ int TorrentBase::clock()
 					uint64_t block_id = seed->get_requested_block();
 					uint32_t piece, block;
 					get_piece_block_from_id(block_id, piece, block);
-					m_piece_states[piece].block2download.push_back(block);
-					m_piece_states[piece].taken_from.erase(seed);
+					//m_piece_states[piece].block2download.push_back(block);
+					//m_piece_states[piece].taken_from.erase(seed);
 				}
 				m_active_seeders.erase(seed_iter);
 				m_waiting_seeders.push_back(seed);
@@ -474,7 +472,7 @@ int TorrentBase::clock()
 					if (seed->have_piece(piece) && seed->may_request())
 					{
 						requested_blocks_num[piece] = 0;
-						while(!seed->request_limit() && !m_piece_states[piece].block2download.empty())
+						/*while(!seed->request_limit() && !m_piece_states[piece].block2download.empty())
 						{
 							uint32_t block = m_piece_states[piece].block2download.front();
 							uint32_t block_length;
@@ -484,7 +482,7 @@ int TorrentBase::clock()
 							m_piece_states[piece].block2download.pop_front();
 							m_piece_states[piece].taken_from.insert(seed);
 							requested_blocks_num[piece]++;
-						}
+						}*/
 					}
 				}
 
@@ -495,7 +493,7 @@ int TorrentBase::clock()
 				piece_iter_add = m_downloadable_pieces.begin(); piece_iter != m_downloadable_pieces.end(); piece_iter = piece_iter_add)
 		{
 			++piece_iter_add;
-			uint32_t piece = *piece_iter;
+			/*uint32_t piece = *piece_iter;
 
 			if (m_piece_states[piece].block2download.size() == m_torrent_file->get_blocks_count_in_piece(piece))
 			{
@@ -505,7 +503,7 @@ int TorrentBase::clock()
 				task.task_data = piece;
 				m_task_queue.push_back(task);
 				m_piece_states[piece].taken_from.clear();//на пожарный случай
-			}
+			}*/
 		}
 
 		for(peer_map_iter leecher_iter = m_leechers.begin(); leecher_iter != m_leechers.end(); ++leecher_iter)
@@ -565,7 +563,7 @@ int TorrentBase::event_piece_hash(uint32_t piece_index, bool ok, bool error)
 	if (ok && !error)
 	{
 		m_have_list.push_back(piece_index);
-		m_downloaded +=m_torrent_file->m_piece_info[piece_index].length;
+		m_downloaded += m_piece_manager->get_piece_length(piece_index);
 		//save_state();
 		m_piece_manager->piece_good(piece_index);
 		printf("Piece %d OK\n", piece_index);
@@ -592,20 +590,20 @@ int TorrentBase::get_info(torrent_info * info)
 {
 	if (info == NULL)
 		return ERR_NULL_REF;
-	info->comment = m_comment;
-	info->created_by = m_created_by;
-	info->creation_date = m_creation_date;
+	info->comment = m_metafile.comment;
+	info->created_by = m_metafile.created_by;
+	info->creation_date = m_metafile.creation_date;
 	info->download_directory = m_download_directory;
 	info->downloaded = m_downloaded;
-	info->length = m_length;
-	info->name = m_name;
-	info->piece_count = m_piece_count;
-	info->piece_length = m_piece_length;
-	info->private_ = m_private;
+	info->length = m_metafile.length;
+	info->name = m_metafile.name;
+	info->piece_count = m_metafile.piece_count;
+	info->piece_length = m_metafile.piece_length;
+	info->private_ = m_metafile.private_;
 	info->rx_speed = m_rx_speed;
 	info->tx_speed = m_tx_speed;
 	info->uploaded = m_uploaded;
-	memcpy(info->info_hash_hex, m_info_hash_hex, SHA1_LENGTH * 2 + 1);
+	memcpy(info->info_hash_hex, m_metafile.info_hash_hex, SHA1_HEX_LENGTH);
 	for(peer_list_iter iter = m_active_seeders.begin(); iter != m_active_seeders.end(); ++iter)
 	{
 		PeerPtr seeder = *iter;
@@ -629,24 +627,24 @@ int TorrentBase::get_info(torrent_info * info)
 		(*iter).second->get_info(&ti);
 		info->trackers.push_back(ti);
 	}
-	for(int i = 0; i < m_files_count; i++)
+	for(size_t i = 0; i < m_metafile.files.size(); i++)
 	{
 		torrent_info::file f;
-		f.first = m_files[i].name;
-		f.second = m_files[i].length;
+		f.first = m_metafile.files[i].name;
+		f.second = m_metafile.files[i].length;
 		info->file_list_.push_back(f);
 	}
 	if (m_state == TORRENT_STATE_CHECKING)
-		info->progress = ((m_piece_count - m_task_queue.size()) * 100) / m_piece_count;
+		info->progress = ((m_metafile.piece_count - m_task_queue.size()) * 100) / m_metafile.piece_count;
 	else
-		info->progress = (m_downloaded * 100) / m_length;
+		info->progress = (m_downloaded * 100) / m_metafile.length;
 	return ERR_NO_ERROR;
 }
 
 int TorrentBase::erase_state()
 {
 	remove(m_state_file_name.c_str());
-	std::string infohash_str = m_info_hash_hex;
+	std::string infohash_str = m_metafile.info_hash_hex;
 	std::string fname =  m_work_directory + infohash_str + ".torrent";
 	remove(fname.c_str());
 	return ERR_NO_ERROR;

@@ -91,7 +91,7 @@ DirTree::DirTree() {
 
 DirTree::DirTree(const DirTree & dirtree)
 {
-	this->m_root = new Dir(*dirtree.m_root);
+	this->m_root = dirtree.m_root == NULL ? NULL : new Dir(*dirtree.m_root);
 	this->m_iter = m_root;
 }
 
@@ -108,7 +108,7 @@ DirTree & DirTree::operator = (const DirTree & dirtree)
 		if (m_root != NULL)
 			delete m_root;
 
-		m_root = new Dir(*dirtree.m_root);
+		m_root = dirtree.m_root == NULL ? NULL : new Dir(*dirtree.m_root);
 		m_iter = m_root;
 	}
 	return *this;

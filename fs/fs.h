@@ -158,6 +158,7 @@ public:
 	int Init_for_tests(uint16_t write_cache_size, uint16_t fd_cache_size);
 	~FileManager();
 	int File_add(const char * fn, uint64_t length, bool fictive, const FileAssociation::ptr & assoc, File & file);
+	int File_add(const std::string & fn, uint64_t length, bool fictive, const FileAssociation::ptr & assoc, File & file);
 	int File_write(File & file, const char * buf, uint32_t length, uint64_t offset, uint64_t block_id );
 	int File_read_immediately(File & file, char * buf, uint64_t offset, uint64_t length);
 	void File_delete(File & file);
