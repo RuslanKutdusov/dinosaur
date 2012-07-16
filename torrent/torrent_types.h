@@ -9,6 +9,7 @@
 #define TORRENT_TYPES_H_
 
 #include "../consts.h"
+#include "../fs/fs.h"
 
 namespace torrent
 {

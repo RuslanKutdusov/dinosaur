@@ -9,16 +9,22 @@
 namespace torrent
 {
 
-TorrentFile::TorrentFile(const TorrentInterfaceInternalPtr & t, std::string & path)
+TorrentFile::TorrentFile(const TorrentInterfaceInternalPtr & t)
 {
 #ifdef BITTORRENT_DEBUG
 	printf("TorrentFile default constructor\n");
 #endif
-	if (t == NULL || path == "" || path[0] != '/')
+	if (t == NULL)
 		throw Exception(GENERAL_ERROR_UNDEF_ERROR);
 
 	m_torrent = t;
 	m_fm = t->get_fm();
+}
+
+void TorrentFile::init(const std::string & path)
+{
+	if (path == "" || path[0] != '/')
+		throw Exception(GENERAL_ERROR_UNDEF_ERROR);
 
 	std::string i_path(path);
 	if (i_path[i_path.length() - 1] != '/')
@@ -33,13 +39,15 @@ TorrentFile::TorrentFile(const TorrentInterfaceInternalPtr & t, std::string & pa
 		m_torrent->get_dirtree()->make_dir_tree(i_path);
 		i_path.append(m_torrent->get_name() + "/");
 	}
-	m_files.resize(files_count);
 	for(uint32_t i = 0; i < files_count; i++)
 	{
 		base_file_info * fi = m_torrent->get_file_info(i);
-		m_files[i].length = fi->length;
-		m_files[i].name = i_path + fi->name;
-		m_fm->File_add(m_files[i].name, m_files[i].length, false, shared_from_this(), m_files[i].file);
+		file f;
+		f.length = fi->length;
+		f.name = i_path + fi->name;
+		f.download = true;
+		m_fm->File_add(f.name, f.length, false, shared_from_this(), f.file);
+		m_files.push_back(f);
 	}
 }
 

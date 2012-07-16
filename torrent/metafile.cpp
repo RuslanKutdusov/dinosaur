@@ -64,17 +64,17 @@ Metafile & Metafile::operator = (const Metafile & metafile)
 		m_metafile = 		bencode::copy(metafile.m_metafile);
 		m_metafile_len = 	metafile.m_metafile_len;
 		announces = 		metafile.announces;
-		comment = 		metafile.comment;
+		comment = 			metafile.comment;
 		created_by = 		metafile.created_by;
 		creation_date = 	metafile.creation_date;
-		private_ = 		metafile.private_;
+		private_ = 			metafile.private_;
 		length = 			metafile.length;
 		files = 			metafile.files;
-		dir_tree = 		metafile.dir_tree;
-		name = 			metafile.name;
-		piece_length = 	metafile.piece_length;
-		piece_count = 	metafile.piece_count;
-		pieces = NULL;
+		dir_tree = 			metafile.dir_tree;
+		name = 				metafile.name;
+		piece_length = 		metafile.piece_length;
+		piece_count = 		metafile.piece_count;
+		pieces = 			NULL;
 		if (m_metafile != NULL)
 		{
 			bencode::be_node * info;// = bencode::get_info_dict(m_metafile);
@@ -365,7 +365,7 @@ void Metafile::dump()
 	std::cout<<"PRIVATE: "<<private_<<std::endl;
 	std::cout<<"LENGHT: "<<length<<std::endl;
 	std::cout<<"FILES:"<<std::endl;
-	for(std::vector<file_info>::iterator iter = files.begin(); iter != files.end(); ++iter)
+	for(std::vector<base_file_info>::iterator iter = files.begin(); iter != files.end(); ++iter)
 	{
 		std::cout<<"	"<<iter->name<<"	"<<iter->length<<std::endl;
 	}

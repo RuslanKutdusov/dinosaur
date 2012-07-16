@@ -46,6 +46,9 @@ typedef boost::shared_ptr<TorrentInterfaceBase> 		TorrentInterfaceBasePtr;
 class TorrentInterfaceInternal;
 typedef boost::shared_ptr<TorrentInterfaceInternal> 	TorrentInterfaceInternalPtr;
 
+class TorrentFile;
+typedef boost::shared_ptr<TorrentFile> TorrentFilePtr;
+
 class Tracker : public network::SocketAssociation
 {
 private:
@@ -239,7 +242,6 @@ private:
 	CSHA1 								m_csha1;
 	void build_piece_info();
 public:
-	PieceManager();
 	PieceManager(const TorrentInterfaceInternalPtr & torrent, BITFIELD bitfield);
 	void reset();
 	~PieceManager();
@@ -262,16 +264,29 @@ private:
 	fs::FileManager * 				m_fm;
 	TorrentInterfaceInternalPtr 	m_torrent;
 	std::vector<file>				m_files;
+	TorrentFile(const TorrentInterfaceInternalPtr & t);
+	void init(const std::string & path);
 public:
-	TorrentFile(const TorrentInterfaceInternalPtr & t, std::string & path);
 	int save_block(uint32_t piece, uint32_t block_offset, uint32_t block_length, char * block);
 	int read_block(uint32_t piece, uint32_t block_index, char * block, uint32_t & block_length);
 	int read_piece(uint32_t piece_index, unsigned char * dst);
 	int event_file_write(fs::write_event * eo);
 	void ReleaseFiles();
 	~TorrentFile();
+	static void CreateTorrentFile(const TorrentInterfaceInternalPtr & t, const std::string & path, TorrentFilePtr & ptr)
+	{
+		try
+		{
+			ptr.reset(new TorrentFile(t));
+			ptr->init(path);
+		}
+		catch(Exception & e)
+		{
+			ptr.reset();
+			throw Exception(e);
+		}
+	}
 };
-typedef boost::shared_ptr<TorrentFile> TorrentFilePtr;
 
 
 class TorrentBase : public boost::enable_shared_from_this<TorrentBase>
@@ -307,7 +322,6 @@ protected:
 	PieceManagerPtr 				m_piece_manager;
 	Metafile 						m_metafile;
 
-	std::string 					m_work_directory;
 	std::string 					m_download_directory;
 	std::string 					m_state_file_name;
 
@@ -327,13 +341,9 @@ protected:
 	TORRENT_STATE 					m_state;
 	std::string 					m_error;
 
-	virtual void init_members(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc, std::string & work_directory);
-	virtual void release();
 	virtual int handle_download_task();
 	virtual void add_seeders(uint32_t count, sockaddr_in * addrs);
 	virtual int add_leecher(network::Socket & sock);
-	virtual int Init(const Metafile & metafile, network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc,
-			std::string & work_directory);
 	virtual std::string get_error();
 	virtual int start(std::string & download_directory);
 	virtual int stop();
@@ -346,21 +356,40 @@ protected:
 	virtual int get_info(torrent_info * info);
 	virtual int erase_state();
 	virtual void prepare2release();
+	TorrentBase(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc);
+	void init(const Metafile & metafile, const std::string & work_directory, const std::string & download_directory);
+	static void CreateTorrent(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc,
+				const Metafile & metafile, const std::string & work_directory, const std::string & download_directory, TorrentBasePtr & ptr)
+	{
+		try
+		{
+			ptr.reset(new TorrentBase(nm, g_cfg, fm, bc));
+			ptr->init(metafile, work_directory, download_directory);
+		}
+		catch (Exception & e)
+		{
+			ptr.reset();
+			throw Exception(e);
+		}
+	}
 public:
-	TorrentBase();
 	virtual ~TorrentBase();
 };
 
 class TorrentInterfaceBase : public TorrentBase
 {
 public:
-	TorrentInterfaceBase()
-	{}
+	static void CreateTorrent(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc,
+			const Metafile & metafile, const std::string & work_directory, const std::string & download_directory, TorrentInterfaceBasePtr & ptr)
+	{
+		ptr.reset();
+		TorrentBasePtr base_ptr;
+		TorrentBase::CreateTorrent(nm, g_cfg, fm, bc, metafile, work_directory, download_directory, base_ptr);
+		ptr = boost::static_pointer_cast<TorrentInterfaceBase>(base_ptr);
+	}
 	virtual ~TorrentInterfaceBase() {}
 	virtual void add_seeders(uint32_t count, sockaddr_in * addrs) = 0;
 	virtual int add_leecher(network::Socket & sock) = 0;
-	virtual int Init(std::string metafile, network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc,
-			std::string & work_directory, bool is_new) = 0;
 	virtual std::string get_error() = 0;
 	virtual int start(std::string & download_directory) = 0;
 	virtual int stop() = 0;
@@ -370,7 +399,6 @@ public:
 	virtual bool is_downloaded() = 0;
 	virtual int clock() = 0;
 	virtual int get_info(torrent_info * info) = 0;
-	virtual int save_meta2file(const char * filepath) = 0;
 	virtual int erase_state() = 0;
 	virtual void prepare2release() = 0;
 };

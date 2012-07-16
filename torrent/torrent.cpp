@@ -52,26 +52,72 @@ void get_peer_key(sockaddr_in * addr, std::string * key)
 	key->append(port_c);
 }
 
-TorrentBase::TorrentBase()
+TorrentBase::TorrentBase(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc)
 	//:network::sock_event(), fs::file_event()
 {
 #ifdef BITTORRENT_DEBUG
 	printf("Torrent default constructor\n");
 #endif
-	std::string t = "";
-	init_members(NULL, NULL, NULL, NULL, t);
-	m_nm = NULL;
-	m_g_cfg = NULL;
-	m_downloaded = 0;
+	if (nm == NULL || g_cfg == NULL || fm == NULL || bc == NULL)
+		throw Exception(GENERAL_ERROR_UNDEF_ERROR);
+
+	m_nm = nm;
+	m_g_cfg = g_cfg;
+	m_fm = fm;
+	m_bc = bc;
+	m_downloaded  = 0;
 	m_uploaded = 0;
-	m_fm = NULL;
-	m_bc = NULL;
-	m_rx_speed = 0.0f;
-	m_tx_speed = 0.0f;
+	m_rx_speed = 0;
+	m_tx_speed = 0;
 	m_state = TORRENT_STATE_NONE;
 	m_error = TORRENT_ERROR_NO_ERROR;
-	m_torrent_file.reset(new TorrentFile());
-	m_piece_manager.reset(new PieceManager());
+}
+
+void TorrentBase::init(const Metafile & metafile, const std::string & work_directory, const std::string & download_directory)
+{
+	if (work_directory.length() == 0)
+		throw Exception(GENERAL_ERROR_UNDEF_ERROR);
+	BITFIELD bitfield = NULL;
+	try{
+		m_metafile = metafile;
+
+		m_state_file_name = work_directory;
+		m_state_file_name.append(m_metafile.info_hash_hex);
+
+		StateSerializator s(m_state_file_name);
+		size_t bitfield_len = ceil(m_metafile.piece_count / 8.0f);
+		bitfield = new unsigned char[bitfield_len];
+		if (s.deserialize(m_uploaded, m_download_directory, bitfield, bitfield_len) == -1)
+		{
+			m_download_directory = download_directory;
+			if (m_download_directory[m_download_directory.length() - 1] != '/')
+				m_download_directory.append("/");
+			m_uploaded = 0;
+			memset(bitfield, 0, bitfield_len);
+			s.serialize(m_uploaded, m_download_directory, bitfield, bitfield_len);
+			delete[] bitfield;
+			bitfield = NULL;
+		}
+
+		TorrentFile::CreateTorrentFile(boost::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()), m_download_directory, m_torrent_file);
+
+		m_piece_manager.reset(new PieceManager(boost::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()), bitfield));
+
+		if (bitfield != NULL)
+			delete[] bitfield;
+	}
+	catch( std::bad_alloc & e)
+	{
+		if (bitfield != NULL)
+			delete[] bitfield;
+		throw Exception(GENERAL_ERROR_NO_MEMORY_AVAILABLE);
+	}
+	catch ( Exception & e)
+	{
+		if (bitfield != NULL)
+			delete[] bitfield;
+		throw Exception(e);
+	}
 }
 
 TorrentBase::~TorrentBase()
@@ -79,7 +125,6 @@ TorrentBase::~TorrentBase()
 #ifdef BITTORRENT_DEBUG
 	printf("Torrent destructor\n");
 #endif
-	release();
 #ifdef BITTORRENT_DEBUG
 	printf("Torrent destroyed\n");
 #endif
@@ -113,61 +158,6 @@ void TorrentBase::prepare2release()
 	m_torrent_file->ReleaseFiles();
 	m_torrent_file.reset();
 	m_piece_manager.reset();
-}
-
-void TorrentBase::release()
-{
-	// TODO Auto-generated destructor stub
-
-	//std::cout<<"Torrent released\n";
-}
-
-void TorrentBase::init_members(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc, std::string & work_directory)
-{
-	m_nm = nm;
-	m_g_cfg = g_cfg;
-	m_fm = fm;
-	m_bc = bc;
-	m_work_directory = work_directory;
-	m_downloaded  = 0;
-	m_uploaded = 0;
-	m_rx_speed = 0;
-	m_tx_speed = 0;
-	m_state = TORRENT_STATE_NONE;
-}
-
-int TorrentBase::Init(const Metafile & metafile, network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc,
-		std::string & work_directory)
-{
-	if (nm == NULL || g_cfg == NULL || fm == NULL || bc == NULL || work_directory.length() == 0)
-	{
-		m_error = GENERAL_ERROR_UNDEF_ERROR;
-		return ERR_BAD_ARG;
-	}
-	init_members(nm, g_cfg, fm, bc, work_directory);
-	try{
-
-		m_metafile = metafile;
-		//формируем путь к файлу вида $HOME/.dinosaur/$INFOHASH_HEX
-		m_state_file_name = m_work_directory;
-		m_state_file_name.append(m_metafile.info_hash_hex);
-
-
-		m_waiting_seeders.clear();
-		m_active_seeders.clear();
-		m_seeders.clear();
-		m_leechers.clear();
-	}
-	catch( std::bad_alloc & e)
-	{
-		m_error = GENERAL_ERROR_NO_MEMORY_AVAILABLE;
-		return ERR_INTERNAL;
-	}
-	catch( Exception & e)
-	{
-		return ERR_INTERNAL;
-	}
-	return ERR_NO_ERROR;
 }
 
 void TorrentBase::add_seeders(uint32_t count, sockaddr_in * addrs)
@@ -233,28 +223,6 @@ int TorrentBase::start(std::string & download_directory)
 	{
 		m_active_seeders.clear();
 
-		StateSerializator s(m_state_file_name);
-		size_t bitfield_len = ceil(m_metafile.piece_count / 8.0f);
-		unsigned char * bitfield = new unsigned char[bitfield_len];
-		if (s.deserialize(m_uploaded, m_download_directory, bitfield, bitfield_len) == -1)
-		{
-			m_download_directory = download_directory;
-			if (m_download_directory[m_download_directory.length() - 1] != '/')
-				m_download_directory.append("/");
-			m_uploaded = 0;
-			memset(bitfield, 0, bitfield_len);
-			s.serialize(m_uploaded, m_download_directory, bitfield, bitfield_len);
-			delete[] bitfield;
-			bitfield = NULL;
-		}
-		if (m_torrent_file->Init(boost::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()), m_download_directory) != ERR_NO_ERROR)
-			return ERR_FILE_ERROR;
-
-		if (m_piece_manager->Init(boost::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()), bitfield) != ERR_NO_ERROR)
-			return ERR_INTERNAL;
-
-		if (bitfield != NULL)
-			delete[] bitfield;
 
 		for (std::vector<std::string>::iterator iter = m_metafile.announces.begin(); iter != m_metafile.announces.end(); ++iter)
 		{
@@ -560,7 +528,7 @@ int TorrentBase::clock()
 
 int TorrentBase::event_piece_hash(uint32_t piece_index, bool ok, bool error)
 {
-	if (ok && !error)
+	/*if (ok && !error)
 	{
 		m_have_list.push_back(piece_index);
 		m_downloaded += m_piece_manager->get_piece_length(piece_index);
@@ -582,7 +550,7 @@ int TorrentBase::event_piece_hash(uint32_t piece_index, bool ok, bool error)
 		m_piece_manager->piece_bad(piece_index);
 		printf("Piece %d BAD\n", piece_index);
 		//printf("rx=%f tx=%f done=%d downloaded=%llu\n", m_rx_speed, m_tx_speed, m_pieces_to_download.size(), m_downloaded);
-	}
+	}*/
 	return ERR_NO_ERROR;
 }
 
@@ -644,9 +612,6 @@ int TorrentBase::get_info(torrent_info * info)
 int TorrentBase::erase_state()
 {
 	remove(m_state_file_name.c_str());
-	std::string infohash_str = m_metafile.info_hash_hex;
-	std::string fname =  m_work_directory + infohash_str + ".torrent";
-	remove(fname.c_str());
 	return ERR_NO_ERROR;
 }
 
