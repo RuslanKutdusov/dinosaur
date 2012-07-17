@@ -617,6 +617,17 @@ int Peer::get_info(peer_info * info)
 	return ERR_NO_ERROR;
 }
 
+int Peer::prepare2release()
+{
+	m_nm->Socket_delete(m_sock);
+	return ERR_NO_ERROR;
+}
+
+void Peer::forced_releasing()
+{
+	prepare2release();
+}
+
 Peer::~Peer()
 {
 #ifdef BITTORRENT_DEBUG

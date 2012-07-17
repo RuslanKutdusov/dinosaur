@@ -143,7 +143,8 @@ int Bittorrent::init_torrent(const torrent::Metafile & metafile, const std::stri
 	pthread_mutex_lock(&m_mutex);
 	if (m_torrents.count(infohash_str) !=0)
 	{
-		torrent->prepare2release();
+		torrent->erase_state();
+		torrent->forced_releasing();
 		add_error_mes(TORRENT_ERROR_EXISTS);
 		pthread_mutex_unlock(&m_mutex);
 		return ERR_SEE_ERROR;

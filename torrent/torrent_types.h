@@ -18,6 +18,13 @@ typedef unsigned char 		SHA1_HASH[SHA1_LENGTH];
 typedef char 				SHA1_HASH_HEX[SHA1_HEX_LENGTH];
 typedef unsigned char * 	BITFIELD;
 
+enum PIECE_PRIORITY
+{
+	PIECE_PRIORITY_LOW,
+	PIECE_PRIORITY_NORMAL,
+	PIECE_PRIORITY_HIGH
+};
+
 enum PEER_ADD
 {
 	PEER_ADD_TRACKER,

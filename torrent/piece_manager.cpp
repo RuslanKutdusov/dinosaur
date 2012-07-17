@@ -34,6 +34,7 @@ PieceManager::PieceManager(const TorrentInterfaceInternalPtr & torrent, unsigned
 		Exception(GENERAL_ERROR_NO_MEMORY_AVAILABLE);
 	}
 
+	m_tag_list.push_back(1);
 	build_piece_info();
 }
 
@@ -88,14 +89,22 @@ void PieceManager::build_piece_info()
 		m_piece_info[i].offset = abs_offset - file_offset;//смещение до начала куска внутри файла
 		m_piece_info[i].block_count = (uint32_t)ceil((double)piece_length / (double)BLOCK_LENGTH);
 		m_torrent->copy_piece_hash(m_piece_info[i].hash, i);
+		m_piece_info[i].prio = PIECE_PRIORITY_NORMAL;
 
 		if (!bit_in_bitfield(i, piece_count, m_bitfield))
+		{
 			m_pieces_to_download.insert(i);
+			m_download_queue.normal_prio_pieces.push_back(i);
+			m_piece_info[i].prio_iter = --m_download_queue.normal_prio_pieces.end();
+			for(uint32_t block = 0; block < m_piece_info[i].block_count; block++)
+				m_piece_info[i].block2download.push_back(block);
+		}
 		else
+		{
 			m_torrent->inc_downloaded(piece_length);
+			m_piece_info[i].prio_iter = m_tag_list.begin();
+		}
 
-		for(uint32_t block = 0; block < m_piece_info[i].block_count; block++)
-			m_piece_info[i].block2download.push_back(block);
 	}
 }
 
@@ -194,5 +203,135 @@ bool PieceManager::check_piece_hash(unsigned char * piece, uint32_t piece_index)
 	}
 	return false;
 }
+
+int PieceManager::front_piece2download(uint32_t & piece_index)
+{
+	if (!m_download_queue.high_prio_pieces.empty())
+	{
+		piece_index = m_download_queue.high_prio_pieces.front();
+		return ERR_NO_ERROR;
+	}
+	if (!m_download_queue.normal_prio_pieces.empty())
+	{
+		piece_index = m_download_queue.normal_prio_pieces.front();
+		return ERR_NO_ERROR;
+	}
+	if (!m_download_queue.low_prio_pieces.empty())
+	{
+		piece_index = m_download_queue.low_prio_pieces.front();
+		return ERR_NO_ERROR;
+	}
+	return ERR_EMPTY_QUEUE;
+}
+
+void PieceManager::pop_piece2download()
+{
+	if (!m_download_queue.high_prio_pieces.empty())
+	{
+		uint32_t piece_index = m_download_queue.high_prio_pieces.front();
+		m_piece_info[piece_index].prio_iter = m_tag_list.begin();
+		m_download_queue.high_prio_pieces.pop_front();
+
+	}
+	if (!m_download_queue.normal_prio_pieces.empty())
+	{
+		uint32_t piece_index = m_download_queue.normal_prio_pieces.front();
+		m_piece_info[piece_index].prio_iter = m_tag_list.begin();
+		m_download_queue.normal_prio_pieces.pop_front();
+
+	}
+	if (!m_download_queue.low_prio_pieces.empty())
+	{
+		uint32_t piece_index = m_download_queue.low_prio_pieces.front();
+		m_piece_info[piece_index].prio_iter = m_tag_list.begin();
+		m_download_queue.low_prio_pieces.pop_front();
+
+	}
+}
+
+int PieceManager::push_piece2download(uint32_t piece_index)
+{
+	if (piece_index >= m_piece_info.size())
+		return ERR_BAD_ARG;
+	if (m_piece_info[piece_index].prio_iter != m_tag_list.begin())
+		return ERR_ALREADY_EXISTS;
+
+	switch(m_piece_info[piece_index].prio)
+	{
+	case(PIECE_PRIORITY_LOW):
+			m_download_queue.low_prio_pieces.push_back(piece_index);
+			m_piece_info[piece_index].prio_iter = --m_download_queue.low_prio_pieces.end();
+			break;
+	case(PIECE_PRIORITY_NORMAL):
+			m_download_queue.normal_prio_pieces.push_back(piece_index);
+			m_piece_info[piece_index].prio_iter = --m_download_queue.normal_prio_pieces.end();
+			break;
+	case(PIECE_PRIORITY_HIGH):
+			m_download_queue.high_prio_pieces.push_back(piece_index);
+			m_piece_info[piece_index].prio_iter = --m_download_queue.high_prio_pieces.end();
+			break;
+	default:
+			return ERR_INTERNAL;
+			break;
+	}
+	return ERR_NO_ERROR;
+}
+
+int PieceManager::set_piece_priority(uint32_t piece_index, PIECE_PRIORITY priority)
+{
+	if (piece_index >= m_piece_info.size() || (priority != PIECE_PRIORITY_LOW && priority != PIECE_PRIORITY_NORMAL && priority != PIECE_PRIORITY_HIGH))
+		return ERR_BAD_ARG;
+	if (m_piece_info[piece_index].prio_iter == m_tag_list.begin())
+		return ERR_EMPTY_QUEUE;
+	if (m_piece_info[piece_index].prio == priority)
+		return ERR_NO_ERROR;
+
+	switch(m_piece_info[piece_index].prio)
+	{
+	case(PIECE_PRIORITY_LOW):
+			m_download_queue.low_prio_pieces.erase(m_piece_info[piece_index].prio_iter);
+			break;
+	case(PIECE_PRIORITY_NORMAL):
+			m_download_queue.normal_prio_pieces.erase(m_piece_info[piece_index].prio_iter);
+			break;
+	case(PIECE_PRIORITY_HIGH):
+			m_download_queue.high_prio_pieces.erase(m_piece_info[piece_index].prio_iter);
+			break;
+	default:
+			return ERR_INTERNAL;
+			break;
+	}
+
+	switch(priority)
+	{
+	case(PIECE_PRIORITY_LOW):
+			m_download_queue.low_prio_pieces.push_back(piece_index);
+			m_piece_info[piece_index].prio_iter = --m_download_queue.low_prio_pieces.end();
+			break;
+	case(PIECE_PRIORITY_NORMAL):
+			m_download_queue.normal_prio_pieces.push_back(piece_index);
+			m_piece_info[piece_index].prio_iter = --m_download_queue.normal_prio_pieces.end();
+			break;
+	case(PIECE_PRIORITY_HIGH):
+			m_download_queue.high_prio_pieces.push_back(piece_index);
+			m_piece_info[piece_index].prio_iter = --m_download_queue.high_prio_pieces.end();
+			break;
+	default:
+			return ERR_INTERNAL;
+			break;
+	}
+
+	m_piece_info[piece_index].prio = priority;
+	return ERR_NO_ERROR;
+}
+
+int PieceManager::get_piece_priority(uint32_t piece_index, PIECE_PRIORITY & priority)
+{
+	if (piece_index >= m_piece_info.size())
+		return ERR_BAD_ARG;
+	priority =  m_piece_info[piece_index].prio;
+	return ERR_NO_ERROR;
+}
+
 
 }

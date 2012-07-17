@@ -388,6 +388,11 @@ int Tracker::prepare2release()
 	return ERR_NO_ERROR;
 }
 
+void Tracker::forced_releasing()
+{
+	delete_socket();
+}
+
 int Tracker::send_completed()
 {
 	if (restore_socket() != ERR_NO_ERROR)

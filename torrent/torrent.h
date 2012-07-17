@@ -123,6 +123,7 @@ public:
 	const sockaddr_in * get_peer(int i);
 	int update();
 	int prepare2release();
+	void forced_releasing();
 	int clock(bool & release_me);
 	int send_stopped();
 	int send_started();
@@ -197,11 +198,8 @@ public:
 	double get_tx_speed();
 	std::string get_ip_str();
 	int get_info(peer_info * info);
-	int prepare2release()
-	{
-		m_nm->Socket_delete(m_sock);
-		return ERR_NO_ERROR;
-	}
+	int prepare2release();
+	void forced_releasing();
 	~Peer();
 };
 
@@ -220,25 +218,37 @@ typedef peer_list::iterator peer_list_iter;
 class PieceManager
 {
 private:
+	typedef std::list<uint32_t> uint32_list;
+	typedef std::list<uint32_t>::iterator uint32_list_iter;
 	struct piece_info
 	{
-		int 						file_index;//индекс файла, в котором начинается кусок
-		uint32_t 					length;//его длина
-		uint32_t 					remain;
-		uint64_t 					offset;//смещение внутри файла до начала куска
-		uint32_t 					block_count;//кол-во блоков в куске
-		std::set<PeerPtr> 			taken_from;
-		std::list<uint32_t> 		block2download;
-		SHA1_HASH					hash;
+		int 							file_index;//индекс файла, в котором начинается кусок
+		uint32_t 						length;//его длина
+		uint32_t 						remain;
+		uint64_t 						offset;//смещение внутри файла до начала куска
+		uint32_t 						block_count;//кол-во блоков в куске
+		std::set<PeerPtr> 				taken_from;
+		uint32_list			 			block2download;
+		SHA1_HASH						hash;
+		PIECE_PRIORITY					prio;
+		uint32_list_iter				prio_iter;
+	};
+	struct download_queue
+	{
+		uint32_list 					low_prio_pieces;
+		uint32_list 					normal_prio_pieces;
+		uint32_list 					high_prio_pieces;
 	};
 private:
 	TorrentInterfaceInternalPtr 		m_torrent;
 	BITFIELD 							m_bitfield;
 	size_t 								m_bitfield_len;
-	std::set<uint32_t> 					m_pieces_to_download;//куски, которые надо загрузить
+	std::set<uint32_t>					m_pieces_to_download;//куски, которые надо загрузить
 	std::vector<piece_info> 			m_piece_info;
 	unsigned char *						m_piece_for_check_hash;
 	CSHA1 								m_csha1;
+	download_queue						m_download_queue;
+	uint32_list							m_tag_list;//хранит один элемент, на который будут ссылатся prio_iter у загруженных кусков
 	void build_piece_info();
 public:
 	PieceManager(const TorrentInterfaceInternalPtr & torrent, BITFIELD bitfield);
@@ -253,6 +263,12 @@ public:
 	size_t get_bitfield_length();
 	void copy_bitfield(BITFIELD dst);
 	bool check_piece_hash(unsigned char * piece, uint32_t piece_index);
+	int front_piece2download(uint32_t & piece_index)
+	void pop_piece2download();
+	int push_piece2download(uint32_t piece_index);
+	int set_piece_priority(uint32_t piece_index, PIECE_PRIORITY priority);
+	int get_piece_priority(uint32_t piece_index, PIECE_PRIORITY & priority);
+
 };
 typedef boost::shared_ptr<PieceManager> PieceManagerPtr;
 
@@ -355,6 +371,7 @@ protected:
 	virtual int get_info(torrent_info * info);
 	virtual int erase_state();
 	virtual void prepare2release();
+	virtual void forced_releasing();
 	TorrentBase(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc);
 	void init(const Metafile & metafile, const std::string & work_directory, const std::string & download_directory);
 	static void CreateTorrent(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc,
@@ -400,6 +417,7 @@ public:
 	virtual int get_info(torrent_info * info) = 0;
 	virtual int erase_state() = 0;
 	virtual void prepare2release() = 0;
+	virtual void forced_releasing() = 0;
 };
 
 class TorrentInterfaceInternal : public TorrentBase

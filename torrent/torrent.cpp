@@ -117,6 +117,30 @@ void TorrentBase::prepare2release()
 	m_piece_manager.reset();
 }
 
+void TorrentBase::forced_releasing()
+{
+	m_state = TORRENT_STATE_RELEASING;
+	for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
+	{
+		(*iter).second->forced_releasing();
+	}
+	for(peer_map_iter iter = m_seeders.begin(); iter != m_seeders.end(); ++iter)
+	{
+		(*iter).second->forced_releasing();
+	}
+	for(peer_map_iter iter = m_leechers.begin(); iter != m_leechers.end(); ++iter)
+	{
+		(*iter).second->forced_releasing();
+	}
+	m_seeders.clear();
+	m_active_seeders.clear();
+	m_waiting_seeders.clear();
+	m_leechers.clear();
+	m_torrent_file->ReleaseFiles();
+	m_torrent_file.reset();
+	m_piece_manager.reset();
+}
+
 void TorrentBase::add_seeders(uint32_t count, sockaddr_in * addrs)
 {
 	count = count > m_g_cfg->get_tracker_numwant() ? m_g_cfg->get_tracker_numwant() : count;
