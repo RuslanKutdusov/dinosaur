@@ -46,7 +46,7 @@ void TorrentFile::init(const std::string & path)
 		f.length = fi->length;
 		f.name = i_path + fi->name;
 		f.download = true;
-		m_fm->File_add(f.name, f.length, false, shared_from_this(), f.file);
+		m_fm->File_add(f.name, f.length, false, shared_from_this(), f.file_);
 		m_files.push_back(f);
 	}
 }
@@ -95,7 +95,7 @@ int TorrentFile::save_block(uint32_t piece, uint32_t block_offset, uint32_t bloc
 		uint32_t remain = m_files[file_index].length - offset;
 		//если данных для записи больше,чем это возможно, пишем в файл сколько можем(remain), иначе пишем все что есть
 		uint32_t to_write = block_length - pos > remain ? remain : block_length - pos;
-		if (m_fm->File_write(m_files[file_index++].file, &block[pos], to_write, offset, id) != ERR_NO_ERROR)
+		if (m_fm->File_write(m_files[file_index++].file_, &block[pos], to_write, offset, id) != ERR_NO_ERROR)
 		{
 			return ERR_INTERNAL;
 		}
@@ -137,7 +137,7 @@ int TorrentFile::read_block(uint32_t piece, uint32_t block_index, char * block, 
 		uint32_t remain = m_files[file_index].length - offset;
 		//если прочитать надо больше, чем это возможно, читаем сколько можем(remain), иначе читаем все
 		uint32_t to_read = block_length - pos > remain ? remain : block_length - pos;
-		int ret = m_fm->File_read_immediately(m_files[file_index++].file, &block[pos], offset, to_read);
+		int ret = m_fm->File_read_immediately(m_files[file_index++].file_, &block[pos], offset, to_read);
 		if (ret < 0)
 			return ERR_INTERNAL;
 		pos += to_read;
@@ -168,7 +168,7 @@ int TorrentFile::read_piece(uint32_t piece_index, unsigned char * dst)
 
 	while(pos < piece_length)
 	{
-		int r = m_fm->File_read_immediately(m_files[file_index++].file, (char*)&dst[pos], offset, to_read);
+		int r = m_fm->File_read_immediately(m_files[file_index++].file_, (char*)&dst[pos], offset, to_read);
 		if (r == -1)
 		{
 			return ERR_INTERNAL;
@@ -210,7 +210,7 @@ void TorrentFile::ReleaseFiles()
 {
 	for(uint32_t i = 0; i < m_files.size(); i++)
 	{
-		m_fm->File_delete(m_files[i].file);
+		m_fm->File_delete(m_files[i].file_);
 	}
 }
 

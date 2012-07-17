@@ -59,15 +59,15 @@ void PieceManager::reset()
 
 void PieceManager::build_piece_info()
 {
-	uint32_t piece_length = m_torrent->get_piece_length();
+	uint32_t piece_length_ = m_torrent->get_piece_length();
 	uint64_t length = m_torrent->get_length();
 	uint32_t file_count = m_torrent->get_files_count();
 	uint32_t piece_count = m_torrent->get_piece_count();
 	m_piece_info.resize(piece_count);
 	for (uint32_t i = 0; i < piece_count; i++)
 	{
-		uint64_t abs_offset = i * piece_length;//смещение до начала куска
-		uint64_t piece_length = (i == piece_count - 1) ? length - piece_length * i : piece_length; //размер последнего куска может быть меньше m_piece_length
+		uint64_t abs_offset = i * piece_length_;//смещение до начала куска
+		uint32_t piece_length = (i == piece_count - 1) ? length - piece_length_ * i : piece_length_; //размер последнего куска может быть меньше m_piece_length
 		int file_index = 0;
 		uint64_t last_files_length = 0;
 		for(uint32_t j = 0; j < file_count; j++)
@@ -99,20 +99,20 @@ void PieceManager::build_piece_info()
 	}
 }
 
-int PieceManager::get_blocks_count_in_piece(uint32_t piece, uint32_t & blocks_count)
+int PieceManager::get_blocks_count_in_piece(uint32_t piece_index, uint32_t & blocks_count)
 {
-	if (piece >= m_piece_info.size())
+	if (piece_index >= m_piece_info.size())
 		return ERR_BAD_ARG;
 
-	blocks_count =  m_piece_info[piece].block_count;
+	blocks_count =  m_piece_info[piece_index].block_count;
 	return ERR_NO_ERROR;
 }
 
-int PieceManager::get_piece_length(uint32_t piece, uint32_t & piece_length)
+int PieceManager::get_piece_length(uint32_t piece_index, uint32_t & piece_length)
 {
-	if (piece >= m_piece_info.size())
+	if (piece_index >= m_piece_info.size())
 		return ERR_BAD_ARG;
-	piece_length = m_piece_info[piece].length;
+	piece_length = m_piece_info[piece_index].length;
 	return ERR_NO_ERROR;
 }
 

@@ -217,7 +217,7 @@ int TorrentBase::add_leecher(network::Socket & sock)
 	return ERR_NO_ERROR;
 }
 
-int TorrentBase::start(std::string & download_directory)
+int TorrentBase::start()
 {
 	if (m_state == TORRENT_STATE_NONE)
 	{
@@ -418,7 +418,7 @@ int TorrentBase::clock()
 			{
 				m_rx_speed += seed->get_rx_speed();
 				m_tx_speed += seed->get_tx_speed();
-				for(std::list<uint32_t>::iterator have_iter = m_have_list.begin();
+				/*for(std::list<uint32_t>::iterator have_iter = m_have_list.begin();
 						have_iter != m_have_list.end();
 						++have_iter)
 				{
@@ -440,7 +440,7 @@ int TorrentBase::clock()
 					if (seed->have_piece(piece) && seed->may_request())
 					{
 						requested_blocks_num[piece] = 0;
-						/*while(!seed->request_limit() && !m_piece_states[piece].block2download.empty())
+						while(!seed->request_limit() && !m_piece_states[piece].block2download.empty())
 						{
 							uint32_t block = m_piece_states[piece].block2download.front();
 							uint32_t block_length;
@@ -450,18 +450,18 @@ int TorrentBase::clock()
 							m_piece_states[piece].block2download.pop_front();
 							m_piece_states[piece].taken_from.insert(seed);
 							requested_blocks_num[piece]++;
-						}*/
+						}
 					}
-				}
+				}*/
 
 			}
 		}
 
-		for(std::list<uint32_t>::iterator piece_iter = m_downloadable_pieces.begin(),
+		/*for(std::list<uint32_t>::iterator piece_iter = m_downloadable_pieces.begin(),
 				piece_iter_add = m_downloadable_pieces.begin(); piece_iter != m_downloadable_pieces.end(); piece_iter = piece_iter_add)
 		{
 			++piece_iter_add;
-			/*uint32_t piece = *piece_iter;
+			uint32_t piece = *piece_iter;
 
 			if (m_piece_states[piece].block2download.size() == m_torrent_file->get_blocks_count_in_piece(piece))
 			{
@@ -471,8 +471,8 @@ int TorrentBase::clock()
 				task.task_data = piece;
 				m_task_queue.push_back(task);
 				m_piece_states[piece].taken_from.clear();//на пожарный случай
-			}*/
-		}
+			}
+		}*/
 
 		for(peer_map_iter leecher_iter = m_leechers.begin(); leecher_iter != m_leechers.end(); ++leecher_iter)
 		{

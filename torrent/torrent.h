@@ -245,8 +245,8 @@ public:
 	PieceManager(const TorrentInterfaceInternalPtr & torrent, BITFIELD bitfield);
 	void reset();
 	~PieceManager();
-	int get_blocks_count_in_piece(uint32_t piece, uint32_t & blocks_count);
-	int get_piece_length(uint32_t piece, uint32_t & piece_length);
+	int get_blocks_count_in_piece(uint32_t piece_index, uint32_t & blocks_count);
+	int get_piece_length(uint32_t piece_index, uint32_t & piece_length);
 	int get_block_index_by_offset(uint32_t piece_index, uint32_t block_offset, uint32_t & index);
 	int get_block_length_by_index(uint32_t piece_index, uint32_t block_index, uint32_t & block_length);
 	int get_piece_offset(uint32_t piece_index, uint64_t & offset);
@@ -345,7 +345,7 @@ protected:
 	virtual void add_seeders(uint32_t count, sockaddr_in * addrs);
 	virtual int add_leecher(network::Socket & sock);
 	virtual std::string get_error();
-	virtual int start(std::string & download_directory);
+	virtual int start();
 	virtual int stop();
 	virtual int pause();
 	virtual int continue_();
@@ -391,7 +391,7 @@ public:
 	virtual void add_seeders(uint32_t count, sockaddr_in * addrs) = 0;
 	virtual int add_leecher(network::Socket & sock) = 0;
 	virtual std::string get_error() = 0;
-	virtual int start(std::string & download_directory) = 0;
+	virtual int start() = 0;
 	virtual int stop() = 0;
 	virtual int pause() = 0;
 	virtual int continue_() = 0;

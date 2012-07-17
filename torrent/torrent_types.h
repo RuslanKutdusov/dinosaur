@@ -49,7 +49,7 @@ struct file
 	uint64_t 		length;
 	std::string		name;
 	bool 			download;
-	fs::File 		file;
+	fs::File 		file_;
 };
 
 struct base_file_info

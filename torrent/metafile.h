@@ -60,6 +60,7 @@ public:
 	int save2file(const char * filepath);
 	void dump();
 };
+typedef boost::shared_ptr<Metafile> MetafilePtr;
 
 } /* namespace torrent */
 #endif /* METAFILE_H_ */
