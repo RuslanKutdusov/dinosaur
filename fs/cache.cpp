@@ -122,7 +122,7 @@ void cache::pop()
 }
 
 
-int cache::push(const File & file, const char * buf, uint32_t length, uint64_t offset, uint64_t id)
+int cache::push(const File & file, const char * buf, uint32_t length, uint64_t offset, const BLOCK_ID & id)
 {
 #ifdef BITTORRENT_DEBUG
 	printf("cache push file=%s length=%u offset=%llu id=%llu\n", file->fn(), length, offset, id);

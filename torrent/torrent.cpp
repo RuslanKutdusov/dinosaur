@@ -9,49 +9,6 @@
 
 namespace torrent {
 
-void set_bitfield(uint32_t piece, uint32_t piece_count, unsigned char * bitfield)
-{
-	if (piece >= piece_count)
-		return;
-	int byte_index = (int)floor(piece / 8);
-	int bit_index = piece - byte_index * 8;
-	int bit = (int)pow(2.0f, 7 - bit_index);
-	bitfield[byte_index] |= bit;
-}
-
-void reset_bitfield(uint32_t piece, uint32_t piece_count, unsigned char * bitfield)
-{
-	if (piece >= piece_count)
-		return;
-	int byte_index = (int)floor(piece / 8);
-	int bit_index = piece - byte_index * 8;
-	int bit = (int)pow(2.0f, 7 - bit_index);
-	unsigned char mask;
-	memset(&mask, 255, 1);
-	mask ^= bit;
-	bitfield[byte_index] &= mask;
-}
-
-bool bit_in_bitfield(uint32_t piece, uint32_t piece_count, unsigned char * bitfield)
-{
-	if (piece >= piece_count)
-			return false;
-	int byte_index = (int)floor(piece / 8);
-	int bit_index = piece - byte_index * 8;
-	int bit = (int)pow(2.0f, 7 - bit_index);
-	return (bitfield[byte_index] & bit) > 0;
-}
-
-void get_peer_key(sockaddr_in * addr, std::string * key)
-{
-	*key = inet_ntoa(addr->sin_addr);
-	uint16_t port = ntohs(addr->sin_port);
-	char port_c[256];
-	sprintf(port_c, "%u", port);
-	key->append(":");
-	key->append(port_c);
-}
-
 TorrentBase::TorrentBase(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc)
 	//:network::sock_event(), fs::file_event()
 {
@@ -168,7 +125,7 @@ void TorrentBase::add_seeders(uint32_t count, sockaddr_in * addrs)
 		try
 		{
 			std::string key;
-			get_peer_key(&addrs[i], &key);
+			get_peer_key(&addrs[i], key);
 			//если такого пира у нас нет, добавляем его
 			if (m_seeders.count(key) == 0)
 			{
@@ -193,7 +150,7 @@ int TorrentBase::add_leecher(network::Socket & sock)
 	try
 	{
 		std::string key;
-		get_peer_key(&sock->m_peer, &key);
+		get_peer_key(&sock->m_peer, key);
 		//printf("add incoming peer %s\n", key.c_str());
 		if ((m_leechers.count(key) == 0 || m_leechers[key] == NULL) && m_leechers.size() < m_g_cfg->get_max_active_leechers())
 		{
@@ -403,11 +360,11 @@ int TorrentBase::clock()
 			seed->clock();
 			if (seed->is_sleep())
 			{
-				while(!seed->no_requested_blocks())
+				BLOCK_ID block_id;
+				while(seed->get_requested_block(block_id))
 				{
-					uint64_t block_id = seed->get_requested_block();
 					uint32_t piece, block;
-					get_piece_block_from_id(block_id, piece, block);
+					get_piece_block_from_block_id(block_id, piece, block);
 					//m_piece_states[piece].block2download.push_back(block);
 					//m_piece_states[piece].taken_from.erase(seed);
 				}
@@ -418,13 +375,13 @@ int TorrentBase::clock()
 			{
 				m_rx_speed += seed->get_rx_speed();
 				m_tx_speed += seed->get_tx_speed();
-				/*for(std::list<uint32_t>::iterator have_iter = m_have_list.begin();
+				for(std::list<uint32_t>::iterator have_iter = m_have_list.begin();
 						have_iter != m_have_list.end();
 						++have_iter)
 				{
 					seed->send_have(*have_iter);
 				}
-				if (m_downloadable_pieces.size() < m_active_seeders.size() &&
+				/*if (m_downloadable_pieces.size() < m_active_seeders.size() &&
 						m_task_queue.size() > 0 &&
 						m_task_queue.front().task == TORRENT_TASK_DOWNLOAD_PIECE)
 				{

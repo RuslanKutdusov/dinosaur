@@ -47,12 +47,12 @@ struct write_cache_element
 	char block[BLOCK_LENGTH];
 	uint32_t length;
 	uint64_t offset;
-	uint64_t block_id;
+	BLOCK_ID block_id;
 };
 
 struct write_event
 {
-	uint64_t block_id;
+	BLOCK_ID block_id;
 	ssize_t writted;
 	File file;
 };
@@ -130,7 +130,7 @@ public:
 	~cache();
 	const write_cache_element * const front() const;
 	void pop();
-	int push(const File & file, const char * buf, uint32_t length, uint64_t offset, uint64_t id);
+	int push(const File & file, const char * buf, uint32_t length, uint64_t offset, const BLOCK_ID & id);
 	bool empty() const;
 	uint16_t count() const
 	{return m_count;}
@@ -159,7 +159,7 @@ public:
 	~FileManager();
 	int File_add(const char * fn, uint64_t length, bool fictive, const FileAssociation::ptr & assoc, File & file);
 	int File_add(const std::string & fn, uint64_t length, bool fictive, const FileAssociation::ptr & assoc, File & file);
-	int File_write(File & file, const char * buf, uint32_t length, uint64_t offset, uint64_t block_id );
+	int File_write(File & file, const char * buf, uint32_t length, uint64_t offset, const BLOCK_ID & block_id );
 	int File_read_immediately(File & file, char * buf, uint64_t offset, uint64_t length);
 	void File_delete(File & file);
 	void notify();

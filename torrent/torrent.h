@@ -160,8 +160,8 @@ private:
 	bool 							m_am_interested;//я заинтересован в пире
 	int 							m_state;
 	BITFIELD 						m_bitfield;
-	std::set<uint64_t> 				m_requested_blocks;//блоки, которые мы запросили
-	std::set<uint64_t> 				m_requests_queue;//блоки, которые у нас запросили(очередь запросов)
+	std::set<BLOCK_ID> 				m_requested_blocks;//блоки, которые мы запросили
+	std::set<BLOCK_ID> 				m_requests_queue;//блоки, которые у нас запросили(очередь запросов)
 	time_t 							m_sleep_time;
 	int process_messages();
 	void goto_sleep();
@@ -191,9 +191,8 @@ public:
 	bool is_sleep();
 	bool may_request();
 	bool request_limit();
-	bool no_requested_blocks();
-	void erase_requested_block(uint64_t block);
-	uint64_t get_requested_block();
+	void erase_requested_block(const BLOCK_ID & block_id);
+	bool get_requested_block(BLOCK_ID & block_id);
 	double get_rx_speed();
 	double get_tx_speed();
 	std::string get_ip_str();
@@ -439,9 +438,9 @@ public:
 	virtual void add_seeders(uint32_t count, sockaddr_in * addrs) = 0;
 };
 
+void set_bitfield(uint32_t piece, uint32_t piece_count, BITFIELD bitfield);
+void reset_bitfield(uint32_t piece, uint32_t piece_count, BITFIELD bitfield);
+bool bit_in_bitfield(uint32_t piece, uint32_t piece_count, BITFIELD bitfield);
+void get_peer_key(sockaddr_in * addr, std::string & key);
 
-void set_bitfield(uint32_t piece, uint32_t piece_count, unsigned char * bitfield);
-void reset_bitfield(uint32_t piece, uint32_t piece_count, unsigned char * bitfield);
-bool bit_in_bitfield(uint32_t piece, uint32_t piece_count, unsigned char * bitfield);
-void get_peer_key(sockaddr_in * addr, std::string * key);
 } /* namespace TorrentNamespace */

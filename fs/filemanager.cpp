@@ -148,7 +148,7 @@ int FileManager::prepare_file(File & file)
 	return ERR_NO_ERROR;
 }
 
-int FileManager::File_write(File & file, const char * buf, uint32_t length, uint64_t offset, uint64_t block_id)
+int FileManager::File_write(File & file, const char * buf, uint32_t length, uint64_t offset, const BLOCK_ID & block_id)
 {
 	//printf("File_write id=%d\n", file);
 	pthread_mutex_lock(&m_mutex);

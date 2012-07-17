@@ -87,7 +87,8 @@ int TorrentFile::save_block(uint32_t piece, uint32_t block_offset, uint32_t bloc
 		offset -= m_files[file_index++].length;
 	}
 	uint32_t pos = 0;
-	uint64_t id = generate_block_id(piece, block_index);
+	BLOCK_ID block_id;
+	generate_block_id(piece, block_index, block_id);
 	//uint64_t id = ((uint64_t)piece << 32) + block_index;
 	while(pos < block_length)
 	{
@@ -95,7 +96,7 @@ int TorrentFile::save_block(uint32_t piece, uint32_t block_offset, uint32_t bloc
 		uint32_t remain = m_files[file_index].length - offset;
 		//если данных для записи больше,чем это возможно, пишем в файл сколько можем(remain), иначе пишем все что есть
 		uint32_t to_write = block_length - pos > remain ? remain : block_length - pos;
-		if (m_fm->File_write(m_files[file_index++].file_, &block[pos], to_write, offset, id) != ERR_NO_ERROR)
+		if (m_fm->File_write(m_files[file_index++].file_, &block[pos], to_write, offset, block_id) != ERR_NO_ERROR)
 		{
 			return ERR_INTERNAL;
 		}
@@ -110,9 +111,10 @@ int TorrentFile::read_block(uint32_t piece, uint32_t block_index, char * block, 
 	if (m_torrent->get_block_length_by_index(piece, block_index, block_length) != ERR_NO_ERROR)
 		return ERR_INTERNAL;
 
-	uint64_t id = generate_block_id(piece, block_index);
+	BLOCK_ID block_id;
+	generate_block_id(piece, block_index, block_id);
 	//printf("look to cache...\n");
-	block_cache::cache_key key(m_torrent.get(), id);
+	block_cache::cache_key key(m_torrent.get(), block_id);
 	//if (m_torrent->m_bc->get(m_torrent, id, block) == ERR_NO_ERROR)
 	if (m_torrent->get_bc()->get(key, (block_cache::cache_element *)block) == ERR_NO_ERROR)
 		return ERR_NO_ERROR;

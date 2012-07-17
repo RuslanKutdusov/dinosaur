@@ -51,7 +51,7 @@ int Peer::Init(sockaddr_in * addr, const TorrentInterfaceInternalPtr & torrent)
 		return ERR_BAD_ARG;
 	memcpy(&m_addr, addr, sizeof(sockaddr_in));
 	m_state = PEER_STATE_SEND_HANDSHAKE;
-	get_peer_key(addr, &m_ip);//inet_ntoa(m_sock->m_peer.sin_addr);
+	get_peer_key(addr, m_ip);//inet_ntoa(m_sock->m_peer.sin_addr);
 	return ERR_NO_ERROR;
 }
 
@@ -90,7 +90,7 @@ int Peer::Init(network::Socket & sock, const TorrentInterfaceInternalPtr & torre
 		m_state = PEER_STATE_GENERAL_READY;
 		break;
 	}
-	get_peer_key(&m_sock->m_peer, &m_ip);//inet_ntoa(m_sock->m_peer.sin_addr);
+	get_peer_key(&m_sock->m_peer, m_ip);//inet_ntoa(m_sock->m_peer.sin_addr);
 	return ERR_NO_ERROR;
 }
 
@@ -149,7 +149,8 @@ int Peer::send_request(uint32_t piece, uint32_t block, uint32_t block_length)
 	int ret = m_nm->Socket_send(m_sock, request, 17);
 	if (ret == 17)
 	{
-		uint64_t id = generate_block_id(piece, block);
+		BLOCK_ID id;
+		generate_block_id(piece, block, id);
 		m_requested_blocks.insert(id);
 		return ERR_NO_ERROR;
 	}
@@ -278,6 +279,7 @@ int Peer::process_messages()
 	memset(ip, 0, 16);
 	strcpy(ip,  inet_ntoa(m_sock->m_peer.sin_addr));
 	uint32_t piece_count = m_torrent->get_piece_count();
+	BLOCK_ID block_id;
 	while((int)m_buf.length - (int)m_buf.pos > 4)
 	{
 		uint32_t len = 0;
@@ -346,7 +348,6 @@ int Peer::process_messages()
 				uint32_t index;//индекс куска
 				uint32_t offset;
 				uint32_t length;
-				uint64_t block_id;
 				memcpy(&index,&m_buf.data[m_buf.pos], 4);
 				index = ntohl(index);
 				memcpy(&offset,&m_buf.data[m_buf.pos + 4], 4);
@@ -363,7 +364,7 @@ int Peer::process_messages()
 				if (m_torrent->get_block_length_by_index(index, block_index, real_block_length) != ERR_NO_ERROR || real_block_length != length)
 					return ERR_INTERNAL;
 				//кладем индекс блока в очередь запросов
-				block_id = generate_block_id(index, block_index);
+				generate_block_id(index, block_index, block_id);
 				m_requests_queue.insert(block_id);
 				break;
 			case '\x07'://piece: <len=0009+X><id=7><index><begin><block>
@@ -384,8 +385,8 @@ int Peer::process_messages()
 				m_downloaded += block_length;
 				if (m_torrent->save_block(index, offset, block_length, &m_buf.data[m_buf.pos + 8]) != ERR_NO_ERROR)
 					return ERR_INTERNAL;
-				uint64_t id = generate_block_id(index, offset / BLOCK_LENGTH);
-				m_requested_blocks.erase(id);
+				generate_block_id(index, offset / BLOCK_LENGTH, block_id);
+				m_requested_blocks.erase(block_id);
 				break;
 			}
 			case '\x08'://cancel: <len=0013><id=8><index><begin><length>
@@ -395,7 +396,6 @@ int Peer::process_messages()
 				uint32_t index;//индекс куска
 				uint32_t offset;
 				uint32_t length;
-				uint64_t block_id;
 				memcpy(&index,&m_buf.data[m_buf.pos], 4);
 				index = ntohl(index);
 				memcpy(&offset,&m_buf.data[m_buf.pos + 4], 4);
@@ -411,8 +411,8 @@ int Peer::process_messages()
 				uint32_t real_block_length;
 				if (m_torrent->get_block_length_by_index(index, block_index, real_block_length) != ERR_NO_ERROR || real_block_length != length)
 					return ERR_INTERNAL;
-				block_id = generate_block_id(index, block_index);
-				m_requests_queue.erase(block_id);
+				generate_block_id(index, block_index, block_id);
+				m_requested_blocks.erase(block_id);
 				break;
 			}
 			case '\x09'://port: <len=0003><id=9><listen-port>
@@ -528,10 +528,10 @@ int Peer::clock()
 	{
 		char block[BLOCK_LENGTH];
 		uint32_t block_length;
-		std::set<uint64_t>::iterator iter = m_requests_queue.begin();
-		uint64_t id = *iter;
-		uint32_t piece_index = get_piece_from_id(id);
-		uint32_t block_index = get_block_from_id(id);
+		uint32_t piece_index;
+		uint32_t block_index;
+		std::set<BLOCK_ID>::iterator iter = m_requests_queue.begin();
+		get_piece_block_from_block_id(*iter, piece_index, block_index);
 		//если удалось прочитать блок и отправить, удаляем индекс блока из очереди
 		if (m_torrent->read_block(piece_index, block_index, block, block_length) == ERR_NO_ERROR &&
 				send_piece(piece_index, BLOCK_LENGTH * block_index, block_length, block) == ERR_NO_ERROR)
@@ -573,22 +573,19 @@ void Peer::goto_sleep()
 	m_state = PEER_STATE_SLEEP;
 }
 
-bool Peer::no_requested_blocks()
+bool Peer::get_requested_block(BLOCK_ID & block_id)
 {
-	return m_requested_blocks.empty();
-}
-
-uint64_t Peer::get_requested_block()
-{
-	std::set<uint64_t>::iterator iter = m_requested_blocks.begin();
-	uint64_t id = *iter;
+	if (m_requested_blocks.empty())
+		return false;
+	std::set<BLOCK_ID>::iterator iter = m_requested_blocks.begin();
+	block_id = *iter;
 	m_requested_blocks.erase(iter);
-	return id;
+	return true;
 }
 
-void Peer::erase_requested_block(uint64_t block)
+void Peer::erase_requested_block(const BLOCK_ID & block_id)
 {
-	m_requested_blocks.erase(block);
+	m_requested_blocks.erase(block_id);
 }
 
 double Peer::get_rx_speed()
