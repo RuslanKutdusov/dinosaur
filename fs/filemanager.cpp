@@ -11,7 +11,7 @@ namespace fs {
 
 FileManager::FileManager()
 {
-#ifdef BITTORRENT_DEBUG
+#ifdef FS_DEBUG
 	printf("FileManager default constructor\n");
 #endif
 	m_write_thread = 0;
@@ -37,7 +37,7 @@ int FileManager::Init(cfg::Glob_cfg * cfg) {
 	pthread_mutexattr_t   mta;
 	pthread_mutexattr_init(&mta);
 	pthread_mutexattr_settype(&mta, PTHREAD_MUTEX_RECURSIVE);
-	pthread_mutex_init(&m_mutex, NULL);
+	pthread_mutex_init(&m_mutex, &mta);
 	pthread_cond_init (&m_cond, NULL);
 	//pthread_mutex_init(&m_mutex_timeout_sockets, NULL);
 	if (pthread_create(&m_write_thread, &attr, FileManager::cache_thread, (void *)this))
@@ -73,7 +73,7 @@ int FileManager::Init_for_tests(uint16_t write_cache_size, uint16_t fd_cache_siz
 }
 
 FileManager::~FileManager() {
-#ifdef BITTORRENT_DEBUG
+#ifdef FS_DEBUG
 	printf("FileManager destructor\n");
 #endif
 	if (m_write_thread != 0)
@@ -87,7 +87,7 @@ FileManager::~FileManager() {
 	{
 		(*iter)->m_assoc.reset();
 	}
-#ifdef BITTORRENT_DEBUG
+#ifdef FS_DEBUG
 	printf("FileManager destroyed\n");
 #endif
 }

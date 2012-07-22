@@ -157,7 +157,7 @@ int TorrentFile::read_piece(uint32_t piece_index, unsigned char * dst)
 	uint64_t offset;
 	int file_index;
 	uint32_t piece_length;
-	uint32_t to_read = piece_length;
+	uint32_t to_read;
 	uint32_t pos = 0;
 
 	if (m_torrent->get_piece_offset(piece_index, offset) != ERR_NO_ERROR)
@@ -166,12 +166,13 @@ int TorrentFile::read_piece(uint32_t piece_index, unsigned char * dst)
 		return ERR_INTERNAL;
 	if (m_torrent->get_piece_length(piece_index, piece_length) != ERR_NO_ERROR)
 		return ERR_INTERNAL;
+	to_read = piece_length;
 
 
 	while(pos < piece_length)
 	{
 		int r = m_fm->File_read_immediately(m_files[file_index++].file_, (char*)&dst[pos], offset, to_read);
-		if (r == -1)
+		if (r < 0)
 		{
 			return ERR_INTERNAL;
 		}
@@ -184,6 +185,7 @@ int TorrentFile::read_piece(uint32_t piece_index, unsigned char * dst)
 
 int TorrentFile::event_file_write(fs::write_event * eo)
 {
+	return m_torrent->event_file_write(eo);
 	/*if (eo->writted >= 0)
 	{
 		uint32_t block_index = get_block_from_id(eo->block_id);//(eo->id & (uint32_t)4294967295);
@@ -205,7 +207,6 @@ int TorrentFile::event_file_write(fs::write_event * eo)
 		uint32_t piece = get_piece_from_id(eo->block_id);//(eo->id - block_index)>>32;
 
 	}*/
-	return ERR_NO_ERROR;
 }
 
 void TorrentFile::ReleaseFiles()

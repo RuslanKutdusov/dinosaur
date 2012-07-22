@@ -88,7 +88,7 @@ public:
 	int _read(char * buf, uint64_t offset, uint64_t length);
 	void _close();
 	bool is_opened();
-#ifdef BITTORRENT_DEBUG
+#ifdef FS_DEBUG
 	const char * fn() const {return m_fn;}
 	int get_fd() const {return m_fd;}
 	void set_fd(int fd) { m_fd = fd; }

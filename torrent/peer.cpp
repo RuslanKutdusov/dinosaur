@@ -98,6 +98,11 @@ int Peer::send_handshake()
 {
 	if (m_state != PEER_STATE_SEND_HANDSHAKE)
 		return ERR_INTERNAL;
+
+#ifdef PEER_DEBUG
+	printf("Peer %s sending handshake\n", m_ip.c_str());
+#endif
+
 	unsigned char handshake[HANDSHAKE_LENGHT];
 	memset(handshake, 0, HANDSHAKE_LENGHT);
 	handshake[0] = '\x13';
@@ -115,6 +120,11 @@ int Peer::send_bitfield()
 {
 	if (m_state == PEER_STATE_WAIT_HANDSHAKE)
 		return ERR_INTERNAL;
+
+#ifdef PEER_DEBUG
+	printf("Peer %s sending bitfield\n", m_ip.c_str());
+#endif
+
 	int len =  m_torrent->get_bitfield_length();
 	unsigned char * bitfield = new unsigned char[5 + len];
 	uint32_t net_len = htonl(len + 1);
@@ -132,8 +142,13 @@ int Peer::send_bitfield()
 
 int Peer::send_request(uint32_t piece, uint32_t block, uint32_t block_length)
 {
-	if (m_peer_choking || m_state == PEER_STATE_WAIT_HANDSHAKE || m_state == PEER_STATE_SEND_HANDSHAKE || m_state == PEER_STATE_SLEEP || request_limit())
+	if (m_peer_choking || m_state == PEER_STATE_WAIT_HANDSHAKE || m_state == PEER_STATE_SEND_HANDSHAKE || m_state == PEER_STATE_SLEEP)
 			return ERR_INTERNAL;
+
+#ifdef PEER_DEBUG
+	printf("Peer %s sending request piece=%u block=%u\n", m_ip.c_str(), piece, block);
+#endif
+
 	//<len=0013><id=6><index><begin><length>
 	char request[17];
 	uint32_t len = htonl(13);
@@ -148,12 +163,7 @@ int Peer::send_request(uint32_t piece, uint32_t block, uint32_t block_length)
 	memcpy(&request[13], &block_length, 4);
 	int ret = m_nm->Socket_send(m_sock, request, 17);
 	if (ret == 17)
-	{
-		BLOCK_ID id;
-		generate_block_id(piece, block, id);
-		m_requested_blocks.insert(id);
 		return ERR_NO_ERROR;
-	}
 	return ERR_INTERNAL;
 }
 
@@ -161,6 +171,11 @@ int Peer::send_piece(uint32_t piece, uint32_t offset, uint32_t length, char * bl
 { //<len=0009+X><id=7><index><begin><block>
 	if (m_state == PEER_STATE_WAIT_HANDSHAKE || m_state == PEER_STATE_SEND_HANDSHAKE || m_state == PEER_STATE_SLEEP)
 			return ERR_INTERNAL;
+
+#ifdef PEER_DEBUG
+	printf("Peer %s sending piece piece=%u offset=%u\n", m_ip.c_str(), piece, offset);
+#endif
+
 	char mes[BLOCK_LENGTH + 13];
 	uint32_t _length = htonl(length + 9);
 	memcpy(&mes[0], &_length, 4);
@@ -180,6 +195,11 @@ int Peer::send_choke()
 {
 	if (m_state == PEER_STATE_WAIT_HANDSHAKE || m_state == PEER_STATE_SEND_HANDSHAKE || m_state == PEER_STATE_SLEEP)
 			return ERR_INTERNAL;
+
+#ifdef PEER_DEBUG
+	printf("Peer %s sending choke\n", m_ip.c_str());
+#endif
+
 	char mes[5];
 	memset(mes, 0, 5);
 	mes[3] = '\x01';
@@ -194,6 +214,11 @@ int Peer::send_unchoke()
 {
 	if (m_state == PEER_STATE_WAIT_HANDSHAKE || m_state == PEER_STATE_SEND_HANDSHAKE || m_state == PEER_STATE_SLEEP)
 			return ERR_INTERNAL;
+
+#ifdef PEER_DEBUG
+	printf("Peer %s sending unchoke\n", m_ip.c_str());
+#endif
+
 	char mes[5];
 	memset(mes, 0, 5);
 	mes[3] = '\x01';
@@ -208,6 +233,11 @@ int Peer::send_interested()
 {
 	if (m_state == PEER_STATE_WAIT_HANDSHAKE || m_state == PEER_STATE_SEND_HANDSHAKE || m_state == PEER_STATE_SLEEP)
 			return ERR_INTERNAL;
+
+#ifdef PEER_DEBUG
+	printf("Peer %s sending interested\n", m_ip.c_str());
+#endif
+
 	char mes[5];
 	memset(mes, 0, 5);
 	mes[3] = '\x01';
@@ -222,6 +252,11 @@ int Peer::send_not_interested()
 {
 	if (m_state == PEER_STATE_WAIT_HANDSHAKE || m_state == PEER_STATE_SEND_HANDSHAKE || m_state == PEER_STATE_SLEEP)
 			return ERR_INTERNAL;
+
+#ifdef PEER_DEBUG
+	printf("Peer %s sending not interested\n", m_ip.c_str());
+#endif
+
 	char mes[5];
 	memset(mes, 0, 5);
 	mes[3] = '\x01';
@@ -236,6 +271,11 @@ int Peer::send_have(uint32_t piece_index)
 {//have: <len=0005><id=4><piece index>
 	if (m_state == PEER_STATE_WAIT_HANDSHAKE || m_state == PEER_STATE_SEND_HANDSHAKE || m_state == PEER_STATE_SLEEP)
 			return ERR_INTERNAL;
+
+#ifdef PEER_DEBUG
+	printf("Peer %s sending have\n", m_ip.c_str());
+#endif
+
 	char mes[9];
 	memset(mes, 0, 9);
 	mes[3] = '\x5';
@@ -247,18 +287,6 @@ int Peer::send_have(uint32_t piece_index)
 	else
 		return ERR_INTERNAL;
 
-}
-
-bool Peer::may_request()
-{
-	if (m_peer_choking || m_state == PEER_STATE_WAIT_HANDSHAKE || m_state == PEER_STATE_SEND_HANDSHAKE || m_state == PEER_STATE_SLEEP)
-			return false;
-	return true;//!m_peer_choking;
-}
-
-bool Peer::request_limit()
-{
-	return m_requested_blocks.size() >= PEER_MAX_REQUEST_NUMBER;//m_torrent->m_piece_length / BLOCK_LENGTH;
 }
 
 int Peer::process_messages()
@@ -274,6 +302,9 @@ int Peer::process_messages()
 			return ERR_INTERNAL;
 		m_buf.pos += HANDSHAKE_LENGHT;
 		m_state = PEER_STATE_GENERAL_READY;
+		#ifdef PEER_DEBUG
+			printf("Peer %s is received handshake\n", m_ip.c_str());
+		#endif
 	}
 	char ip[16];
 	memset(ip, 0, 16);
@@ -294,6 +325,9 @@ int Peer::process_messages()
 			switch (id)
 			{
 			case '\x00'://choke: <len=0001><id=0>
+				#ifdef PEER_DEBUG
+					printf("Peer %s is received choke\n", m_ip.c_str());
+				#endif
 				if ( m_state == PEER_STATE_WAIT_HANDSHAKE)
 					return ERR_INTERNAL;
 				m_peer_choking = true;
@@ -301,6 +335,9 @@ int Peer::process_messages()
 					return ERR_INTERNAL;//m_state = PEER_STATE_GENERAL_READY; иначе зацикливаемся
 				break;
 			case '\x01'://unchoke: <len=0001><id=1>
+				#ifdef PEER_DEBUG
+					printf("Peer %s is received unchoke\n", m_ip.c_str());
+				#endif
 				if ( m_state == PEER_STATE_WAIT_HANDSHAKE)
 					return ERR_INTERNAL;
 				m_peer_choking = false;
@@ -308,17 +345,26 @@ int Peer::process_messages()
 					m_state = PEER_STATE_REQUEST_READY;
 				break;
 			case '\x02'://interested: <len=0001><id=2>
+				#ifdef PEER_DEBUG
+					printf("Peer %s is received interested\n", m_ip.c_str());
+				#endif
 				if ( m_state == PEER_STATE_WAIT_HANDSHAKE)
 					return ERR_INTERNAL;
 				m_peer_interested = true;
 				send_unchoke();
 				break;
 			case '\x03'://not interested: <len=0001><id=3>
+				#ifdef PEER_DEBUG
+					printf("Peer %s is received not interested\n", m_ip.c_str());
+				#endif
 				if ( m_state == PEER_STATE_WAIT_HANDSHAKE)
 					return ERR_INTERNAL;
 				m_peer_interested = false;
 				break;
 			case '\x04'://have: <len=0005><id=4><piece index>
+				#ifdef PEER_DEBUG
+					printf("Peer %s is received have\n", m_ip.c_str());
+				#endif
 				if ( m_state == PEER_STATE_WAIT_HANDSHAKE)
 					return ERR_INTERNAL;
 				uint32_t piece_index;
@@ -330,6 +376,9 @@ int Peer::process_messages()
 				set_bitfield(piece_index, piece_count, m_bitfield);
 				break;
 			case '\x05'://bitfield: <len=0001+X><id=5><bitfield>
+				#ifdef PEER_DEBUG
+					printf("Peer %s is received bitfield\n", m_ip.c_str());
+				#endif
 
 				if (len - 1 != m_torrent->get_bitfield_length())
 					return ERR_INTERNAL;
@@ -366,6 +415,11 @@ int Peer::process_messages()
 				//кладем индекс блока в очередь запросов
 				generate_block_id(index, block_index, block_id);
 				m_requests_queue.insert(block_id);
+
+				#ifdef PEER_DEBUG
+					printf("Peer %s is received request piece=%u block=%u\n", m_ip.c_str(), index, block_index);
+				#endif
+
 				break;
 			case '\x07'://piece: <len=0009+X><id=7><index><begin><block>
 			{
@@ -382,11 +436,23 @@ int Peer::process_messages()
 				offset = ntohl(offset);
 				if (offset % BLOCK_LENGTH != 0)
 					return ERR_INTERNAL;
-				m_downloaded += block_length;
+
+				generate_block_id(index, offset / BLOCK_LENGTH, block_id);
+				std::set<BLOCK_ID>::iterator iter = m_requested_blocks.find(block_id);
+
+				#ifdef PEER_DEBUG
+					printf("Peer %s is received piece piece=%u block=%u\n", m_ip.c_str(), index, offset / BLOCK_LENGTH);
+				#endif
+
+				if (iter == m_requested_blocks.end())
+					return ERR_INTERNAL;
+
 				if (m_torrent->save_block(index, offset, block_length, &m_buf.data[m_buf.pos + 8]) != ERR_NO_ERROR)
 					return ERR_INTERNAL;
-				generate_block_id(index, offset / BLOCK_LENGTH, block_id);
-				m_requested_blocks.erase(block_id);
+
+				m_requested_blocks.erase(iter);
+				m_downloaded += block_length;
+
 				break;
 			}
 			case '\x08'://cancel: <len=0013><id=8><index><begin><length>
@@ -408,6 +474,11 @@ int Peer::process_messages()
 				uint32_t block_index;
 				if (m_torrent->get_block_index_by_offset(index, offset, block_index) != ERR_NO_ERROR)
 					return ERR_INTERNAL;
+
+				#ifdef PEER_DEBUG
+					printf("Peer %s is received cancel piece=%u block=%u\n", m_ip.c_str(), index, block_index);
+				#endif
+
 				uint32_t real_block_length;
 				if (m_torrent->get_block_length_by_index(index, block_index, real_block_length) != ERR_NO_ERROR || real_block_length != length)
 					return ERR_INTERNAL;
@@ -465,6 +536,9 @@ int Peer::event_sock_sended(network::Socket sock)
 
 int Peer::event_sock_connected(network::Socket sock)
 {
+#ifdef PEER_DEBUG
+	printf("Peer %s connected\n", m_ip.c_str());
+#endif
 	return 0;
 
 }
@@ -492,6 +566,11 @@ int Peer::event_sock_unresolved(network::Socket sock)
 bool Peer::have_piece(uint32_t piece_index)
 {
 	return bit_in_bitfield(piece_index, m_torrent->get_piece_count(), m_bitfield);
+}
+
+bool Peer::is_choking()
+{
+	return m_peer_choking;
 }
 
 int Peer::clock()
@@ -542,6 +621,20 @@ int Peer::clock()
 			//printf("rx=%f tx=%f\n", get_rx_speed(), get_tx_speed());
 		}
 	}
+	if (m_state == PEER_STATE_REQUEST_READY && m_requested_blocks.size() <= PEER_MAX_REQUEST_NUMBER && !m_blocks2request.empty())
+	{
+		std::set<BLOCK_ID>::iterator iter = m_blocks2request.begin();
+		uint32_t piece;
+		uint32_t block;
+		uint32_t length;
+		get_piece_block_from_block_id(*iter, piece, block);
+		m_torrent->get_block_length_by_index(piece, block, length);
+		if (send_request(piece, block, length) == ERR_NO_ERROR)
+		{
+			m_requested_blocks.insert(*iter);
+			m_blocks2request.erase(iter);
+		}
+	}
 	return ERR_NO_ERROR;
 }
 
@@ -564,7 +657,7 @@ void Peer::goto_sleep()
 	if (m_state == PEER_STATE_SLEEP)
 		return;
 	m_nm->Socket_delete(m_sock);
-	m_peer_choking= true;
+	m_peer_choking = true;
 	m_peer_interested = false;
 	m_am_choking = false;//
 	m_am_interested = false;//
@@ -573,20 +666,57 @@ void Peer::goto_sleep()
 	m_state = PEER_STATE_SLEEP;
 }
 
-bool Peer::get_requested_block(BLOCK_ID & block_id)
+bool Peer::may_request()
 {
-	if (m_requested_blocks.empty())
+	if (m_peer_choking || m_state == PEER_STATE_WAIT_HANDSHAKE || m_state == PEER_STATE_SEND_HANDSHAKE || m_state == PEER_STATE_SLEEP)
+			return false;
+	if (m_blocks2request.size() > 0 || m_requested_blocks.size() > 0)
 		return false;
-	std::set<BLOCK_ID>::iterator iter = m_requested_blocks.begin();
-	block_id = *iter;
-	m_requested_blocks.erase(iter);
 	return true;
 }
+/*
+bool Peer::request_limit()
+{
+	return m_requested_blocks.size() >= PEER_MAX_REQUEST_NUMBER;//m_torrent->m_piece_length / BLOCK_LENGTH;
+}*/
 
-void Peer::erase_requested_block(const BLOCK_ID & block_id)
+int Peer::request(uint32_t piece_index, uint32_t block_index)
+{
+	BLOCK_ID id;
+	generate_block_id(piece_index, block_index, id);
+	return request(id);
+}
+
+int Peer::request(const BLOCK_ID & block_id)
+{
+	m_blocks2request.insert(block_id);
+	return ERR_NO_ERROR;
+}
+
+bool Peer::get_requested_block(BLOCK_ID & block_id)
+{
+	if (!m_requested_blocks.empty())
+	{
+		std::set<BLOCK_ID>::iterator iter = m_requested_blocks.begin();
+		block_id = *iter;
+		m_requested_blocks.erase(iter);
+		return true;
+	}
+	if (!m_blocks2request.empty())
+	{
+		std::set<BLOCK_ID>::iterator iter = m_blocks2request.begin();
+		block_id = *iter;
+		m_blocks2request.erase(iter);
+		return true;
+	}
+
+	return false;
+}
+
+/*void Peer::erase_requested_block(const BLOCK_ID & block_id)
 {
 	m_requested_blocks.erase(block_id);
-}
+}*/
 
 double Peer::get_rx_speed()
 {

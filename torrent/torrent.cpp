@@ -342,12 +342,6 @@ int TorrentBase::check()
 	return ERR_NO_ERROR;
 }
 
-
-int TorrentBase::handle_download_task()
-{
-	return ERR_NO_ERROR;
-}
-
 int TorrentBase::clock()
 {
 	//printf("CLOCK\n");
@@ -373,9 +367,14 @@ int TorrentBase::clock()
 			if (seed->is_sleep())
 				m_waiting_seeders.push_back(seed);
 			else
+			{
 				m_active_seeders.push_back(seed);
+#ifdef BITTORRENT_DEBUG
+				printf("Pushing seed %s to active seeders\n", seed->get_ip_str().c_str());
+#endif
+			}
 		}
-		std::map<uint32_t, uint32_t> requested_blocks_num;
+		//std::map<uint32_t, uint32_t> requested_blocks_num;
 		for(peer_list_iter seed_iter = m_active_seeders.begin(),
 							seed_iter_add = m_active_seeders.begin(); seed_iter != m_active_seeders.end(); seed_iter = seed_iter_add)
 		{
@@ -389,11 +388,14 @@ int TorrentBase::clock()
 				{
 					uint32_t piece, block;
 					get_piece_block_from_block_id(block_id, piece, block);
-					//m_piece_states[piece].block2download.push_back(block);
+					m_piece_manager->push_block2download(piece, block);
 					//m_piece_states[piece].taken_from.erase(seed);
 				}
 				m_active_seeders.erase(seed_iter);
 				m_waiting_seeders.push_back(seed);
+#ifdef BITTORRENT_DEBUG
+				printf("Pushing seed %s to waiting seeders\n", seed->get_ip_str().c_str());
+#endif
 			}
 			else
 			{
@@ -405,35 +407,35 @@ int TorrentBase::clock()
 				{
 					seed->send_have(*have_iter);
 				}
-				/*if (m_downloadable_pieces.size() < m_active_seeders.size() &&
-						m_task_queue.size() > 0 &&
-						m_task_queue.front().task == TORRENT_TASK_DOWNLOAD_PIECE)
+				uint32_t piece_index;
+				if (m_downloadable_pieces.size() < m_active_seeders.size() && m_piece_manager->front_piece2download(piece_index) == ERR_NO_ERROR)
 				{
-					uint32_t piece = m_task_queue.front().task_data;
-					m_task_queue.pop_front();
-					m_downloadable_pieces.push_back(piece);
+					m_downloadable_pieces.push_back(piece_index);
+					m_piece_manager->pop_piece2download();
+					#ifdef BITTORRENT_DEBUG
+					printf("Piece %u now is downloadable\n", piece_index);
+					#endif
 				}
 				if (m_downloadable_pieces.size() > 0)
 				{
-					uint32_t piece  = m_downloadable_pieces.front();
+					uint32_t piece_index  = m_downloadable_pieces.front();
 					m_downloadable_pieces.pop_front();
-					m_downloadable_pieces.push_back(piece);
-					if (seed->have_piece(piece) && seed->may_request())
+					m_downloadable_pieces.push_back(piece_index);
+					if (m_piece_manager->get_block2download_count(piece_index) == 0)
+						continue;
+
+					if (seed->have_piece(piece_index) && seed->may_request())
 					{
-						requested_blocks_num[piece] = 0;
-						while(!seed->request_limit() && !m_piece_states[piece].block2download.empty())
+						uint32_t block_index;
+						while(m_piece_manager->get_block2download(piece_index, block_index) == ERR_NO_ERROR)
 						{
-							uint32_t block = m_piece_states[piece].block2download.front();
-							uint32_t block_length;
-							m_torrent_file->get_block_length_by_index(piece, block, &block_length);
-							if (seed->send_request(piece, block, block_length) != ERR_NO_ERROR)
-								break;
-							m_piece_states[piece].block2download.pop_front();
-							m_piece_states[piece].taken_from.insert(seed);
-							requested_blocks_num[piece]++;
+							seed->request(piece_index, block_index);
 						}
+						#ifdef BITTORRENT_DEBUG
+						printf("Piece %u is requested from seed %s\n", piece_index, seed->get_ip_str().c_str());
+						#endif
 					}
-				}*/
+				}
 
 			}
 		}
@@ -532,6 +534,30 @@ int TorrentBase::event_piece_hash(uint32_t piece_index, bool ok, bool error)
 		printf("Piece %d BAD\n", piece_index);
 		//printf("rx=%f tx=%f done=%d downloaded=%llu\n", m_rx_speed, m_tx_speed, m_pieces_to_download.size(), m_downloaded);
 	}*/
+	return ERR_NO_ERROR;
+}
+
+int TorrentBase::event_file_write(fs::write_event * we)
+{
+	if (m_state == TORRENT_STATE_RELEASING)
+		return ERR_NO_ERROR;
+	PIECE_STATE piece_state;
+	m_piece_manager->event_file_write(we, piece_state);
+	if (piece_state == PIECE_STATE_FIN_HASH_OK)
+	{
+		m_downloadable_pieces.remove(we->block_id.first);
+		StateSerializator s(m_state_file_name);
+		BITFIELD bitfield = new unsigned char[m_piece_manager->get_bitfield_length()];
+		m_piece_manager->copy_bitfield(bitfield);
+		s.serialize(m_uploaded, m_download_directory, bitfield,m_piece_manager->get_bitfield_length());
+		delete[] bitfield;
+		return ERR_NO_ERROR;
+	}
+	if (piece_state == PIECE_STATE_FIN_HASH_BAD)
+	{
+		m_downloadable_pieces.remove(we->block_id.first);
+		m_piece_manager->push_piece2download(we->block_id.first);
+	}
 	return ERR_NO_ERROR;
 }
 

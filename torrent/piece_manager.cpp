@@ -30,9 +30,10 @@ PieceManager::PieceManager(const TorrentInterfaceInternalPtr & torrent, unsigned
 	m_piece_for_check_hash = new(std::nothrow) unsigned char[m_torrent->get_piece_length()];
 	if (m_piece_for_check_hash == NULL)
 	{
-		delete[] m_bitfield;
-		Exception(GENERAL_ERROR_NO_MEMORY_AVAILABLE);
+		delete[] bitfield;
+		throw Exception(GENERAL_ERROR_NO_MEMORY_AVAILABLE);
 	}
+
 
 	m_tag_list.push_back(1);
 	build_piece_info();
@@ -42,18 +43,31 @@ PieceManager::~PieceManager()
 {
 	if (m_bitfield != NULL)
 		delete[] m_bitfield;
+	if (m_piece_for_check_hash != NULL)
+		delete[] m_piece_for_check_hash;
 }
 
 void PieceManager::reset()
 {
 	m_pieces_to_download.clear();
+	m_download_queue.high_prio_pieces.clear();
+	m_download_queue.normal_prio_pieces.clear();
+	m_download_queue.low_prio_pieces.clear();
 	memset(m_bitfield, 0, m_bitfield_len);
 	uint32_t piece_count = m_torrent->get_piece_count();
 	for (uint32_t i = 0; i < piece_count; i++)
 	{
-		m_piece_info[i].remain = m_piece_info[i].length;
+		m_piece_info[i].prio = PIECE_PRIORITY_NORMAL;
+
+		m_pieces_to_download.insert(i);
+
+		m_download_queue.normal_prio_pieces.push_back(i);
+		m_piece_info[i].prio_iter = --m_download_queue.normal_prio_pieces.end();
+
 		for(uint32_t block = 0; block < m_piece_info[i].block_count; block++)
-			m_piece_info[i].block2download.push_back(block);
+			m_piece_info[i].block2download.insert(block);
+
+		m_piece_info[i].downloaded_blocks.clear();
 	}
 
 }
@@ -85,7 +99,6 @@ void PieceManager::build_piece_info()
 		uint64_t file_offset = last_files_length - finfo->length;//смещение до file_index файла
 		m_piece_info[i].file_index = file_index;
 		m_piece_info[i].length = piece_length;
-		m_piece_info[i].remain = piece_length;
 		m_piece_info[i].offset = abs_offset - file_offset;//смещение до начала куска внутри файла
 		m_piece_info[i].block_count = (uint32_t)ceil((double)piece_length / (double)BLOCK_LENGTH);
 		m_torrent->copy_piece_hash(m_piece_info[i].hash, i);
@@ -97,7 +110,7 @@ void PieceManager::build_piece_info()
 			m_download_queue.normal_prio_pieces.push_back(i);
 			m_piece_info[i].prio_iter = --m_download_queue.normal_prio_pieces.end();
 			for(uint32_t block = 0; block < m_piece_info[i].block_count; block++)
-				m_piece_info[i].block2download.push_back(block);
+				m_piece_info[i].block2download.insert(block);
 		}
 		else
 		{
@@ -177,9 +190,9 @@ void PieceManager::copy_bitfield(unsigned char * dst)
 	memcpy(dst, m_bitfield, m_bitfield_len);
 }
 
-bool PieceManager::check_piece_hash(unsigned char * piece, uint32_t piece_index)
+bool PieceManager::check_piece_hash(uint32_t piece_index)
 {
-	if (piece == NULL || piece_index >= m_piece_info.size())
+	if (piece_index >= m_piece_info.size())
 		return false;
 	SHA1_HASH sha1;
 	memset(sha1, 0, SHA1_LENGTH);
@@ -191,14 +204,17 @@ bool PieceManager::check_piece_hash(unsigned char * piece, uint32_t piece_index)
 	{
 		m_pieces_to_download.erase(piece_index);
 		set_bitfield(piece_index, m_piece_info.size(), m_bitfield);
-		m_piece_info[piece_index].remain = 0;
+		m_piece_info[piece_index].block2download.clear();
+		m_torrent->inc_downloaded(m_piece_info[piece_index].length);
 		return true;
 	}
 	else
 	{
 		m_pieces_to_download.insert(piece_index);
 		reset_bitfield(piece_index, m_piece_info.size(), m_bitfield);
-		m_piece_info[piece_index].remain = m_piece_info[piece_index].length;
+		for(uint32_t block = 0; block < m_piece_info[piece_index].block_count; block++)
+			m_piece_info[piece_index].block2download.insert(block);
+		m_piece_info[piece_index].downloaded_blocks.clear();
 		return false;
 	}
 	return false;
@@ -333,5 +349,72 @@ int PieceManager::get_piece_priority(uint32_t piece_index, PIECE_PRIORITY & prio
 	return ERR_NO_ERROR;
 }
 
+int PieceManager::get_block2download(uint32_t piece_index, uint32_t & block_index)
+{
+	if (piece_index >= m_piece_info.size())
+		return ERR_BAD_ARG;
+	if (m_piece_info[piece_index].block2download.empty())
+		return ERR_EMPTY_QUEUE;
+	std::set<uint32_t>::iterator iter = m_piece_info[piece_index].block2download.begin();
+	block_index = *iter;
+	m_piece_info[piece_index].block2download.erase(iter);
+	return ERR_NO_ERROR;
+}
+
+int PieceManager::get_block2download_count(uint32_t piece_index)
+{
+	if (piece_index >= m_piece_info.size())
+		return ERR_BAD_ARG;
+	return m_piece_info[piece_index].block2download.size();
+}
+
+int PieceManager::push_block2download(uint32_t piece_index, uint32_t block_index)
+{
+	if (piece_index >= m_piece_info.size())
+		return ERR_BAD_ARG;
+	if (block_index >= m_piece_info[piece_index].block_count)
+		return ERR_BAD_ARG;
+
+	//push_piece2download(piece_index);
+	m_piece_info[piece_index].block2download.insert(block_index);
+
+
+	return ERR_NO_ERROR;
+}
+
+int PieceManager::event_file_write(fs::write_event * we, PIECE_STATE & piece_state)
+{
+	piece_state = PIECE_STATE_NOT_FIN;
+	uint32_t piece_index;
+	uint32_t block_index;
+	uint32_t block_length;
+	get_piece_block_from_block_id(we->block_id, piece_index, block_index);
+#ifdef BITTORRENT_DEBUG
+	//printf("event_file_write piece=%u block=%u writted=%d\n", piece_index, block_index, we->writted);
+#endif
+	if (we->writted == -1)
+	{
+		return push_block2download(piece_index, block_index);
+	}
+
+	m_downloadable_blocks[we->block_id] += we->writted;
+
+	get_block_length_by_index(piece_index, block_index, block_length);
+	if (m_downloadable_blocks[we->block_id] == block_length)
+	{
+		m_downloadable_blocks.erase(we->block_id);
+		m_piece_info[piece_index].downloaded_blocks.insert(block_index);
+		if (m_piece_info[piece_index].downloaded_blocks.size() == m_piece_info[piece_index].block_count)
+		{
+			m_torrent->read_piece(piece_index, m_piece_for_check_hash);
+			bool ret = check_piece_hash(piece_index);
+			piece_state = ret ? PIECE_STATE_FIN_HASH_OK : PIECE_STATE_FIN_HASH_BAD;
+#ifdef BITTORRENT_DEBUG
+			printf("PIECE DONE %u ret=%d\n", piece_index, (int)ret);
+#endif
+		}
+	}
+	return ERR_NO_ERROR;
+}
 
 }

@@ -158,4 +158,9 @@ int TorrentInterfaceInternal::read_block(uint32_t piece, uint32_t block_index, c
 	return m_torrent_file->read_block(piece, block_index, block, block_length);
 }
 
+int TorrentInterfaceInternal::read_piece(uint32_t piece, unsigned char * dst)
+{
+	return m_torrent_file->read_piece(piece, dst);
+}
+
 }
