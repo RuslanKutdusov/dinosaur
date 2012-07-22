@@ -12,7 +12,7 @@ namespace fs
 
 file::file()
 {
-#ifdef FS_DEBUG
+#ifdef BITTORRENT_DEBUG
 	printf("file default constructor\n");
 #endif
 	m_length = 0;
@@ -24,7 +24,7 @@ file::file()
 
 file::file(const char * fn, uint64_t length, bool fictive, const FileAssociation::ptr & assoc)
 {
-#ifdef FS_DEBUG
+#ifdef BITTORRENT_DEBUG
 	printf("file constructor fn=%s length=%llu\n", fn, length);
 #endif
 	if (fn == NULL || length == 0)
@@ -43,13 +43,13 @@ file::file(const char * fn, uint64_t length, bool fictive, const FileAssociation
 
 file::~file()
 {
-#ifdef FS_DEBUG
+#ifdef BITTORRENT_DEBUG
 	printf("file destructor fn=%s %X\n",m_fn, this);
 #endif
 	_close();
 	if (m_fn != NULL)
 		delete[] m_fn;
-#ifdef FS_DEBUG
+#ifdef BITTORRENT_DEBUG
 	printf("file destructed\n");
 #endif
 }

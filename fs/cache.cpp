@@ -11,7 +11,7 @@ namespace fs
 {
 cache::cache()
 {
-#ifdef FS_DEBUG
+#ifdef BITTORRENT_DEBUG
 	printf("cache default constructor\n");
 #endif
 	m_cache_head = NULL;
@@ -61,7 +61,7 @@ void cache::init_cache(uint16_t size)
 
 cache::~cache()
 {
-#ifdef FS_DEBUG
+#ifdef BITTORRENT_DEBUG
 	printf("cache destructor\n");
 #endif
 	if (m_cache_head != NULL)
@@ -75,7 +75,7 @@ cache::~cache()
 			q = next;
 		}
 	}
-#ifdef FS_DEBUG
+#ifdef BITTORRENT_DEBUG
 	printf("cache destructed\n");
 #endif
 }

@@ -94,6 +94,9 @@ std::string TorrentBase::get_error()
 
 void TorrentBase::prepare2release()
 {
+#ifdef BITTORRENT_DEBUG
+	printf("Releasing torrent %s %s\n", m_metafile.name.c_str(), m_metafile.info_hash_hex);
+#endif
 	m_state = TORRENT_STATE_RELEASING;
 	for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
 	{
@@ -539,8 +542,8 @@ int TorrentBase::event_piece_hash(uint32_t piece_index, bool ok, bool error)
 
 int TorrentBase::event_file_write(fs::write_event * we)
 {
-	if (m_state == TORRENT_STATE_RELEASING)
-		return ERR_NO_ERROR;
+	//if (m_state == TORRENT_STATE_RELEASING)
+	//	return ERR_NO_ERROR;
 	PIECE_STATE piece_state;
 	m_piece_manager->event_file_write(we, piece_state);
 	if (piece_state == PIECE_STATE_FIN_HASH_OK)

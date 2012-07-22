@@ -11,7 +11,7 @@ namespace fs {
 
 FileManager::FileManager()
 {
-#ifdef FS_DEBUG
+#ifdef BITTORRENT_DEBUG
 	printf("FileManager default constructor\n");
 #endif
 	m_write_thread = 0;
@@ -73,7 +73,7 @@ int FileManager::Init_for_tests(uint16_t write_cache_size, uint16_t fd_cache_siz
 }
 
 FileManager::~FileManager() {
-#ifdef FS_DEBUG
+#ifdef BITTORRENT_DEBUG
 	printf("FileManager destructor\n");
 #endif
 	if (m_write_thread != 0)
@@ -87,7 +87,7 @@ FileManager::~FileManager() {
 	{
 		(*iter)->m_assoc.reset();
 	}
-#ifdef FS_DEBUG
+#ifdef BITTORRENT_DEBUG
 	printf("FileManager destroyed\n");
 #endif
 }
@@ -202,7 +202,8 @@ void FileManager::notify()
 	{
 		write_event we = m_write_event.front();
 		m_write_event.pop_front();
-		we.file->m_assoc->event_file_write(&we);
+		if (!we.file->m_instance2delete)
+			we.file->m_assoc->event_file_write(&we);
 	}
 	pthread_mutex_unlock(&m_mutex);
 }
