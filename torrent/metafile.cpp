@@ -115,7 +115,7 @@ void Metafile::init(const char * metafile_path)
 	char * buf = read_file(metafile_path, &m_metafile_len, MAX_TORRENT_FILE_LENGTH);
 	if (buf == NULL)
 		throw FileException(errno);
-	m_metafile = bencode::decode(buf, m_metafile_len, true);
+	m_metafile = bencode::decode(buf, m_metafile_len, false);
 #ifdef BITTORRENT_DEBUG
 	bencode::dump(m_metafile);
 #endif
