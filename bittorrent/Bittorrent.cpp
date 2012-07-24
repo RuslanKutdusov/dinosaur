@@ -51,6 +51,11 @@ Bittorrent::Bittorrent()
 	load_our_torrents();
 }
 
+void Bittorrent::init_listen_socket()
+{
+	m_nm.ListenSocket_add(m_gcfg.get_port(), shared_from_this(), m_sock);
+}
+
 Bittorrent::~Bittorrent() {
 	// TODO Auto-generated destructor stub
 #ifdef BITTORRENT_DEBUG
@@ -72,7 +77,12 @@ Bittorrent::~Bittorrent() {
 		}
 		usleep(100000);
 		if (time(NULL) - release_start > MAX_RELEASE_TIME)
+		{
+#ifdef BITTORRENT_DEBUG
+			printf("MAX_RELEASE_TIME\n");
+#endif
 			break;
+		}
 	}
 	if (m_thread != 0)
 	{
@@ -334,10 +344,8 @@ const std::string & Bittorrent::get_DownloadDirectory()
 
 int Bittorrent::event_sock_ready2read(network::Socket sock)
 {
-	printf("ready\n");
 	if (m_nm.Socket_datalen(sock) < HANDSHAKE_LENGHT)
 	{
-		printf("not enough\n");
 		return 0;
 	}
 	char handshake[HANDSHAKE_LENGHT];
@@ -345,13 +353,11 @@ int Bittorrent::event_sock_ready2read(network::Socket sock)
 	m_nm.Socket_recv(sock, handshake, HANDSHAKE_LENGHT);
 	if (handshake[0] != '\x13')
 	{
-		printf("not bittorrent1\n");
 		m_nm.Socket_delete(sock);
 		return ERR_INTERNAL;
 	}
 	if (memcmp(&handshake[1], "BitTorrent protocol", 19) != 0)
 	{
-		printf("not bittorrent2\n");
 		m_nm.Socket_delete(sock);
 		return ERR_INTERNAL;
 	}
@@ -360,20 +366,14 @@ int Bittorrent::event_sock_ready2read(network::Socket sock)
 	char infohash_hex[SHA1_LENGTH * 2 + 1];
 	bin2hex(infohash, infohash_hex, SHA1_LENGTH);
 	std::string str_infohash = infohash_hex;
-	std::cout<<str_infohash<<std::endl;
 	torrent_map_iter iter = m_torrents.find(str_infohash);
 	if (iter == m_torrents.end() && m_torrents.count(str_infohash) == 0)
 	{
-
-		printf("invalid hash\n");
-
 		m_nm.Socket_delete(sock);
 		return ERR_INTERNAL;
 	}
-	printf("accepted\n");
 	if ((*iter).second->add_leecher(sock) != ERR_NO_ERROR)
 	{
-		printf("can not add peer\n");
 		m_nm.Socket_delete(sock);
 		return ERR_INTERNAL;
 	}
@@ -382,6 +382,11 @@ int Bittorrent::event_sock_ready2read(network::Socket sock)
 
 int Bittorrent::event_sock_closed(network::Socket sock)
 {
+#ifdef BITTORRENT_DEBUG
+	printf("LISTEN_SOCKET closed\n");
+#endif
+	if (sock != m_sock)
+		m_nm.Socket_delete(sock);
 	return 0;
 }
 
@@ -397,6 +402,9 @@ int Bittorrent::event_sock_connected(network::Socket sock)
 
 int Bittorrent::event_sock_accepted(network::Socket sock, network::Socket accepted_sock)
 {
+#ifdef BITTORRENT_DEBUG
+	printf("LISTEN_SOCKET accepted\n");
+#endif
 	m_nm.Socket_set_assoc(accepted_sock, shared_from_this());
 	return 0;
 }
