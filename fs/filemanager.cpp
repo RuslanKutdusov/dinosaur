@@ -37,7 +37,7 @@ int FileManager::Init(cfg::Glob_cfg * cfg) {
 	pthread_mutexattr_t   mta;
 	pthread_mutexattr_init(&mta);
 	pthread_mutexattr_settype(&mta, PTHREAD_MUTEX_RECURSIVE);
-	pthread_mutex_init(&m_mutex, NULL);
+	pthread_mutex_init(&m_mutex, &mta);
 	pthread_cond_init (&m_cond, NULL);
 	//pthread_mutex_init(&m_mutex_timeout_sockets, NULL);
 	if (pthread_create(&m_write_thread, &attr, FileManager::cache_thread, (void *)this))
@@ -112,6 +112,11 @@ int FileManager::File_add(const char * fn, uint64_t length, bool fictive, const 
 	return ERR_NO_ERROR;
 }
 
+int FileManager::File_add(const std::string & fn, uint64_t length, bool fictive, const FileAssociation::ptr & assoc, File & file)
+{
+	return File_add(fn.c_str(), length, fictive, assoc, file);
+}
+
 int FileManager::prepare_file(File & file)
 {
 	if (file == NULL)
@@ -143,7 +148,7 @@ int FileManager::prepare_file(File & file)
 	return ERR_NO_ERROR;
 }
 
-int FileManager::File_write(File & file, const char * buf, uint32_t length, uint64_t offset, uint64_t block_id)
+int FileManager::File_write(File & file, const char * buf, uint32_t length, uint64_t offset, const BLOCK_ID & block_id)
 {
 	//printf("File_write id=%d\n", file);
 	pthread_mutex_lock(&m_mutex);
@@ -197,7 +202,8 @@ void FileManager::notify()
 	{
 		write_event we = m_write_event.front();
 		m_write_event.pop_front();
-		we.file->m_assoc->event_file_write(&we);
+		if (!we.file->m_instance2delete)
+			we.file->m_assoc->event_file_write(&we);
 	}
 	pthread_mutex_unlock(&m_mutex);
 }

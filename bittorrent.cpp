@@ -39,6 +39,8 @@ using namespace std;
 #include "utils/dir_tree.h"
 #include "fs/fs_tests.h"
 
+//little change for git
+
 void char_set()
 {
 	unsigned char byte = '\xff';
@@ -204,13 +206,8 @@ void bencode_test()
 	cout<<hash_hex2<<endl;
 }
 
-int main(int argc,char* argv[]) {
-	//block_cache_test();
-	//dir_tree::DirTreeTest drt;
-	//drt.test_DirTree();
-	//test_fd_cache_test();
-	//return 0;
-
+int main(int argc,char* argv[])
+{
 	try
 	{
 		init_gui();

@@ -50,7 +50,7 @@ int Tracker::parse_announce()
 	return ERR_NO_ERROR;
 }
 
-Tracker::Tracker(const TorrentInterfaceForTrackerPtr & torrent, std::string & announce)
+Tracker::Tracker(const TorrentInterfaceInternalPtr & torrent, std::string & announce)
 	:network::SocketAssociation()
 {
 #ifdef BITTORRENT_DEBUG
@@ -386,6 +386,11 @@ int Tracker::prepare2release()
 	}
 	m_state = TRACKER_STATE_STOPPING;
 	return ERR_NO_ERROR;
+}
+
+void Tracker::forced_releasing()
+{
+	delete_socket();
 }
 
 int Tracker::send_completed()

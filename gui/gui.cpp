@@ -20,7 +20,7 @@ GtkLabel* label_dir;
 GtkLabel* label_piece_number;
 GtkLabel* label_piece_length;
 bittorrent::Bittorrent * bt;
-torrent::TorrentInterfaceBasePtr torrent2add;
+torrent::MetafilePtr metafile;
 
 enum
 {
@@ -81,16 +81,16 @@ extern "C" void on_button_open_clicked (GtkWidget *object, gpointer user_data)
 	{
 		char *filename;
 		filename = gtk_file_chooser_get_filename (GTK_FILE_CHOOSER (dialog));
-		bt->OpenTorrent(filename, torrent2add);
-		if (torrent2add != NULL)
+		try
 		{
+			metafile.reset(new torrent::Metafile(filename));
 			gtk_widget_destroy (dialog);
 			show_open_dialog();
 		}
-		else
+		catch(Exception & e)
 		{
 			gtk_widget_destroy (dialog);
-			messagebox(bt->get_error().c_str());
+			messagebox(e.get_error().c_str());
 		}
 		g_free (filename);
 	}
@@ -132,7 +132,7 @@ extern "C" void on_button_stop_clicked (GtkWidget *object, gpointer user_data)
 
 extern "C" void on_button_delete_clicked (GtkWidget *object, gpointer user_data)
 {
-	/*GtkTreeSelection *selection;
+	GtkTreeSelection *selection;
 	GtkTreeModel     *model;
 	GtkTreeIter       selected_iter;
 	selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(torrent_view));
@@ -144,7 +144,7 @@ extern "C" void on_button_delete_clicked (GtkWidget *object, gpointer user_data)
 		g_free(g_hash);
 		bt->DeleteTorrent(hash);
 		on_window1_show(NULL,NULL);
-	}*/
+	}
 }
 
 extern "C" void on_button_check_clicked(GtkWidget *object, gpointer user_data)
@@ -186,27 +186,27 @@ extern "C" void on_open_dialog_button_ok_clicked (GtkWidget *object, gpointer us
 	}
 	std::string dir_str = dir;
 	std::string hash;
-	if (bt->AddTorrent(torrent2add, &hash) != ERR_NO_ERROR)
+	if (bt->AddTorrent(*metafile, dir_str, hash) != ERR_NO_ERROR)
 	{
 		gtk_object_destroy(GTK_OBJECT(open_dialog));
 		messagebox(bt->get_error().c_str());
 		open_dialog = NULL;
-		torrent2add.reset();
+		metafile.reset();
 		return;
 	}
-	if (bt->StartTorrent(hash, dir_str) != ERR_NO_ERROR)
+	if (bt->StartTorrent(hash) != ERR_NO_ERROR)
 	{
 		gtk_object_destroy(GTK_OBJECT(open_dialog));
 		messagebox(bt->get_error().c_str());
 		open_dialog = NULL;
-		torrent2add.reset();
+		metafile.reset();
 		return;
 	}
 	g_free(dir);
 	//commit
 	gtk_object_destroy(GTK_OBJECT(open_dialog));
 	open_dialog = NULL;
-	torrent2add.reset();
+	metafile.reset();
 	on_window1_show(NULL,NULL);
 }
 
@@ -214,7 +214,7 @@ extern "C" void on_open_dialog_button_cancel_clicked (GtkWidget *object, gpointe
 {
 	gtk_object_destroy(GTK_OBJECT(open_dialog));
 	open_dialog = NULL;
-	torrent2add.reset();
+	metafile.reset();
 }
 
 
@@ -594,28 +594,26 @@ void show_open_dialog()
 
 	g_object_unref (builder);
 
-	torrent::torrent_info info;
-	torrent2add->get_info(&info);
-
-	gtk_label_set_text(label_hash, info.info_hash_hex);
+	gtk_label_set_text(label_hash, metafile->info_hash_hex);
 	char chars[100];
-	sprintf(chars, "%llu", info.length);
+	sprintf(chars, "%llu", metafile->length);
 	gtk_label_set_text(label_length, chars);
 
-	sprintf(chars, "%llu", info.piece_length);
+	sprintf(chars, "%llu", metafile->piece_length);
 	gtk_label_set_text(label_piece_length, chars);
 
-	sprintf(chars, "%u", info.piece_count);
+	sprintf(chars, "%u", metafile->piece_count);
 	gtk_label_set_text(label_piece_number, chars);
 
 
 	GtkTreeIter   iter;
-	for(torrent::torrent_info::file_list_iter i = info.file_list_.begin(); i != info.file_list_.end(); ++i)
+	//for(torrent::torrent_info::file_list_iter i = info.file_list_.begin(); i != info.file_list_.end(); ++i)
+	for(size_t i = 0; i < metafile->files.size(); i++)
 	{
 		gtk_list_store_append(file_list, &iter);
 		gtk_list_store_set (file_list, &iter,
-							0, (*i).first.c_str(),
-							1, (guint64)(*i).second,
+							0, metafile->files[i].name.c_str(),
+							1, (guint64)metafile->files[i].length,
 							-1);
 	}
 	gtk_widget_show_all (GTK_WIDGET(open_dialog));

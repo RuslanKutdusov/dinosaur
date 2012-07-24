@@ -28,11 +28,11 @@ private:
 	children_map m_children;
 public:
 	Dir();
-	Dir(Dir & node);
-	Dir(std::string & m_name);
+	Dir(const Dir & node);
+	Dir(const std::string & m_name);
 	Dir(const char * name);
 	std::string get_name();
-	Dir * add_child(std::string  & name);
+	Dir * add_child(const std::string  & name);
 	Dir * add_child(const char * name);
 	int make(std::string current_dir);
 	~Dir();
@@ -44,10 +44,11 @@ private:
 	Dir * m_iter;
 public:
 	DirTree();
-	DirTree(DirTree & dirtree);
-	DirTree(std::string & root);
+	DirTree(const DirTree & dirtree);
+	DirTree(const std::string & root);
+	DirTree & operator = (const DirTree & dirtree);
 	int reset();
-	int put(std::string & dir);
+	int put(const std::string & dir);
 	int put(const char * dir);
 	int make_dir_tree(std::string  current_dir);
 	~DirTree();
@@ -73,7 +74,9 @@ public:
 		c = "имя папки на русском русском";
 		dir.add_child(c);
 		std::string d = "";
-		dir.make(d);
+		//dir.make(d);
+		Dir dir_copy = dir;
+		dir_copy.make(d);
 	}
 	void test_DirTree()
 	{
@@ -103,7 +106,9 @@ public:
 		tree.put(v);
 
 		v = "test_dir";
-		tree.make_dir_tree(v);
+		DirTree tree_copy;
+		tree_copy = tree;
+		tree_copy.make_dir_tree(v);
 	}
 };
 

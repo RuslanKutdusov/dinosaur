@@ -143,11 +143,9 @@ public:
 		m_max_active_leechers = 10;
 		return ERR_NO_ERROR;
 	}
-	void get_download_directory(std::string * s)
+	const std::string & get_download_directory()
 	{
-		if (s == NULL)
-			return;
-		*s = m_download_directory;
+		return m_download_directory;
 	}
 	void get_peer_id(char * c)
 	{

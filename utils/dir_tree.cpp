@@ -14,7 +14,7 @@ Dir::Dir()
 	m_name = "";
 }
 
-Dir::Dir(std::string & name)
+Dir::Dir(const std::string & name)
 {
 	m_name = name;
 }
@@ -24,9 +24,12 @@ Dir::Dir(const char * name)
 	m_name = name;
 }
 
-Dir::Dir(Dir & node)
+Dir::Dir(const Dir & node)
 {
-	this->m_children = node.m_children;
+	for(children_map_iter iter = node.m_children.begin(); iter != node.m_children.end(); ++iter)
+	{
+		m_children[iter->first] = new Dir(*iter->second);
+	}
 	this->m_name = node.m_name;
 }
 
@@ -35,12 +38,12 @@ std::string Dir::get_name()
 	return m_name;
 }
 
-Dir * Dir::add_child(std::string & name)
+Dir * Dir::add_child(const std::string & name)
 {
 	if (name == "")
 		return NULL;
 	children_map_iter iter = m_children.find(name);
-	if (iter == m_children.end() && m_children.count(name) == 0)
+	if (iter == m_children.end())
 	{
 		Dir * dir = new Dir(name);//bad alloc пробросить выше, а там поймаем)
 		m_children[name] = dir;
@@ -86,21 +89,35 @@ DirTree::DirTree() {
 	m_iter = NULL;
 }
 
-DirTree::DirTree(DirTree & dirtree)
+DirTree::DirTree(const DirTree & dirtree)
 {
-	this->m_root = dirtree.m_root;
-	this->m_iter = dirtree.m_iter;
+	this->m_root = dirtree.m_root == NULL ? NULL : new Dir(*dirtree.m_root);
+	this->m_iter = m_root;
 }
 
-DirTree::DirTree(std::string & root)
+DirTree::DirTree(const std::string & root)
 {
 	m_root = new Dir(root);
 	m_iter = m_root;
 }
 
+DirTree & DirTree::operator = (const DirTree & dirtree)
+{
+	if (this != &dirtree)
+	{
+		if (m_root != NULL)
+			delete m_root;
+
+		m_root = dirtree.m_root == NULL ? NULL : new Dir(*dirtree.m_root);
+		m_iter = m_root;
+	}
+	return *this;
+}
+
 DirTree::~DirTree() {
 	// TODO Auto-generated destructor stub
-	delete m_root;
+	if (m_root != NULL)
+		delete m_root;
 }
 
 int DirTree::reset()
@@ -112,7 +129,7 @@ int DirTree::reset()
 	return ERR_NO_ERROR;
 }
 
-int DirTree::put(std::string & dir2put)
+int DirTree::put(const std::string & dir2put)
 {
 	return put(dir2put.c_str());
 }
@@ -136,6 +153,7 @@ int DirTree::put(const char * dir2put)
 	{
 		return ERR_INTERNAL;
 	}
+	return ERR_NO_ERROR;
 }
 
 int DirTree::make_dir_tree(std::string current_dir)
