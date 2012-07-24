@@ -8,8 +8,8 @@ EXECUTABLE=dinosaur
 
 all:  $(SOURCES) dinosaur
 
-debug: CFLAGS += DEBUG
-debug:	CFLAGS += g3
+debug: CFLAGS += $(DEBUG)
+debug:	CFLAGS += -g3
 debug:	$(OBJECTS)
 	$(CC) $(OBJECTS) -o dinosaur $(LDFLAGS)
 	rm $(OBJECTS)
