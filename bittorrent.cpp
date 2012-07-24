@@ -38,6 +38,7 @@ using namespace std;
 #include "lru_cache/lru_cache.h"
 #include "utils/dir_tree.h"
 #include "fs/fs_tests.h"
+#include <execinfo.h>
 
 //little change for git
 
@@ -205,9 +206,30 @@ void bencode_test()
 	cout<<hash_hex1<<endl;
 	cout<<hash_hex2<<endl;
 }
+void catchCrash(int signum)
+{
+	void *callstack[128];
+    int frames = backtrace(callstack, 128);
+    char **strs=backtrace_symbols(callstack, frames);
+    // тут выводим бэктрейс в файлик crash_report.txt
+    // можно так же вывести и иную полезную инфу - версию ОС, программы, etc
+    FILE *f = fopen("crash_report.txt", "w");
+    if (f)
+    {
+        for(int i = 0; i < frames; ++i)
+        {
+            fprintf(f, "%s\n", strs[i]);
+        }
+        fclose(f);
+    }
+    free(strs);
+    signal(signum, SIG_DFL);
+	exit(3);
+}
 
 int main(int argc,char* argv[])
 {
+	signal(SIGSEGV, catchCrash);
 	try
 	{
 		init_gui();
