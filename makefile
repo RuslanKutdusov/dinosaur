@@ -6,7 +6,6 @@ SOURCES = utils/bencode.cpp utils/sha1.cpp utils/utils.cpp utils/dir_tree.cpp to
 OBJECTS = $(SOURCES:.cpp=.o)
 EXECUTABLE=dinosaur
 
-
 all:  $(SOURCES) dinosaur
 
 debug: CFLAGS += $(DEBUG)
