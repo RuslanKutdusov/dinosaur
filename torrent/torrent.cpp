@@ -207,6 +207,7 @@ int TorrentBase::start()
 	{
 		m_active_seeders.clear();
 		m_pieces2check.clear();
+		m_work = m_downloaded == m_metafile.length ? TORRENT_UPLOADING : TORRENT_DOWNLOADING;
 		for (std::vector<std::string>::iterator iter = m_metafile.announces.begin(); iter != m_metafile.announces.end(); ++iter)
 		{
 			TrackerPtr temp;
@@ -258,6 +259,7 @@ int TorrentBase::stop()
 	}
 	m_state = TORRENT_STATE_STOPPED;
 	m_pieces2check.clear();
+	m_work = TORRENT_PAUSED;
 	return 0;
 }
 
@@ -289,6 +291,7 @@ int TorrentBase::pause()
 	}
 	m_state = TORRENT_STATE_PAUSED;
 	//m_pieces2check.clear(); не вычищаем, check->pause->check норм продолжит проверку, check->pause->continue->check начнет сначала проверку
+	m_work = TORRENT_PAUSED;
 	return ERR_NO_ERROR;
 }
 
@@ -302,6 +305,7 @@ int TorrentBase::continue_()
 	}
 	m_state = TORRENT_STATE_STARTED;
 	m_pieces2check.clear();
+	m_work = m_downloaded == m_metafile.length ? TORRENT_UPLOADING : TORRENT_DOWNLOADING;
 	return ERR_NO_ERROR;
 }
 
@@ -345,6 +349,7 @@ int TorrentBase::check()
 		m_pieces2check.push_back(i);
 	}
 	m_state = TORRENT_STATE_CHECKING;
+	m_work = TORRENT_CHECKING;
 	return ERR_NO_ERROR;
 }
 
@@ -506,6 +511,7 @@ int TorrentBase::event_file_write(fs::write_event * we)
 		s.serialize(m_uploaded, m_download_directory, bitfield,m_piece_manager->get_bitfield_length());
 		delete[] bitfield;
 		m_piece_manager->clear_piece_taken_from(piece_index);
+		m_work = m_downloaded == m_metafile.length ? TORRENT_UPLOADING : TORRENT_DOWNLOADING;
 		return ERR_NO_ERROR;
 	}
 	if (piece_state == PIECE_STATE_FIN_HASH_BAD)
@@ -537,13 +543,14 @@ int TorrentBase::get_info(torrent_info * info)
 	info->rx_speed = m_rx_speed;
 	info->tx_speed = m_tx_speed;
 	info->uploaded = m_uploaded;
+	info->total_seeders = m_seeders.size();
 	memcpy(info->info_hash_hex, m_metafile.info_hash_hex, SHA1_HEX_LENGTH);
 	for(peer_list_iter iter = m_active_seeders.begin(); iter != m_active_seeders.end(); ++iter)
 	{
 		PeerPtr seeder = *iter;
 		peer_info pi;
 		seeder->get_info(&pi);
-		info->peers.push_back(pi);
+		info->seeders.push_back(pi);
 	}
 	for(peer_map_iter iter = m_leechers.begin(); iter != m_leechers.end(); ++iter)
 	{
@@ -552,7 +559,7 @@ int TorrentBase::get_info(torrent_info * info)
 		{
 			peer_info pi;
 			leecher->get_info(&pi);
-			info->peers.push_back(pi);
+			info->leechers.push_back(pi);
 		}
 	}
 	for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)

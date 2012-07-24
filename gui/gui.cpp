@@ -291,7 +291,19 @@ extern "C" void  on_torrent_view_cursor_changed(GtkWidget *object, gpointer user
 					TRACKER_LIST_COL_SEEDERS,(gint)(*i).seeders,
 						  -1);
 		}
-		for(torrent::torrent_info::peer_info_iter i = info.peers.begin(); i != info.peers.end(); ++i)
+		for(torrent::torrent_info::peer_info_iter i = info.seeders.begin(); i != info.seeders.end(); ++i)
+		{
+			gtk_list_store_append(peer_list, &iter);
+			gtk_list_store_set (peer_list, &iter,
+					PEER_LIST_COL_IP, (*i).ip,
+					PEER_LIST_COL_DOWNLOADED, (gfloat)(*i).downloaded,
+					PEER_LIST_COL_UPLOADED, (gfloat)(*i).uploaded,
+					PEER_LIST_COL_DOWN_SPEED, (gfloat)(*i).downSpeed,
+					PEER_LIST_COL_UP_SPEED, (gfloat)(*i).upSpeed,
+					PEER_LIST_COL_AVAILABLE, (gfloat)(*i).available,
+					-1);
+		}
+		for(torrent::torrent_info::peer_info_iter i = info.leechers.begin(); i != info.leechers.end(); ++i)
 		{
 			gtk_list_store_append(peer_list, &iter);
 			gtk_list_store_set (peer_list, &iter,
@@ -388,7 +400,20 @@ gboolean on_timer(gpointer data)
 		gtk_tree_model_foreach(GTK_TREE_MODEL(tracker_list), foreach_tracker_list, (gpointer)&info);
 
 		gtk_list_store_clear(peer_list);
-		for(torrent::torrent_info::peer_info_iter i = info.peers.begin(); i != info.peers.end(); ++i)
+		for(torrent::torrent_info::peer_info_iter i = info.seeders.begin(); i != info.seeders.end(); ++i)
+		{
+			GtkTreeIter iter;
+			gtk_list_store_append(peer_list, &iter);
+			gtk_list_store_set (peer_list, &iter,
+					PEER_LIST_COL_IP, (*i).ip,
+					PEER_LIST_COL_DOWNLOADED, (gfloat)(*i).downloaded,
+					PEER_LIST_COL_UPLOADED, (gfloat)(*i).uploaded,
+					PEER_LIST_COL_DOWN_SPEED, (gfloat)(*i).downSpeed,
+					PEER_LIST_COL_UP_SPEED, (gfloat)(*i).upSpeed,
+					PEER_LIST_COL_AVAILABLE, (gfloat)(*i).available,
+					-1);
+		}
+		for(torrent::torrent_info::peer_info_iter i = info.leechers.begin(); i != info.leechers.end(); ++i)
 		{
 			GtkTreeIter iter;
 			gtk_list_store_append(peer_list, &iter);

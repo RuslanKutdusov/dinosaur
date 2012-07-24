@@ -352,6 +352,7 @@ protected:
 	double 							m_tx_speed;
 	TORRENT_STATE 					m_state;
 	std::string 					m_error;
+	TORRENT_WORK					m_work;
 
 	virtual void add_seeders(uint32_t count, sockaddr_in * addrs);
 	virtual int add_leecher(network::Socket & sock);
