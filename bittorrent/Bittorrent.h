@@ -16,6 +16,7 @@
 #include "../network/network.h"
 #include "../utils/bencode.h"
 #include "../torrent/torrent.h"
+#include "../torrent/metafile.h"
 #include "../cfg/glob_cfg.h"
 #include "../fs/fs.h"
 #include "../block_cache/Block_cache.h"
@@ -28,7 +29,7 @@ namespace bittorrent {
 
 class Bittorrent : public network::SocketAssociation {
 private:
-	typedef std::map<std::string, torrent::TorrentPtr> torrent_map;
+	typedef std::map<std::string, torrent::TorrentInterfaceBasePtr> torrent_map;
 	typedef torrent_map::iterator torrent_map_iter;
 	network::NetworkManager m_nm;
 	cfg::Glob_cfg m_gcfg;
@@ -44,23 +45,21 @@ private:
 	bool m_thread_pause;
 	static void * thread(void * arg);
 	void bin2hex(unsigned char * bin, char * hex, int len);
-	void add_error_mes(std::string & mes);
+	void add_error_mes(const std::string & mes);
 	int load_our_torrents();
-	int init_torrent(std::string & filename, std::string * hash, bool is_new);
-	int init_torrent(const char * filename, std::string * hash, bool is_new);
+	int init_torrent(const torrent::Metafile & metafile, const std::string & download_directory, std::string & hash);
 public:
 	Bittorrent();
-	int OpenTorrent(char * filename, torrent::TorrentPtr & torrent);
-	int AddTorrent(torrent::TorrentPtr & torrent, std::string * hash);
-	int StartTorrent(std::string & hash, std::string & download_directory);
-	int StopTorrent(std::string & hash);
-	int PauseTorrent(std::string & hash);
-	int ContinueTorrent(std::string & hash);
-	int CheckTorrent(std::string & hash);
-	int DeleteTorrent(std::string & hash);
-	int Torrent_info(std::string & hash, torrent::torrent_info * info);
+	int AddTorrent(torrent::Metafile & metafile, const std::string & download_directory, std::string & hash);
+	int StartTorrent(const std::string & hash);
+	int StopTorrent(const std::string & hash);
+	int PauseTorrent(const std::string & hash);
+	int ContinueTorrent(const std::string & hash);
+	int CheckTorrent(const std::string & hash);
+	int DeleteTorrent(const std::string & hash);
+	int Torrent_info(const std::string & hash, torrent::torrent_info * info);
 	int get_TorrentList(std::list<std::string> * list);
-	int get_DownloadDirectory(std::string * dir);
+	const std::string & get_DownloadDirectory();
 	//uint16_t Torrent_peers(std::string & hash, torrent::peer_info ** peers);
 	int event_sock_ready2read(network::Socket sock);
 	int event_sock_closed(network::Socket sock);

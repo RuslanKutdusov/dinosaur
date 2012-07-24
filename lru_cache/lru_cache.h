@@ -45,6 +45,7 @@ public:
 	int Init(uint16_t size);
 	int put(cache_key key, cache_element * value);
 	int get(cache_key key, cache_element * value);
+	bool empty();
 	int remove(cache_key key);
 };
 
@@ -173,6 +174,12 @@ int LRU_Cache<cache_key, cache_element>::get(cache_key key, cache_element * valu
 		return ERR_INTERNAL;
 	}
 	return ERR_NO_ERROR;
+}
+
+template <class cache_key, class cache_element>
+bool LRU_Cache<cache_key, cache_element>::empty()
+{
+	return m_hash_table.empty();
 }
 
 template <class cache_key, class cache_element>

@@ -12,15 +12,21 @@ namespace fs
 
 file::file()
 {
+#ifdef BITTORRENT_DEBUG
+	printf("file default constructor\n");
+#endif
 	m_length = 0;
 	m_fictive = false;
 	m_fn = NULL;
 	m_fd = -1;
-	m_assoc = NULL;
+	m_instance2delete = false;
 }
 
-file::file(const char * fn, uint64_t length, bool fictive, file_event * assoc)
+file::file(const char * fn, uint64_t length, bool fictive, const FileAssociation::ptr & assoc)
 {
+#ifdef BITTORRENT_DEBUG
+	printf("file constructor fn=%s length=%llu\n", fn, length);
+#endif
 	if (fn == NULL || length == 0)
 		throw Exception("Can not create file");
 	int fn_str_len = strlen(fn);
@@ -32,13 +38,20 @@ file::file(const char * fn, uint64_t length, bool fictive, file_event * assoc)
 	m_fictive = fictive;
 	m_assoc = assoc;
 	m_fd = -1;
+	m_instance2delete = false;
 }
 
 file::~file()
 {
+#ifdef BITTORRENT_DEBUG
+	printf("file destructor fn=%s %X\n",m_fn, this);
+#endif
 	_close();
 	if (m_fn != NULL)
 		delete[] m_fn;
+#ifdef BITTORRENT_DEBUG
+	printf("file destructed\n");
+#endif
 }
 
 int file::_open()
@@ -134,5 +147,16 @@ bool file::is_opened()
 	bool b = m_fd != -1;
 	return b;
 }
+
+void file::get_name(std::string & name)
+{
+	name = m_fn;
+}
+
+uint64_t file::get_length()
+{
+	return m_length;
+}
+
 
 }

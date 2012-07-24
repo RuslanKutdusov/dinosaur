@@ -70,7 +70,7 @@ private:
 public:
 	DomainNameResolver(std::string & domain, struct sockaddr_in * addr);
 	DomainNameResolver(const char * domain, struct sockaddr_in * addr);
-	~DomainNameResolver(){}
+	~DomainNameResolver();
 };
 
 class SocketAssociation : public boost::enable_shared_from_this<SocketAssociation>
@@ -120,13 +120,19 @@ public:
 	:m_epoll_events(0),m_state(0), m_socket(-1), m_closed(true), m_connected(false), m_errno(0), m_timer(0), m_rx_last_time(get_time()),m_tx_last_time(get_time()),
 	 m_rx(0.0f), m_tx(0.0f), m_need2resolved(false), m_need2delete(false)
 	{
-		std::cout<<"Socket constructed\n";
+		memset(&m_peer, 0, sizeof(sockaddr_in));
+#ifdef BITTORRENT_DEBUG
+	printf("Socket constructor %X\n", this);
+#endif
 	}
 	~socket_()
 	{
-		std::cout<<"Socket destructed "<<m_socket<<" "<<m_domain<<" "<<inet_ntoa(m_peer.sin_addr)<<std::endl;
+#ifdef BITTORRENT_DEBUG
+		printf("Socket destructed %X %d %s %s\n", this, m_socket, m_domain.c_str(), inet_ntoa(m_peer.sin_addr));
+#endif
 		close(m_socket);
 	}
+#ifdef BITTORRENT_DEBUG
 	int get_fd()
 	{
 		return m_socket;
@@ -135,6 +141,7 @@ public:
 	{
 		printf("%s\n", inet_ntoa(m_peer.sin_addr));
 	}
+#endif
 	friend class NetworkManager;
 };
 
@@ -187,24 +194,26 @@ public:
 	int Socket_get_assoc(Socket & sock, SocketAssociation::ptr & assoc);
 	double Socket_get_rx_speed(Socket & sock);
 	double Socket_get_tx_speed(Socket & sock);
-	int get_sock_errno(socket_ * sock)
+	int Socket_get_addr(Socket & sock, sockaddr_in * addr);
+	int get_sock_errno(Socket & sock)
 	{
 		if (sock == NULL)
 			return ERR_BAD_ARG;
 		return sock->m_errno;
 	}
-	const char * get_sock_errno_str(socket_ * sock)
+	const char * get_sock_errno_str(Socket & sock)
 	{
 		if (sock == NULL)
 			return NULL;
 		return sys_errlist[sock->m_errno];
 	}
-	ssize_t Socket_send_buf_len(socket_ * sock)
+	ssize_t Socket_sendbuf_remain(Socket & sock)
 	{
 		if (sock == NULL)
 			return -1;
-		return sock->m_send_buffer.length;
+		return sock->m_send_buffer.length - sock->m_send_buffer.pos;
 	}
+#ifdef BITTORRENT_DEBUG
 	int test_view_socks()
 	{
 		for(socket_set_iter iter = m_sockets.begin(); iter != m_sockets.end(); ++iter)
@@ -213,7 +222,7 @@ public:
 			std::cout<<"Socket fd = "<<sock->m_socket<<std::endl;
 			std::cout<<"       cl = "<<sock->m_closed<<std::endl;
 			std::cout<<"       cn = "<<sock->m_connected<<std::endl;
-			std::cout<<"       er = "<<sock->m_errno<<" "<<get_sock_errno_str(sock.get())<<std::endl;
+			std::cout<<"       er = "<<sock->m_errno<<" "<<get_sock_errno_str(sock)<<std::endl;
 			char * ip = inet_ntoa (sock->m_peer.sin_addr ) ;
 			std::cout<<"       IP:port ="<<ip<<":"<<ntohs(sock->m_peer.sin_port)<<std::endl;
 			std::cout<<"       Recvbuffer"<<std::endl;
@@ -231,6 +240,7 @@ public:
 		}
 		return 0;
 	}
+#endif
 	int clock();
 	void notify();
 };

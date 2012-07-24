@@ -12,11 +12,16 @@ namespace torrent {
 Tracker::Tracker()
 	:network::SocketAssociation()
 {
+#ifdef BITTORRENT_DEBUG
+	printf("Tracker default constructor\n");
+#endif
 	memset(m_buf, 0, 16384);
 	m_buflen = 0;
 	m_peers = NULL;
 	m_peers_count = 0;
 	m_state = TRACKER_STATE_NONE;
+	m_ready2release = false;
+	m_addr = NULL;
 }
 
 int Tracker::parse_announce()
@@ -45,14 +50,17 @@ int Tracker::parse_announce()
 	return ERR_NO_ERROR;
 }
 
-Tracker::Tracker(Torrent * torrent, std::string & announce)
+Tracker::Tracker(const TorrentInterfaceInternalPtr & torrent, std::string & announce)
 	:network::SocketAssociation()
 {
+#ifdef BITTORRENT_DEBUG
+	printf("Tracker constructor %s\n", announce.c_str());
+#endif
 	if (torrent == NULL || announce == "")
 		throw NoneCriticalException("Bad args");
 	m_torrent = torrent;
-	m_nm = m_torrent->m_nm;
-	m_g_cfg = m_torrent->m_g_cfg;
+	m_nm = m_torrent->get_nm();
+	m_g_cfg = m_torrent->get_cfg();
 	m_announce = announce;
 	memset(m_buf, 0, 16384);
 	m_buflen = 0;
@@ -61,9 +69,11 @@ Tracker::Tracker(Torrent * torrent, std::string & announce)
 	m_seeders = 0;
 	m_leechers = 0;
 	m_peers = NULL;
-	m_downloaded = torrent->m_downloaded;
-	m_uploaded = torrent->m_uploaded;
+	m_addr = NULL;
+	m_downloaded = torrent->get_downloaded();
+	m_uploaded = torrent->get_uploaded();
 	m_peers_count = 0;
+	m_ready2release = false;
 	if (parse_announce() != ERR_NO_ERROR)
 		throw NoneCriticalException("Invalid announce");
 	m_state = TRACKER_STATE_CONNECT;
@@ -73,10 +83,12 @@ Tracker::Tracker(Torrent * torrent, std::string & announce)
 void Tracker::hash2urlencode()
 {
 	memset(m_infohash, 0, SHA1_LENGTH * 3 + 1);
+	unsigned char infohash_bin[SHA1_LENGTH];
+	m_torrent->copy_infohash_bin(infohash_bin);
 	for(int i = 0; i < SHA1_LENGTH; i++)
 	{
 		m_infohash[i * 3] = '%';
-		sprintf(&m_infohash[i * 3 + 1], "%02x", m_torrent->m_info_hash_bin[i]);
+		sprintf(&m_infohash[i * 3 + 1], "%02x", infohash_bin[i]);
 	}
 }
 
@@ -109,23 +121,23 @@ int Tracker::send_request(TRACKER_EVENT event )
 	if (event != TRACKER_EVENT_STARTED)
 	{
 		urn.append("&downloaded=");
-		sprintf(t, "%lld", m_torrent->m_downloaded - m_downloaded);
+		sprintf(t, "%lld", m_torrent->get_downloaded() - m_downloaded);
 		urn.append(t);
 
 		urn.append("&uploaded=");
-		sprintf(t, "%lld", m_torrent->m_uploaded - m_uploaded);
+		sprintf(t, "%lld", m_torrent->get_uploaded() - m_uploaded);
 		urn.append(t);
 	}
 	else
 	{
-		m_downloaded = m_torrent->m_downloaded;
-		m_uploaded = m_torrent->m_uploaded;
+		m_downloaded = m_torrent->get_downloaded();
+		m_uploaded = m_torrent->get_uploaded();
 
 		urn.append("&downloaded=0&uploaded=0");
 	}
 
 	urn.append("&left=");
-	sprintf(t, "%lld", m_torrent->m_length - m_torrent->m_downloaded);
+	sprintf(t, "%lld", m_torrent->get_length() - m_torrent->get_downloaded());
 	urn.append(t);
 
 	urn.append("&numwant=");
@@ -226,15 +238,17 @@ int Tracker::process_response()
 	m_buflen = 0;
 	if (m_peers_count > 0)
 	{
-		m_torrent->take_peers(m_peers_count, m_peers);
+		m_torrent->add_seeders(m_peers_count, m_peers);
 	}
-	DeleteSocket();
+	delete_socket();
 	return 0;
 }
 
 int Tracker::event_sock_ready2read(network::Socket sock)
 {
 	//std::cout<<"TRACKER event_sock_ready2read "<<sock->get_fd()<<" "<<m_announce<<std::endl;
+	if (m_state == TRACKER_STATE_STOPPING)
+		return ERR_NO_ERROR;
 	int len = m_nm->Socket_recv(sock, m_buf + m_buflen, BUFFER_SIZE - m_buflen);
 	if (len < ERR_NO_ERROR)
 		return ERR_INTERNAL;
@@ -248,21 +262,31 @@ int Tracker::event_sock_closed(network::Socket sock)
 	//std::cout<<"TRACKER event_sock_closed "<<sock->get_fd()<<" "<<m_announce<<std::endl;
 	if (m_nm->Socket_datalen(sock) > 0)
 		event_sock_ready2read(sock);
-	DeleteSocket();
+	delete_socket();
 	if (m_status == TRACKER_STATUS_UPDATING)
 		m_status = TRACKER_STATUS_ERROR;
+	m_ready2release = (m_state == TRACKER_STATE_STOPPING);
 	return ERR_NO_ERROR;
 }
 
 int Tracker::event_sock_sended(network::Socket sock)
 {
 	//std::cout<<"TRACKER event_sock_sended "<<sock->get_fd()<<" "<<m_announce<<std::endl;
+	if (m_state == TRACKER_STATE_STOPPING && m_nm->Socket_sendbuf_remain(sock) == 0)
+	{
+		m_ready2release = true;
+#ifdef BITTORRENT_DEBUG
+	printf("Tracker %s stop sended\n", m_announce.c_str());
+#endif
+	}
 	return ERR_NO_ERROR;
 }
 
 int Tracker::event_sock_connected(network::Socket sock)
 {
 	//std::cout<<"TRACKER event_sock_connected "<<sock->get_fd()<<" "<<m_announce<<std::endl;
+	m_addr = new sockaddr_in;
+	m_nm->Socket_get_addr(sock, m_addr);
 	return send_request(m_event_after_connect);
 }
 
@@ -273,12 +297,15 @@ int Tracker::event_sock_accepted(network::Socket sock, network::Socket accepted_
 
 int Tracker::event_sock_timeout(network::Socket sock)
 {
-	//std::cout<<"TRACKER event_sock_timeout "<<sock->get_fd()<<" "<<m_announce<<std::endl;
+#ifdef BITTORRENT_DEBUG
+	printf("Tracker %s timeout\n", m_announce.c_str());
+#endif
 	m_status = TRACKER_STATUS_TIMEOUT;
 	m_last_update = time(NULL);
 	if (m_nm->Socket_datalen(sock) > 0)
 		event_sock_ready2read(sock);
-	DeleteSocket();
+	delete_socket();
+	m_ready2release = (m_state == TRACKER_STATE_STOPPING);
 	return ERR_NO_ERROR;
 }
 
@@ -287,7 +314,8 @@ int Tracker::event_sock_unresolved(network::Socket sock)
 	//std::cout<<"TRACKER event_sock_unresolved "<<sock->get_fd()<<" "<<m_announce<<std::endl;
 	m_status = TRACKER_STATUS_UNRESOLVED;
 	m_last_update = time(NULL);
-	DeleteSocket();
+	delete_socket();
+	m_ready2release = (m_state == TRACKER_STATE_STOPPING);
 	return ERR_NO_ERROR;
 }
 
@@ -309,15 +337,19 @@ int Tracker::restore_socket()
 	{
 		m_status = TRACKER_STATUS_CONNECTING;
 		m_sock.reset();
-		m_nm->Socket_add_domain(m_host, 80, shared_from_this(), m_sock);
+		if (m_addr == NULL)
+			m_nm->Socket_add_domain(m_host, 80, shared_from_this(), m_sock);
+		else
+			m_nm->Socket_add(m_addr, shared_from_this(), m_sock);
 		if (m_sock == NULL)
 			return ERR_INTERNAL;
 	}
 	return ERR_NO_ERROR;
 }
 
-int Tracker::clock()
+int Tracker::clock(bool & release_me)
 {
+	release_me = false;
 	if (m_state == TRACKER_STATE_CONNECT)
 	{
 		restore_socket() ;
@@ -329,6 +361,8 @@ int Tracker::clock()
 	{
 		return update();
 	}
+	if (m_state == TRACKER_STATE_STOPPING)
+		release_me = m_ready2release;
 	return ERR_NO_ERROR;
 }
 
@@ -338,6 +372,25 @@ int Tracker::update()
 		return ERR_INTERNAL;
 	m_event_after_connect = TRACKER_EVENT_NONE;
 	return ERR_NO_ERROR;
+}
+
+int Tracker::prepare2release()
+{
+#ifdef BITTORRENT_DEBUG
+	printf("Tracker %s prepare2release\n", m_announce.c_str());
+#endif
+	if (send_stopped() != ERR_NO_ERROR)
+	{
+		delete_socket();
+		return ERR_INTERNAL;
+	}
+	m_state = TRACKER_STATE_STOPPING;
+	return ERR_NO_ERROR;
+}
+
+void Tracker::forced_releasing()
+{
+	delete_socket();
 }
 
 int Tracker::send_completed()
@@ -378,11 +431,17 @@ int Tracker::get_info(tracker_info * info)
 
 Tracker::~Tracker()
 {
-	printf("Tracker destructor\n");
+#ifdef BITTORRENT_DEBUG
+	printf("Tracker %s destructor\n", m_announce.c_str());
+#endif
 	if(m_peers != NULL)
 		delete[] m_peers;
-	DeleteSocket();
-	printf("Tracker destroyed\n");
+	if (m_addr != NULL)
+		delete m_addr;
+	delete_socket();
+#ifdef BITTORRENT_DEBUG
+	printf("Tracker %s destroyed\n", m_announce.c_str());
+#endif
 }
 
 }

@@ -27,6 +27,10 @@ public:
 	Exception(std::string str)
 		: m_str(str)
 	{}
+	const std::string & get_error() const
+	{
+		return m_str;
+	}
 	void print()
 	{
 		std::cout<<"Exception: "<<m_str<<std::endl;

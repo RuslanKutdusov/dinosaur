@@ -53,7 +53,27 @@ Bittorrent::Bittorrent()
 
 Bittorrent::~Bittorrent() {
 	// TODO Auto-generated destructor stub
+#ifdef BITTORRENT_DEBUG
 	printf("Bittorrent destructor\n");
+#endif
+	pthread_mutex_lock(&m_mutex);
+	for(torrent_map_iter iter = m_torrents.begin(); iter != m_torrents.end(); ++iter)
+	{
+		(*iter).second->prepare2release();
+	}
+	pthread_mutex_unlock(&m_mutex);
+	time_t release_start = time(NULL);
+	while(m_torrents.size() != 0)
+	{
+		for(torrent_map_iter iter = m_torrents.begin(); iter != m_torrents.end(); ++iter)
+		{
+			if ((*iter).second.use_count() == 1)
+				m_torrents.erase(iter);
+		}
+		usleep(100000);
+		if (time(NULL) - release_start > MAX_RELEASE_TIME)
+			break;
+	}
 	if (m_thread != 0)
 	{
 		m_thread_stop = true;
@@ -62,6 +82,9 @@ Bittorrent::~Bittorrent() {
 		pthread_mutex_destroy(&m_mutex);
 	}
 	m_torrents.clear();
+#ifdef BITTORRENT_DEBUG
+	printf("Bittorrent destroyed\n");
+#endif
 }
 
 int Bittorrent::load_our_torrents()
@@ -76,16 +99,14 @@ int Bittorrent::load_our_torrents()
 	{
 		std::string full_path2torrent_file = m_directory + fname;
 		//std::cout<<full_path2torrent_file<<std::endl;
-		init_torrent(full_path2torrent_file, &hash, false);
-		std::string temp = "";
-		m_gcfg.get_download_directory(&temp);
-		StartTorrent(hash, temp);
+		init_torrent(full_path2torrent_file, m_gcfg.get_download_directory(), hash);
+		StartTorrent(hash);
 	}
 	fin.close();
 	return ERR_NO_ERROR;
 }
 
-void Bittorrent::add_error_mes(std::string & mes)
+void Bittorrent::add_error_mes(const std::string & mes)
 {
 	m_error = mes;
 }
@@ -103,101 +124,59 @@ void Bittorrent::bin2hex(unsigned char * bin, char * hex, int len)
 }
 
 
-int Bittorrent::init_torrent(std::string & filename, std::string * hash, bool is_new)
+int Bittorrent::init_torrent(const torrent::Metafile & metafile, const std::string & download_directory, std::string & hash)
 {
-	return init_torrent(filename.c_str(), hash, is_new);
-}
-
-int Bittorrent::init_torrent(const  char * filename, std::string * hash, bool is_new)
-{
-	if (hash == NULL)
-		return ERR_NULL_REF;
-	*hash = "";
-	torrent::TorrentPtr torrent(new torrent::Torrent());
-	std::string err = "";
-	if (torrent->Init(filename,&m_nm,&m_gcfg, &m_fm, &m_bc, m_directory, is_new) != ERR_NO_ERROR)
+	hash = "";
+	torrent::TorrentInterfaceBasePtr torrent;
+	try
 	{
-		err = torrent->get_error();
-		add_error_mes(err);
+		torrent::TorrentInterfaceBase::CreateTorrent(&m_nm, &m_gcfg, &m_fm, &m_bc, metafile, m_directory, download_directory, torrent);
+	}
+	catch (Exception & e)
+	{
+		add_error_mes(e.get_error());
 		return ERR_SEE_ERROR;
 	}
-	torrent::torrent_info t_info;
-	torrent->get_info(&t_info);
-	std::string infohash_str = t_info.info_hash_hex;
+
+	std::string infohash_str = metafile.info_hash_hex;
 
 	pthread_mutex_lock(&m_mutex);
 	if (m_torrents.count(infohash_str) !=0)
 	{
-		err = TORRENT_ERROR_EXISTS;
-		add_error_mes(err);
+		torrent->erase_state();
+		torrent->forced_releasing();
+		add_error_mes(TORRENT_ERROR_EXISTS);
 		pthread_mutex_unlock(&m_mutex);
 		return ERR_SEE_ERROR;
 	}
 	m_torrents[infohash_str] = torrent;
 	pthread_mutex_unlock(&m_mutex);
-	*hash = infohash_str;
+	hash = infohash_str;
 	return ERR_NO_ERROR;
 }
 
-int Bittorrent::OpenTorrent(char * filename, torrent::TorrentPtr & torrent)
+int Bittorrent::AddTorrent(torrent::Metafile & metafile, const std::string & download_directory, std::string & hash)
 {
-	torrent.reset(new torrent::Torrent());
-	std::string err = "";
-	if (torrent->Init(filename,&m_nm,&m_gcfg, &m_fm, &m_bc, m_directory, true) != ERR_NO_ERROR)
-	{
-		err = torrent->get_error();
-		add_error_mes(err);
-		torrent.reset();
-		return ERR_INTERNAL;
-	}
-	return ERR_NO_ERROR;
-}
-
-int Bittorrent::AddTorrent(torrent::TorrentPtr & torrent, std::string * hash)
-{
-	if (torrent == NULL)
-	{
-		std::string err = GENERAL_ERROR_UNDEF_ERROR;
-		add_error_mes(err);
-		return ERR_NULL_REF;
-	}
-
-	torrent::torrent_info t_info;
-	torrent->get_info(&t_info);
-	std::string infohash_str = t_info.info_hash_hex;
-
-	pthread_mutex_lock(&m_mutex);
-	if (m_torrents.count(infohash_str) !=0)
-	{
-		std::string err = TORRENT_ERROR_EXISTS;
-		add_error_mes(err);
-		pthread_mutex_unlock(&m_mutex);
-		return ERR_SEE_ERROR;
-	}
 	std::ofstream fout;
 	std::string state_file = m_directory;
+
 	state_file.append("our_torrents");
 	fout.open(state_file.c_str(), std::ios_base::app);
-	fout<<infohash_str<<".torrent"<<std::endl;
+	fout<<metafile.info_hash_hex<<".torrent"<<std::endl;
 	fout.close();
-	std::string fname =  m_directory + infohash_str + ".torrent";
-	if (torrent->save_meta2file(fname.c_str()) != ERR_NO_ERROR)
+
+	std::string fname =  m_directory + metafile.info_hash_hex + ".torrent";
+	if (metafile.save2file(fname) != ERR_NO_ERROR)
 	{
 		std::string err = TORRENT_ERROR_EXISTS;
 		add_error_mes(err);
-		pthread_mutex_unlock(&m_mutex);
 		return ERR_SEE_ERROR;
 	}
 
-
-	m_torrents[infohash_str] = torrent;
-	pthread_mutex_unlock(&m_mutex);
-	*hash = infohash_str;
-
-	return ERR_NO_ERROR;
+	return init_torrent(metafile, download_directory, hash);
 }
 
-int Bittorrent::StartTorrent(std::string & hash, std::string & download_directory)
+int Bittorrent::StartTorrent(const std::string & hash)
 {
 	if (m_torrents.count(hash) == 0)
 	{
@@ -211,7 +190,7 @@ int Bittorrent::StartTorrent(std::string & hash, std::string & download_director
 	sockaddr.sin_port = htons (6881);
 	inet_pton(AF_INET, "127.0.0.1", &sockaddr.sin_addr) ;
 	m_torrents[hash]->take_peers(1,&sockaddr);*/
-	if (m_torrents[hash]->start(download_directory) != ERR_NO_ERROR)
+	if (m_torrents[hash]->start() != ERR_NO_ERROR)
 	{
 		std::string err = TORRENT_ERROR_CAN_NOT_START;
 		add_error_mes(err);
@@ -222,7 +201,7 @@ int Bittorrent::StartTorrent(std::string & hash, std::string & download_director
 	return ERR_NO_ERROR;
 }
 
-int Bittorrent::StopTorrent(std::string & hash)
+int Bittorrent::StopTorrent(const std::string & hash)
 {
 	if (m_torrents.count(hash) == 0)
 	{
@@ -236,7 +215,7 @@ int Bittorrent::StopTorrent(std::string & hash)
 	return ERR_NO_ERROR;
 }
 
-int Bittorrent::PauseTorrent(std::string & hash)
+int Bittorrent::PauseTorrent(const std::string & hash)
 {
 	if (m_torrents.count(hash) == 0)
 	{
@@ -250,7 +229,7 @@ int Bittorrent::PauseTorrent(std::string & hash)
 	return ERR_NO_ERROR;
 }
 
-int Bittorrent::ContinueTorrent(std::string & hash)
+int Bittorrent::ContinueTorrent(const std::string & hash)
 {
 	if (m_torrents.count(hash) == 0)
 	{
@@ -264,7 +243,7 @@ int Bittorrent::ContinueTorrent(std::string & hash)
 	return ERR_NO_ERROR;
 }
 
-int Bittorrent::CheckTorrent(std::string & hash)
+int Bittorrent::CheckTorrent(const std::string & hash)
 {
 	if (m_torrents.count(hash) == 0)
 	{
@@ -278,7 +257,7 @@ int Bittorrent::CheckTorrent(std::string & hash)
 	return ERR_NO_ERROR;
 }
 
-int Bittorrent::DeleteTorrent(std::string & hash)
+int Bittorrent::DeleteTorrent(const std::string & hash)
 {
 	if (m_torrents.count(hash) == 0)
 	{
@@ -287,10 +266,11 @@ int Bittorrent::DeleteTorrent(std::string & hash)
 		return ERR_SEE_ERROR;
 	}
 	pthread_mutex_lock(&m_mutex);
-	torrent::TorrentPtr torrent = m_torrents[hash];
+	torrent::TorrentInterfaceBasePtr torrent = m_torrents[hash];
 	m_torrents.erase(hash);
 	torrent->stop();
 	torrent->erase_state();
+	torrent->forced_releasing();
 	torrent.reset();
 
 	std::ifstream fin;
@@ -317,11 +297,13 @@ int Bittorrent::DeleteTorrent(std::string & hash)
 	}
 	fout.close();
 
+	remove(current_fname.c_str());
+
 	pthread_mutex_unlock(&m_mutex);
 	return ERR_NO_ERROR;
 }
 
-int Bittorrent::Torrent_info(std::string & hash, torrent::torrent_info * info)
+int Bittorrent::Torrent_info(const std::string & hash, torrent::torrent_info * info)
 {
 	if (m_torrents.count(hash) == 0)
 	{
@@ -344,10 +326,9 @@ int Bittorrent::get_TorrentList(std::list<std::string> * list)
 	return ERR_NO_ERROR;
 }
 
-int Bittorrent::get_DownloadDirectory(std::string * dir)
+const std::string & Bittorrent::get_DownloadDirectory()
 {
-	m_gcfg.get_download_directory(dir);
-	return ERR_NO_ERROR;
+	return m_gcfg.get_download_directory();
 }
 
 
@@ -390,7 +371,7 @@ int Bittorrent::event_sock_ready2read(network::Socket sock)
 		return ERR_INTERNAL;
 	}
 	printf("accepted\n");
-	if ((*iter).second->add_incoming_peer(sock) != ERR_NO_ERROR)
+	if ((*iter).second->add_leecher(sock) != ERR_NO_ERROR)
 	{
 		printf("can not add peer\n");
 		m_nm.Socket_delete(sock);
@@ -446,23 +427,13 @@ void * Bittorrent::thread(void * arg)
 		bt->m_nm.clock();
 		pthread_mutex_lock(&bt->m_mutex);
 		bt->m_nm.notify();
-		//
-
-		fs::write_event eo;
-		eo.assoc = NULL;
-		if (bt->m_fm.get_write_event(&eo))
-		{
-			fs::file_event * f = (fs::file_event *)eo.assoc;
-			if (f != NULL)
-			{
-				f->event_file_write(&eo);
-			}
-		}
+		bt->m_fm.notify();
 		for(torrent_map_iter iter = bt->m_torrents.begin(); iter != bt->m_torrents.end(); ++iter)
 		{
 			(*iter).second->clock();
 		}
 		pthread_mutex_unlock(&bt->m_mutex);
+		usleep(1000);
 	}
 	//printf("MAIN_THREAD stopped\n");
 	return (void*)ret;

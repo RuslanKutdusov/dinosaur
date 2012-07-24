@@ -39,6 +39,8 @@ using namespace std;
 #include "utils/dir_tree.h"
 #include "fs/fs_tests.h"
 
+//little change for git
+
 void char_set()
 {
 	unsigned char byte = '\xff';
@@ -80,58 +82,7 @@ void fm_test()
 }
 
 
-void bimap_test()
-{
-	typedef boost::bimap< int, char > bm_type;
-	bm_type bm;
-	//bm.insert(bm_type::value_type(1, "one"));
-	//bm.insert(bm_type::value_type(2, "two"));
-	for(int i = 65; i < 75; i++)
-	{
-		bm.insert(bm_type::value_type(rand(), (char)i));
-	}
-	bm_type::right_iterator it = bm.right.find('C');
-	bm.right.replace_key(it, 'c');
-	bm.right.erase('A');
-	it = bm.right.find('B');
-	if (it == bm.right.end() && bm.right.count('B') == 0)
-		cout<<"not found\n";
-	else
-		bm.right.replace_data(it, -100);
-	bm.right.erase(it);
-	bm.insert(bm_type::value_type(-200, 'F'));
-	for( bm_type::const_iterator iter = bm.begin(), iend = bm.end();
-	        iter != iend; ++iter )
-	{
-		// iter->left  : data : int
-		// iter->right : data : std::string
 
-		std::cout << iter->left << " <--> " << iter->right << std::endl;
-	}
-	cout<<"==================================\n";
-	typedef bm_type::left_map::const_iterator left_const_iterator;
-
-	for( left_const_iterator left_iter = bm.left.begin(), iend = bm.left.end();
-		 left_iter != iend; ++left_iter )
-	{
-		// left_iter->first  : key  : int
-		// left_iter->second : data : std::string
-
-		std::cout << left_iter->first << " --> " << left_iter->second << std::endl;
-	}
-	cout<<"==================================\n";
-	typedef bm_type::right_map::const_iterator right_const_iterator;
-
-	for( right_const_iterator right_iter = bm.right.begin(), iend = bm.right.end();
-			right_iter != iend; ++right_iter )
-	{
-		// left_iter->first  : key  : int
-		// left_iter->second : data : std::string
-
-		std::cout << right_iter->first << " --> " << right_iter->second << std::endl;
-	}
-
-}
 
 /*void block_cache_test()
 {
@@ -255,18 +206,13 @@ void bencode_test()
 	cout<<hash_hex2<<endl;
 }
 
-int main(int argc,char* argv[]) {
-	//block_cache_test();
-	//dir_tree::DirTreeTest drt;
-	//drt.test_DirTree();
-	//test_fd_cache_test();
-	//return 0;
-
+int main(int argc,char* argv[])
+{
 	try
 	{
 		init_gui();
 	}
-	catch(Exception e)
+	catch(Exception  &e)
 	{
 		e.print();
 	}

@@ -22,6 +22,9 @@ double get_time()
 
 NetworkManager::NetworkManager()
 {
+#ifdef BITTORRENT_DEBUG
+	printf("NetworkManager default constructor\n");
+#endif
 	m_thread = 0;
 	m_thread_stop = false;
 }
@@ -51,7 +54,9 @@ int NetworkManager::Init()
 NetworkManager::~NetworkManager()
 {
 	//pthread_mutex_destroy(&m_mutex_sockets);
+#ifdef BITTORRENT_DEBUG
 	printf("NetworkManager destructor\n");
+#endif
 	if (m_thread != 0)
 	{
 		m_thread_stop = true;
@@ -74,7 +79,9 @@ NetworkManager::~NetworkManager()
 	m_connected_sockets.clear();
 	m_timeout_sockets.clear();
 	m_unresolved_sockets.clear();
-	std::cout<<"NetworkManager destroyed\n";
+#ifdef BITTORRENT_DEBUG
+	printf("NetworkManager destroyed\n");
+#endif
 }
 
 int NetworkManager::Socket_add(std::string & ip, uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock)
@@ -94,6 +101,9 @@ int NetworkManager::Socket_add(const char * ip, uint16_t port, const SocketAssoc
 
 int NetworkManager::Socket_add_domain(const char *domain_name, uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock)
 {
+#ifdef BITTORRENT_DEBUG
+	printf("Adding socket %s\n", domain_name);
+#endif
 	sock.reset(new socket_());
 	if (sock == NULL || domain_name == NULL)
 		return ERR_INTERNAL;;
@@ -111,6 +121,9 @@ int NetworkManager::Socket_add_domain(const char *domain_name, uint16_t port, co
 	m_sockets.insert(sock);
 	//if (lock_mutex)
 	pthread_mutex_unlock(&m_mutex_sockets);
+#ifdef BITTORRENT_DEBUG
+	printf("Socket is added %s\n", domain_name);
+#endif
 	return ERR_NO_ERROR;
 }
 
@@ -121,6 +134,9 @@ int NetworkManager::Socket_add_domain(std::string & domain_name, uint16_t port, 
 
 int NetworkManager::Socket_add(struct sockaddr_in * addr, const SocketAssociation::ptr & assoc, Socket & sock)
 {
+#ifdef BITTORRENT_DEBUG
+	printf("Adding socket %s\n",  inet_ntoa(addr->sin_addr));
+#endif
 	sock.reset(new socket_());
 	if (sock == NULL)
 		return ERR_INTERNAL;
@@ -164,6 +180,9 @@ end:
 	pthread_mutex_lock(&m_mutex_sockets);
 	m_sockets.insert(sock);
 	pthread_mutex_unlock(&m_mutex_sockets);
+#ifdef BITTORRENT_DEBUG
+	printf("Socket is added %d %s\n", sock->m_socket, inet_ntoa(sock->m_peer.sin_addr));
+#endif
 	return ERR_NO_ERROR;
 }
 
@@ -300,10 +319,12 @@ int NetworkManager::clock()
 			m_closed_sockets.insert(sock);
 	}
 	pthread_mutex_unlock(&m_mutex_sockets);
+	return ERR_NO_ERROR;
 }
 
 void NetworkManager::notify()
 {
+	pthread_mutex_lock(&m_mutex_sockets);
 	for(socket_set_iter listening_sockets_iter = m_listening_sockets.begin();
 			listening_sockets_iter != m_listening_sockets.end(); ++listening_sockets_iter)
 	{
@@ -317,18 +338,13 @@ void NetworkManager::notify()
 	}
 
 	socket_set temp_ready2read_sockets = m_ready2read_sockets;
-	socket_set temp_sended_sockets = m_sended_sockets;
-	socket_set temp_closed_sockets = m_closed_sockets;
-	socket_set temp_connected_sockets = m_connected_sockets;
-	socket_set temp_timeout_sockets = m_timeout_sockets;
-	socket_set temp_unresolved_sockets = m_unresolved_sockets;
-
 	for(socket_set_iter iter = temp_ready2read_sockets.begin(); iter != temp_ready2read_sockets.end(); ++iter)
 	{
 		if ((*iter)->m_assoc != NULL)
 			(*iter)->m_assoc->event_sock_ready2read(*iter);
 	}
 
+	socket_set temp_sended_sockets = m_sended_sockets;
 	for(socket_set_iter iter = temp_sended_sockets.begin(); iter != temp_sended_sockets.end(); ++iter)
 	{
 		if ((*iter)->m_assoc != NULL)
@@ -338,6 +354,7 @@ void NetworkManager::notify()
 		}
 	}
 
+	socket_set temp_connected_sockets = m_connected_sockets;
 	for(socket_set_iter iter = temp_connected_sockets.begin(); iter != temp_connected_sockets.end(); ++iter)
 	{
 		if ((*iter)->m_assoc != NULL)
@@ -347,6 +364,7 @@ void NetworkManager::notify()
 		}
 	}
 
+	socket_set temp_timeout_sockets = m_timeout_sockets;
 	for(socket_set_iter iter = temp_timeout_sockets.begin(); iter != temp_timeout_sockets.end(); ++iter)
 	{
 		if ((*iter)->m_assoc != NULL)
@@ -356,6 +374,7 @@ void NetworkManager::notify()
 		}
 	}
 
+	socket_set temp_unresolved_sockets = m_unresolved_sockets;
 	for(socket_set_iter iter = temp_unresolved_sockets.begin(); iter != temp_unresolved_sockets.end(); ++iter)
 	{
 		if ((*iter)->m_assoc != NULL)
@@ -365,6 +384,7 @@ void NetworkManager::notify()
 		}
 	}
 
+	socket_set temp_closed_sockets = m_closed_sockets;
 	for(socket_set_iter iter = temp_closed_sockets.begin(); iter != temp_closed_sockets.end(); ++iter)
 	{
 		if ((*iter)->m_assoc != NULL)
@@ -373,6 +393,7 @@ void NetworkManager::notify()
 			m_closed_sockets.erase(*iter);
 		}
 	}
+	pthread_mutex_unlock(&m_mutex_sockets);
 }
 
 int NetworkManager::Socket_send(Socket & sock, const void * data, size_t len, bool full)
@@ -384,7 +405,7 @@ int NetworkManager::Socket_send(Socket & sock, const void * data, size_t len, bo
 		m_closed_sockets.insert(sock);
 		return ERR_BAD_ARG;
 	}
-	return _send(sock.get(),data,len, full);
+	return _send(sock.get(), data,len, full);
 }
 
 int NetworkManager::Socket_recv(Socket & sock, void * data, size_t len)
@@ -493,6 +514,14 @@ double NetworkManager::Socket_get_tx_speed(Socket & sock)
 	double time = get_time();
 	double speed = (double)sock->m_tx / (time - sock->m_tx_last_time);
 	return speed;
+}
+
+int NetworkManager::Socket_get_addr(Socket & sock, sockaddr_in * addr)
+{
+	if (addr == NULL || sock == NULL)
+		return ERR_BAD_ARG;
+	memcpy(addr, &sock->m_peer, sizeof(sockaddr_in));
+	return ERR_NO_ERROR;
 }
 
 int NetworkManager::handle_event(socket_ * sock, uint32_t events)
@@ -786,88 +815,6 @@ end:
 	return ERR_NO_ERROR;
 }
 
-DomainNameResolver::DomainNameResolver(std::string & domain, struct sockaddr_in * addr)
-{
-	if (addr == NULL || domain.length() == 0)
-		throw Exception("Invalid argument");
-	m_domain = domain;
-	m_addr = addr;
-	if (resolve() != ERR_NO_ERROR)
-			throw Exception("Can not resolve");
-}
-
-DomainNameResolver::DomainNameResolver(const char * domain, struct sockaddr_in * addr)
-{
-	if (addr == NULL || domain == NULL)
-		throw Exception("Invalid argument");
-	m_domain = domain;
-	m_addr = addr;
-	if (resolve() != ERR_NO_ERROR)
-		throw Exception("Can not resolve");
-}
-
-int DomainNameResolver::addrinfo()
-{
-	struct addrinfo * res = NULL;
-	struct addrinfo hints;
-	memset(&hints, 0, sizeof(hints));
-	//резолвим ipшник хоста
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_protocol = 0;
-	if (getaddrinfo(m_domain.c_str(), NULL, &hints, &res) == 0)
-	{
-		uint16_t port = m_addr->sin_port;
-		memcpy(m_addr, res->ai_addr, sizeof(struct sockaddr_in));
-		m_addr->sin_port = port;
-		freeaddrinfo(res);
-		return ERR_NO_ERROR;
-	}
-	else
-	{
-		//freeaddrinfo(res);
-		return ERR_INTERNAL;
-	}
-}
-
-int DomainNameResolver::resolve()
-{
-	if (addrinfo() != ERR_NO_ERROR)
-	{
-		if (split_domain_and_port() != ERR_NO_ERROR)
-			return ERR_INTERNAL;
-		return addrinfo();
-	}
-	return ERR_NO_ERROR;
-}
-
-int DomainNameResolver::split_domain_and_port()
-{
-	pcre *re;
-	const char * error;
-	int erroffset;
-	char pattern2[] = "^(.+?):(\\d+)$";
-	re = pcre_compile(pattern2, 0, &error, &erroffset, NULL);
-	if (!re)
-		return ERR_INTERNAL;
-
-	int ovector[1024];
-	int count = pcre_exec(re, NULL, m_domain.c_str(), m_domain.length(), 0, 0, ovector, 1024);
-	if (count <= 0)
-	{
-		pcre_free(re);
-		return ERR_INTERNAL;
-	}
-	pcre_free(re);
-	std::string port_str = m_domain.substr(ovector[4], ovector[5] - ovector[4]);
-	m_domain = m_domain.substr(0, ovector[3] - ovector[2]);
-
-	unsigned int p;
-	sscanf(port_str.c_str(), "%u", &p);
-	m_addr->sin_port = htons(p);
-	return ERR_NO_ERROR;
-}
-
 void * NetworkManager::timeout_thread(void * arg)
 {
 	int ret = 1;
@@ -917,6 +864,9 @@ void * NetworkManager::timeout_thread(void * arg)
 			}
 			catch (Exception & e)
 			{
+#ifdef BITTORRENT_DEBUG
+	printf("DomainNameResolver is can not resolve %s\n", sock->m_domain.c_str());
+#endif
 				pthread_mutex_lock(&nm->m_mutex_sockets);
 				if (!sock->m_need2delete)
 					nm->m_unresolved_sockets.insert(sock);
