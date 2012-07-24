@@ -166,7 +166,6 @@ private:
 	std::set<BLOCK_ID> 				m_requests_queue;//блоки, которые у нас запросили(очередь запросов)
 	time_t 							m_sleep_time;
 	int process_messages();
-	void goto_sleep();
 public:
 	Peer();
 	int Init(sockaddr_in * addr, const TorrentInterfaceInternalPtr & torrent);
@@ -190,17 +189,15 @@ public:
 	bool have_piece(uint32_t piece_index);
 	bool is_choking();
 	int clock();
-	//int wake_up(network::Socket & sock, PEER_ADD peer_add);
+	void goto_sleep();
 	bool is_sleep();
 	bool may_request();
-	//bool request_limit();
 	int request(uint32_t piece_index, uint32_t block_index);
 	int request(const BLOCK_ID & block_id);
-	//void erase_requested_block(const BLOCK_ID & block_id);
 	bool get_requested_block(BLOCK_ID & block_id);
 	double get_rx_speed();
 	double get_tx_speed();
-	std::string get_ip_str();
+	const std::string & get_ip_str();
 	int get_info(peer_info * info);
 	int prepare2release();
 	void forced_releasing();
@@ -230,7 +227,7 @@ private:
 		uint32_t 						length;//его длина
 		uint64_t 						offset;//смещение внутри файла до начала куска
 		uint32_t 						block_count;//кол-во блоков в куске
-		std::set<PeerPtr> 				taken_from;
+		std::set<std::string>			taken_from;
 		std::set<uint32_t>	 			block2download;
 		std::set<uint32_t>				downloaded_blocks;
 		SHA1_HASH						hash;
@@ -247,14 +244,14 @@ private:
 	TorrentInterfaceInternalPtr 		m_torrent;
 	BITFIELD 							m_bitfield;
 	size_t 								m_bitfield_len;
-	std::set<uint32_t>					m_pieces_to_download;//куски, которые надо загрузить
 	std::vector<piece_info> 			m_piece_info;
 	CSHA1 								m_csha1;
 	download_queue						m_download_queue;
 	uint32_list							m_tag_list;//хранит один элемент, на который будут ссылатся prio_iter у загруженных кусков
 	std::map<BLOCK_ID, uint32_t>		m_downloadable_blocks;
-	unsigned char *					m_piece_for_check_hash;
+	unsigned char *						m_piece_for_check_hash;
 	void build_piece_info();
+	int push_piece2download(uint32_t piece_index);
 public:
 	PieceManager(const TorrentInterfaceInternalPtr & torrent, BITFIELD bitfield);
 	void reset();
@@ -270,7 +267,9 @@ public:
 	bool check_piece_hash(uint32_t piece_index);
 	int front_piece2download(uint32_t & piece_index);
 	void pop_piece2download();
-	int push_piece2download(uint32_t piece_index);
+	int set_piece_taken_from(uint32_t piece_index, const std::string & seed);
+	bool get_piece_taken_from(uint32_t piece_index, std::string & seed);
+	int clear_piece_taken_from(uint32_t piece_index);
 	int set_piece_priority(uint32_t piece_index, PIECE_PRIORITY priority);
 	int get_piece_priority(uint32_t piece_index, PIECE_PRIORITY & priority);
 	int get_block2download(uint32_t piece_index, uint32_t & block_index);
@@ -325,18 +324,6 @@ private:
 		TORRENT_STATE_CHECKING,
 		TORRENT_STATE_RELEASING
 	};
-
-	enum TORRENT_TASKS
-	{
-			TORRENT_TASK_DOWNLOAD_PIECE,
-			TORRENT_TASK_CHECK_HASH
-	};
-
-	struct TORRENT_TASK
-	{
-			TORRENT_TASKS 		task;
-			uint64_t 			task_data;//здесь будем хранить например номер куска для проверки
-	};
 protected:
 	network::NetworkManager * 		m_nm;
 	cfg::Glob_cfg * 				m_g_cfg;
@@ -355,8 +342,9 @@ protected:
 	peer_list 						m_active_seeders;
 	peer_map 						m_leechers;
 	std::list<uint32_t> 			m_have_list;//список кусков, которые мы только загрузили, и о которых надо известить всех участников раздачи(сообщение have)
-	std::list<TORRENT_TASK> 		m_task_queue;
 	std::list<uint32_t> 			m_downloadable_pieces;
+
+	std::list<uint32_t>				m_pieces2check;
 
 	uint64_t 						m_downloaded;
 	uint64_t 						m_uploaded;
@@ -374,7 +362,6 @@ protected:
 	virtual int continue_();
 	virtual int check();
 	virtual bool is_downloaded();
-	virtual int event_piece_hash(uint32_t piece_index, bool ok, bool error);
 	virtual int event_file_write(fs::write_event * we);
 	virtual int clock();
 	virtual int get_info(torrent_info * info);
@@ -462,7 +449,6 @@ public:
 	int save_block(uint32_t piece, uint32_t block_offset, uint32_t block_length, char * block);
 	int read_block(uint32_t piece, uint32_t block_index, char * block, uint32_t & block_length);
 	int read_piece(uint32_t piece, unsigned char * dst);
-	virtual int event_piece_hash(uint32_t piece_index, bool ok, bool error) = 0;
 	virtual int event_file_write(fs::write_event * we) = 0;
 	virtual void add_seeders(uint32_t count, sockaddr_in * addrs) = 0;
 };

@@ -431,6 +431,7 @@ void * Bittorrent::thread(void * arg)
 			(*iter).second->clock();
 		}
 		pthread_mutex_unlock(&bt->m_mutex);
+		usleep(1000);
 	}
 	//printf("MAIN_THREAD stopped\n");
 	return (void*)ret;

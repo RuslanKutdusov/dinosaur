@@ -674,11 +674,6 @@ bool Peer::may_request()
 		return false;
 	return true;
 }
-/*
-bool Peer::request_limit()
-{
-	return m_requested_blocks.size() >= PEER_MAX_REQUEST_NUMBER;//m_torrent->m_piece_length / BLOCK_LENGTH;
-}*/
 
 int Peer::request(uint32_t piece_index, uint32_t block_index)
 {
@@ -713,11 +708,6 @@ bool Peer::get_requested_block(BLOCK_ID & block_id)
 	return false;
 }
 
-/*void Peer::erase_requested_block(const BLOCK_ID & block_id)
-{
-	m_requested_blocks.erase(block_id);
-}*/
-
 double Peer::get_rx_speed()
 {
 	return m_nm->Socket_get_rx_speed(m_sock);
@@ -728,7 +718,7 @@ double Peer::get_tx_speed()
 	return m_nm->Socket_get_tx_speed(m_sock);
 }
 
-std::string Peer::get_ip_str()
+const std::string & Peer::get_ip_str()
 {
 	return m_ip;
 }

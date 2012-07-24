@@ -49,7 +49,7 @@ PieceManager::~PieceManager()
 
 void PieceManager::reset()
 {
-	m_pieces_to_download.clear();
+	m_downloadable_blocks.clear();
 	m_download_queue.high_prio_pieces.clear();
 	m_download_queue.normal_prio_pieces.clear();
 	m_download_queue.low_prio_pieces.clear();
@@ -57,17 +57,20 @@ void PieceManager::reset()
 	uint32_t piece_count = m_torrent->get_piece_count();
 	for (uint32_t i = 0; i < piece_count; i++)
 	{
-		m_piece_info[i].prio = PIECE_PRIORITY_NORMAL;
+		//m_piece_info[i].prio = PIECE_PRIORITY_NORMAL;
 
-		m_pieces_to_download.insert(i);
+		//m_download_queue.normal_prio_pieces.push_back(i);
+		//m_piece_info[i].prio_iter = --m_download_queue.normal_prio_pieces.end();
 
-		m_download_queue.normal_prio_pieces.push_back(i);
-		m_piece_info[i].prio_iter = --m_download_queue.normal_prio_pieces.end();
+		//for(uint32_t block = 0; block < m_piece_info[i].block_count; block++)
+		//	m_piece_info[i].block2download.insert(block);
 
-		for(uint32_t block = 0; block < m_piece_info[i].block_count; block++)
-			m_piece_info[i].block2download.insert(block);
+		m_piece_info[i].prio_iter = m_tag_list.begin();
 
+		m_piece_info[i].block2download.clear();
 		m_piece_info[i].downloaded_blocks.clear();
+
+		m_piece_info[i].taken_from.clear();
 	}
 
 }
@@ -106,7 +109,6 @@ void PieceManager::build_piece_info()
 
 		if (!bit_in_bitfield(i, piece_count, m_bitfield))
 		{
-			m_pieces_to_download.insert(i);
 			m_download_queue.normal_prio_pieces.push_back(i);
 			m_piece_info[i].prio_iter = --m_download_queue.normal_prio_pieces.end();
 			for(uint32_t block = 0; block < m_piece_info[i].block_count; block++)
@@ -190,36 +192,6 @@ void PieceManager::copy_bitfield(unsigned char * dst)
 	memcpy(dst, m_bitfield, m_bitfield_len);
 }
 
-bool PieceManager::check_piece_hash(uint32_t piece_index)
-{
-	if (piece_index >= m_piece_info.size())
-		return false;
-	SHA1_HASH sha1;
-	memset(sha1, 0, SHA1_LENGTH);
-	m_csha1.Update(m_piece_for_check_hash, m_piece_info[piece_index].length);
-	m_csha1.Final();
-	m_csha1.GetHash(sha1);
-	m_csha1.Reset();
-	if (memcmp(sha1, m_piece_info[piece_index].hash, SHA1_LENGTH) == 0)
-	{
-		m_pieces_to_download.erase(piece_index);
-		set_bitfield(piece_index, m_piece_info.size(), m_bitfield);
-		m_piece_info[piece_index].block2download.clear();
-		m_torrent->inc_downloaded(m_piece_info[piece_index].length);
-		return true;
-	}
-	else
-	{
-		m_pieces_to_download.insert(piece_index);
-		reset_bitfield(piece_index, m_piece_info.size(), m_bitfield);
-		for(uint32_t block = 0; block < m_piece_info[piece_index].block_count; block++)
-			m_piece_info[piece_index].block2download.insert(block);
-		m_piece_info[piece_index].downloaded_blocks.clear();
-		return false;
-	}
-	return false;
-}
-
 int PieceManager::front_piece2download(uint32_t & piece_index)
 {
 	if (!m_download_queue.high_prio_pieces.empty())
@@ -290,6 +262,30 @@ int PieceManager::push_piece2download(uint32_t piece_index)
 			return ERR_INTERNAL;
 			break;
 	}
+	return ERR_NO_ERROR;
+}
+
+int PieceManager::set_piece_taken_from(uint32_t piece_index, const std::string & seed)
+{
+	m_piece_info[piece_index].taken_from.insert(seed);
+	return ERR_NO_ERROR;
+}
+
+bool PieceManager::get_piece_taken_from(uint32_t piece_index, std::string & seed)
+{
+	if (!m_piece_info[piece_index].taken_from.empty())
+	{
+		std::set<std::string>::iterator iter = m_piece_info[piece_index].taken_from.begin();
+		seed = *iter;
+		m_piece_info[piece_index].taken_from.erase(iter);
+		return true;
+	}
+	return false;
+}
+
+int PieceManager::clear_piece_taken_from(uint32_t piece_index)
+{
+	m_piece_info[piece_index].taken_from.clear();
 	return ERR_NO_ERROR;
 }
 
@@ -382,33 +378,75 @@ int PieceManager::push_block2download(uint32_t piece_index, uint32_t block_index
 	return ERR_NO_ERROR;
 }
 
+bool PieceManager::check_piece_hash(uint32_t piece_index)
+{
+	m_torrent->read_piece(piece_index, m_piece_for_check_hash);
+	SHA1_HASH sha1;
+	memset(sha1, 0, SHA1_LENGTH);
+	m_csha1.Update(m_piece_for_check_hash, m_piece_info[piece_index].length);
+	m_csha1.Final();
+	m_csha1.GetHash(sha1);
+	m_csha1.Reset();
+	bool ret =  memcmp(sha1, m_piece_info[piece_index].hash, SHA1_LENGTH) == 0;
+	if (ret)
+	{
+		set_bitfield(piece_index, m_piece_info.size(), m_bitfield);
+		m_piece_info[piece_index].block2download.clear();
+		m_torrent->inc_downloaded(m_piece_info[piece_index].length);
+	}
+	else
+	{
+		reset_bitfield(piece_index, m_piece_info.size(), m_bitfield);
+		for(uint32_t block = 0; block < m_piece_info[piece_index].block_count; block++)
+				m_piece_info[piece_index].block2download.insert(block);
+		m_piece_info[piece_index].downloaded_blocks.clear();
+		push_piece2download(piece_index);
+	}
+	return ret;
+}
+
 int PieceManager::event_file_write(fs::write_event * we, PIECE_STATE & piece_state)
 {
 	piece_state = PIECE_STATE_NOT_FIN;
 	uint32_t piece_index;
 	uint32_t block_index;
 	uint32_t block_length;
+	piece_state = PIECE_STATE_NOT_FIN;
 	get_piece_block_from_block_id(we->block_id, piece_index, block_index);
 #ifdef BITTORRENT_DEBUG
 	//printf("event_file_write piece=%u block=%u writted=%d\n", piece_index, block_index, we->writted);
 #endif
 	if (we->writted == -1)
 	{
+		m_downloadable_blocks.erase(we->block_id);
 		return push_block2download(piece_index, block_index);
 	}
 
 	m_downloadable_blocks[we->block_id] += we->writted;
 
 	get_block_length_by_index(piece_index, block_index, block_length);
+
+	if (m_downloadable_blocks[we->block_id] > block_length)
+	{
+		m_downloadable_blocks.erase(we->block_id);
+		return push_block2download(piece_index, block_index);
+	}
+
 	if (m_downloadable_blocks[we->block_id] == block_length)
 	{
 		m_downloadable_blocks.erase(we->block_id);
 		m_piece_info[piece_index].downloaded_blocks.insert(block_index);
 		if (m_piece_info[piece_index].downloaded_blocks.size() == m_piece_info[piece_index].block_count)
 		{
-			m_torrent->read_piece(piece_index, m_piece_for_check_hash);
 			bool ret = check_piece_hash(piece_index);
-			piece_state = ret ? PIECE_STATE_FIN_HASH_OK : PIECE_STATE_FIN_HASH_BAD;
+			if (ret)
+			{
+				piece_state = PIECE_STATE_FIN_HASH_OK;
+			}
+			else
+			{
+				piece_state = PIECE_STATE_FIN_HASH_BAD;
+			}
 #ifdef BITTORRENT_DEBUG
 			printf("PIECE DONE %u ret=%d\n", piece_index, (int)ret);
 #endif
