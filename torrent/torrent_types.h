@@ -38,6 +38,13 @@ enum PEER_ADD
 	PEER_ADD_INCOMING
 };
 
+enum TORRENT_WORK
+{
+	TORRENT_DOWNLOADING,
+	TORRENT_UPLOADING,
+	TORRENT_CHECKING
+};
+
 struct peer_info
 {
 	char 		ip[22];
@@ -105,11 +112,14 @@ public:
 	uint64_t 			uploaded;
 	double 				rx_speed;
 	double 				tx_speed;
-	peer_info_list 		peers;
+	peer_info_list 		seeders;
+	peer_info_list		leechers;
+	uint32_t			total_seeders;
 	tracker_info_list	trackers;
 	file_list 			file_list_;
 	SHA1_HASH_HEX 		info_hash_hex;
 	int 				progress;
+	TORRENT_WORK		work;
 };
 
 }

@@ -132,7 +132,7 @@ extern "C" void on_button_stop_clicked (GtkWidget *object, gpointer user_data)
 
 extern "C" void on_button_delete_clicked (GtkWidget *object, gpointer user_data)
 {
-	/*GtkTreeSelection *selection;
+	GtkTreeSelection *selection;
 	GtkTreeModel     *model;
 	GtkTreeIter       selected_iter;
 	selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(torrent_view));
@@ -144,7 +144,7 @@ extern "C" void on_button_delete_clicked (GtkWidget *object, gpointer user_data)
 		g_free(g_hash);
 		bt->DeleteTorrent(hash);
 		on_window1_show(NULL,NULL);
-	}*/
+	}
 }
 
 extern "C" void on_button_check_clicked(GtkWidget *object, gpointer user_data)

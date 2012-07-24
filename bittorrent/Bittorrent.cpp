@@ -270,7 +270,7 @@ int Bittorrent::DeleteTorrent(const std::string & hash)
 	m_torrents.erase(hash);
 	torrent->stop();
 	torrent->erase_state();
-	torrent->prepare2release();
+	torrent->forced_releasing();
 	torrent.reset();
 
 	std::ifstream fin;
@@ -296,6 +296,8 @@ int Bittorrent::DeleteTorrent(const std::string & hash)
 		our_torrents.pop_front();
 	}
 	fout.close();
+
+	remove(current_fname.c_str());
 
 	pthread_mutex_unlock(&m_mutex);
 	return ERR_NO_ERROR;
