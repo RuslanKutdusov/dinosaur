@@ -19,7 +19,7 @@ GtkLabel* label_length;
 GtkLabel* label_dir;
 GtkLabel* label_piece_number;
 GtkLabel* label_piece_length;
-bittorrent::Bittorrent * bt;
+bittorrent::BittorrentPtr bt;
 torrent::MetafilePtr metafile;
 
 enum
@@ -166,7 +166,7 @@ extern "C" void on_button_check_clicked(GtkWidget *object, gpointer user_data)
 
 extern "C" void on_window1_destroy (GtkWidget *object, gpointer user_data)
 {
-	delete bt;
+	bt.reset();
 	gtk_main_quit();
 }
 
@@ -442,7 +442,7 @@ void init_gui()
 {
 	try
 	{
-		bt = new bittorrent::Bittorrent();
+		bittorrent::Bittorrent::CreateBittorrent(bt);
 	}
 	catch(Exception e)
 	{

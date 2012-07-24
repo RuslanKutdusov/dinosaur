@@ -24,8 +24,12 @@
 #include <map>
 #include <vector>
 #include <string>
+#include <boost/shared_ptr.hpp>
 
 namespace bittorrent {
+
+class Bittorrent;
+typedef boost::shared_ptr<Bittorrent> BittorrentPtr;
 
 class Bittorrent : public network::SocketAssociation {
 private:
@@ -48,8 +52,9 @@ private:
 	void add_error_mes(const std::string & mes);
 	int load_our_torrents();
 	int init_torrent(const torrent::Metafile & metafile, const std::string & download_directory, std::string & hash);
-public:
 	Bittorrent();
+	void init_listen_socket();
+public:
 	int AddTorrent(torrent::Metafile & metafile, const std::string & download_directory, std::string & hash);
 	int StartTorrent(const std::string & hash);
 	int StopTorrent(const std::string & hash);
@@ -77,6 +82,21 @@ public:
 		m_nm.Socket_delete(m_sock);
 	}
 	~Bittorrent();
+	static void CreateBittorrent(BittorrentPtr & ptr)
+	{
+		try
+		{
+			ptr.reset(new Bittorrent());
+			pthread_mutex_lock(&ptr->m_mutex);
+			ptr->init_listen_socket();
+			pthread_mutex_unlock(&ptr->m_mutex);
+		}
+		catch (Exception & e)
+		{
+			ptr.reset();
+			throw e;
+		}
+	}
 };
 
 } /* namespace Bittorrent */
