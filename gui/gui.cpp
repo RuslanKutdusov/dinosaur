@@ -166,7 +166,7 @@ extern "C" void on_button_check_clicked(GtkWidget *object, gpointer user_data)
 
 extern "C" void on_window1_destroy (GtkWidget *object, gpointer user_data)
 {
-	bt.reset();
+	bittorrent::Bittorrent::DeleteBittorrent(bt);
 	gtk_main_quit();
 }
 

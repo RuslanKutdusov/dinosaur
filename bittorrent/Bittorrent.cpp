@@ -423,15 +423,8 @@ void * Bittorrent::thread(void * arg)
 {
 	int ret = 1;
 	Bittorrent * bt = (Bittorrent*)arg;
-	//printf("MAIN_THREAD started\n");
 	while(!bt->m_thread_stop)
 	{
-		/*if (bt->m_thread_pause)
-		{
-			sleep(1);
-			continue;
-		}*/
-		//printf("main_thread loop\n");
 		bt->m_nm.clock();
 		pthread_mutex_lock(&bt->m_mutex);
 		bt->m_nm.notify();
@@ -443,7 +436,6 @@ void * Bittorrent::thread(void * arg)
 		pthread_mutex_unlock(&bt->m_mutex);
 		usleep(1000);
 	}
-	//printf("MAIN_THREAD stopped\n");
 	return (void*)ret;
 }
 
