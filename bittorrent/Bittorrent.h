@@ -97,6 +97,11 @@ public:
 			throw e;
 		}
 	}
+	static void DeleteBittorrent(BittorrentPtr & ptr)
+	{
+		ptr->m_nm.Socket_delete(ptr->m_sock);
+		ptr.reset();
+	}
 };
 
 } /* namespace Bittorrent */
