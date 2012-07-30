@@ -183,7 +183,7 @@ int TorrentFile::read_piece(uint32_t piece_index, unsigned char * dst)
 	return ERR_NO_ERROR;
 }
 
-int TorrentFile::event_file_write(fs::write_event * eo)
+int TorrentFile::event_file_write(const fs::write_event & eo)
 {
 	return m_torrent->event_file_write(eo);
 	/*if (eo->writted >= 0)

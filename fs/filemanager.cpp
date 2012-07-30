@@ -200,10 +200,10 @@ void FileManager::notify()
 	pthread_mutex_lock(&m_mutex);
 	while(!m_write_event.empty())
 	{
-		write_event we = m_write_event.front();
-		m_write_event.pop_front();
+		write_event & we =  m_write_event.front();
 		if (!we.file->m_instance2delete)
-			we.file->m_assoc->event_file_write(&we);
+			we.file->m_assoc->event_file_write(we);
+		m_write_event.pop_front();
 	}
 	pthread_mutex_unlock(&m_mutex);
 }
@@ -222,14 +222,10 @@ void * FileManager::cache_thread(void * arg)
 	{
 		int ret = 1;
 		FileManager * fm = (FileManager*)arg;
-		//printf("CACHE_THREAD started\n");
 		while(!fm->m_thread_stop)
 		{
 			//printf("cache_thread loop\n");
 			pthread_mutex_lock(&fm->m_mutex);
-			//printf("CACHE wait...\n");
-			//pthread_cond_wait(&fm->m_cond, &fm->m_mutex);
-			//printf("CACHE signal received\n");
 			if (!fm->m_write_cache.empty())
 			{
 				const write_cache_element * ce = fm->m_write_cache.front();
@@ -245,7 +241,6 @@ void * FileManager::cache_thread(void * arg)
 					ret = -1;
 				else
 					ret = we.file->_write(ce->block, ce->offset, ce->length);
-				//pthread_mutex_lock(&fm->m_mutex);
 				fm->m_write_cache.pop();
 				we.writted = ret;
 				fm->m_write_event.push_back(we);
@@ -254,7 +249,6 @@ void * FileManager::cache_thread(void * arg)
 			pthread_mutex_unlock(&fm->m_mutex);
 			usleep(1000);
 		}
-		//printf("CACHE_THREAD stopped\n");
 		return (void*)ret;
 	}
 

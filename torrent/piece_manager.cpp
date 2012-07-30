@@ -405,36 +405,36 @@ bool PieceManager::check_piece_hash(uint32_t piece_index)
 	return ret;
 }
 
-int PieceManager::event_file_write(fs::write_event * we, PIECE_STATE & piece_state)
+int PieceManager::event_file_write(const fs::write_event & we, PIECE_STATE & piece_state)
 {
 	piece_state = PIECE_STATE_NOT_FIN;
 	uint32_t piece_index;
 	uint32_t block_index;
 	uint32_t block_length;
 	piece_state = PIECE_STATE_NOT_FIN;
-	get_piece_block_from_block_id(we->block_id, piece_index, block_index);
+	get_piece_block_from_block_id(we.block_id, piece_index, block_index);
 #ifdef BITTORRENT_DEBUG
 	//printf("event_file_write piece=%u block=%u writted=%d\n", piece_index, block_index, we->writted);
 #endif
-	if (we->writted == -1)
+	if (we.writted == -1)
 	{
-		m_downloadable_blocks.erase(we->block_id);
+		m_downloadable_blocks.erase(we.block_id);
 		return push_block2download(piece_index, block_index);
 	}
 
-	m_downloadable_blocks[we->block_id] += we->writted;
+	m_downloadable_blocks[we.block_id] += we.writted;
 
 	get_block_length_by_index(piece_index, block_index, block_length);
 
-	if (m_downloadable_blocks[we->block_id] > block_length)
+	if (m_downloadable_blocks[we.block_id] > block_length)
 	{
-		m_downloadable_blocks.erase(we->block_id);
+		m_downloadable_blocks.erase(we.block_id);
 		return push_block2download(piece_index, block_index);
 	}
 
-	if (m_downloadable_blocks[we->block_id] == block_length)
+	if (m_downloadable_blocks[we.block_id] == block_length)
 	{
-		m_downloadable_blocks.erase(we->block_id);
+		m_downloadable_blocks.erase(we.block_id);
 		m_piece_info[piece_index].downloaded_blocks.insert(block_index);
 		if (m_piece_info[piece_index].downloaded_blocks.size() == m_piece_info[piece_index].block_count)
 		{

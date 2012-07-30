@@ -275,7 +275,7 @@ public:
 	int get_block2download(uint32_t piece_index, uint32_t & block_index);
 	int get_block2download_count(uint32_t piece_index);
 	int push_block2download(uint32_t piece_index, uint32_t block_index);
-	int event_file_write(fs::write_event * we, PIECE_STATE & piece_state);
+	int event_file_write(const fs::write_event & we, PIECE_STATE & piece_state);
 
 };
 typedef boost::shared_ptr<PieceManager> PieceManagerPtr;
@@ -293,7 +293,7 @@ public:
 	int save_block(uint32_t piece, uint32_t block_offset, uint32_t block_length, char * block);
 	int read_block(uint32_t piece, uint32_t block_index, char * block, uint32_t & block_length);
 	int read_piece(uint32_t piece_index, unsigned char * dst);
-	int event_file_write(fs::write_event * eo);
+	int event_file_write(const fs::write_event & eo);
 	void ReleaseFiles();
 	~TorrentFile();
 	static void CreateTorrentFile(const TorrentInterfaceInternalPtr & t, const std::string & path, TorrentFilePtr & ptr)
@@ -363,7 +363,7 @@ protected:
 	virtual int continue_();
 	virtual int check();
 	virtual bool is_downloaded();
-	virtual int event_file_write(fs::write_event * we);
+	virtual int event_file_write(const fs::write_event & we);
 	virtual int clock();
 	virtual int get_info(torrent_info * info);
 	virtual int erase_state();
@@ -450,7 +450,7 @@ public:
 	int save_block(uint32_t piece, uint32_t block_offset, uint32_t block_length, char * block);
 	int read_block(uint32_t piece, uint32_t block_index, char * block, uint32_t & block_length);
 	int read_piece(uint32_t piece, unsigned char * dst);
-	virtual int event_file_write(fs::write_event * we) = 0;
+	virtual int event_file_write(const fs::write_event & we) = 0;
 	virtual void add_seeders(uint32_t count, sockaddr_in * addrs) = 0;
 };
 

@@ -497,10 +497,10 @@ int TorrentBase::clock()
 	return 0;
 }
 
-int TorrentBase::event_file_write(fs::write_event * we)
+int TorrentBase::event_file_write(const fs::write_event & we)
 {
 	PIECE_STATE piece_state;
-	uint32_t piece_index = we->block_id.first;
+	uint32_t piece_index = we.block_id.first;
 	m_piece_manager->event_file_write(we, piece_state);
 	if (piece_state == PIECE_STATE_FIN_HASH_OK)
 	{
