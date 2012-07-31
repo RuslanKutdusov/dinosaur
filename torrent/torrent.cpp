@@ -135,6 +135,7 @@ void TorrentBase::forced_releasing()
 	{
 		(*iter).second->forced_releasing();
 	}
+	m_trackers.clear();
 	m_seeders.clear();
 	m_active_seeders.clear();
 	m_waiting_seeders.clear();
