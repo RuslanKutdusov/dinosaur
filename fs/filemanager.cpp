@@ -150,24 +150,54 @@ int FileManager::prepare_file(File & file)
 
 int FileManager::File_write(File & file, const char * buf, uint32_t length, uint64_t offset, const BLOCK_ID & block_id)
 {
-	//printf("File_write id=%d\n", file);
+	#ifdef FS_DEBUG
+		printf("Write to file %s offset=%llu length=%u\n", file->m_fn,  offset, length);
+	#endif
 	pthread_mutex_lock(&m_mutex);
-	if (buf == NULL || length == 0 || file == NULL)
+	if (buf == NULL || file == NULL)
 	{
 		pthread_mutex_unlock(&m_mutex);
-		//printf("bad args\n");
+		#ifdef FS_DEBUG
+			printf("Fail: buf = NULL or file = NULL\n");
+		#endif
 		return ERR_BAD_ARG;
+	}
+	if (length == 0 && offset > 0)
+	{
+		pthread_mutex_unlock(&m_mutex);
+		#ifdef FS_DEBUG
+			printf("Fail: length = 0 and offset > 0\n");
+		#endif
+		return ERR_BAD_ARG;
+	}
+	if (length == 0)
+	{
+		prepare_file(file);
+		write_event we;
+		we.block_id = block_id;
+		we.file = file;
+		we.writted = 0;
+		m_write_event.push_back(we);
+		we.file.reset();
+		#ifdef FS_DEBUG
+			printf("OK\n");
+		#endif
+		pthread_mutex_unlock(&m_mutex);
+		return ERR_NO_ERROR;
 	}
 	if (offset >= file->m_length)
 	{
 		pthread_mutex_unlock(&m_mutex);
-		//printf("offset overflow\n");
+		#ifdef FS_DEBUG
+			printf("Fail: offset overflow\n");
+		#endif
 		return ERR_BAD_ARG;
 	}
 
 	int ret = m_write_cache.push(file, buf, length, offset, block_id);
-	//pthread_cond_signal(&m_cond);
-	//printf("ok\n");
+	#ifdef FS_DEBUG
+			printf("OK\n");
+	#endif
 	pthread_mutex_unlock(&m_mutex);
 	return ret;
 }
@@ -175,10 +205,20 @@ int FileManager::File_write(File & file, const char * buf, uint32_t length, uint
 int FileManager::File_read_immediately(File & file, char * buf, uint64_t offset, uint64_t length)
 {
 	pthread_mutex_lock(&m_mutex);
-	if (buf == NULL || length == 0|| file == NULL)
+	if (buf == NULL || file == NULL)
 	{
 		pthread_mutex_unlock(&m_mutex);
 		return ERR_BAD_ARG;
+	}
+	if (length == 0 && offset > 0)
+	{
+		pthread_mutex_unlock(&m_mutex);
+		return ERR_BAD_ARG;
+	}
+	if (length == 0)
+	{
+		pthread_mutex_unlock(&m_mutex);
+		return ERR_NO_ERROR;
 	}
 	if (offset >= file->m_length)
 	{

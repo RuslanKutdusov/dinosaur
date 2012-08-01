@@ -17,6 +17,11 @@ namespace torrent
 typedef unsigned char 		SHA1_HASH[SHA1_LENGTH];
 typedef char 				SHA1_HASH_HEX[SHA1_HEX_LENGTH];
 typedef unsigned char * 	BITFIELD;
+typedef int 				FILE_INDEX;
+typedef uint32_t 			BLOCK_INDEX;
+typedef uint32_t 			PIECE_INDEX;
+typedef uint32_t 			BLOCK_OFFSET;
+typedef uint64_t			FILE_OFFSET;
 
 enum PIECE_PRIORITY
 {

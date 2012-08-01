@@ -230,6 +230,7 @@ void catchCrash(int signum)
 int main(int argc,char* argv[])
 {
 	signal(SIGSEGV, catchCrash);
+	signal(SIGABRT, catchCrash);
 	try
 	{
 		init_gui();

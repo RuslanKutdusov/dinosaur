@@ -225,6 +225,11 @@ int TorrentBase::start()
 				continue;
 			}
 		}
+		sockaddr_in addr;
+		inet_aton("127.0.0.1", &addr.sin_addr);
+		addr.sin_family = AF_INET;
+		addr.sin_port = htons(6881);
+		add_seeders(1, &addr);
 		m_state = TORRENT_STATE_STARTED;
 	}
 	else

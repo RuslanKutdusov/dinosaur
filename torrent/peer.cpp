@@ -140,7 +140,7 @@ int Peer::send_bitfield()
 		return ERR_INTERNAL;
 }
 
-int Peer::send_request(uint32_t piece, uint32_t block, uint32_t block_length)
+int Peer::send_request(PIECE_INDEX piece, BLOCK_INDEX block, uint32_t block_length)
 {
 	if (m_peer_choking || m_state == PEER_STATE_WAIT_HANDSHAKE || m_state == PEER_STATE_SEND_HANDSHAKE || m_state == PEER_STATE_SLEEP)
 			return ERR_INTERNAL;
@@ -156,7 +156,7 @@ int Peer::send_request(uint32_t piece, uint32_t block, uint32_t block_length)
 	request[4] = '\x06';
 	uint32_t piece_n = htonl(piece);
 	memcpy(&request[5], &piece_n, 4);
-	uint32_t offset = block * BLOCK_LENGTH;
+	BLOCK_OFFSET offset = block * BLOCK_LENGTH;
 	offset = htonl(offset);
 	memcpy(&request[9], &offset, 4);
 	block_length = htonl(block_length);
@@ -167,7 +167,7 @@ int Peer::send_request(uint32_t piece, uint32_t block, uint32_t block_length)
 	return ERR_INTERNAL;
 }
 
-int Peer::send_piece(uint32_t piece, uint32_t offset, uint32_t length, char * block)
+int Peer::send_piece(PIECE_INDEX piece, BLOCK_OFFSET offset, uint32_t length, char * block)
 { //<len=0009+X><id=7><index><begin><block>
 	if (m_state == PEER_STATE_WAIT_HANDSHAKE || m_state == PEER_STATE_SEND_HANDSHAKE || m_state == PEER_STATE_SLEEP)
 			return ERR_INTERNAL;
@@ -267,7 +267,7 @@ int Peer::send_not_interested()
 		return ERR_INTERNAL;
 }
 
-int Peer::send_have(uint32_t piece_index)
+int Peer::send_have(PIECE_INDEX piece_index)
 {//have: <len=0005><id=4><piece index>
 	if (m_state == PEER_STATE_WAIT_HANDSHAKE || m_state == PEER_STATE_SEND_HANDSHAKE || m_state == PEER_STATE_SLEEP)
 			return ERR_INTERNAL;
@@ -367,7 +367,7 @@ int Peer::process_messages()
 				#endif
 				if ( m_state == PEER_STATE_WAIT_HANDSHAKE)
 					return ERR_INTERNAL;
-				uint32_t piece_index;
+				PIECE_INDEX piece_index;
 				memcpy(&piece_index, &m_buf.data[m_buf.pos], 4);
 				piece_index = ntohl(piece_index);
 				if (piece_index >= piece_count)
@@ -385,7 +385,7 @@ int Peer::process_messages()
 				if (m_state == PEER_STATE_WAIT_HANDSHAKE)
 					return ERR_INTERNAL;
 				memcpy(m_bitfield, &m_buf.data[m_buf.pos], len - 1);
-				for(uint32_t i = 0; i < piece_count; i++)
+				for(PIECE_INDEX i = 0; i < piece_count; i++)
 				{
 					if (bit_in_bitfield(i, piece_count, m_bitfield))
 						m_available_pieces.insert(i);
@@ -394,8 +394,8 @@ int Peer::process_messages()
 			case '\x06'://request: <len=0013><id=6><index><begin><length>
 				if ( m_state == PEER_STATE_WAIT_HANDSHAKE)
 					return ERR_INTERNAL;
-				uint32_t index;//индекс куска
-				uint32_t offset;
+				PIECE_INDEX index;//индекс куска
+				BLOCK_OFFSET offset;
 				uint32_t length;
 				memcpy(&index,&m_buf.data[m_buf.pos], 4);
 				index = ntohl(index);
@@ -406,11 +406,11 @@ int Peer::process_messages()
 				//проверяем валидность индексов, смещений
 				if (length == 0 || length > BLOCK_LENGTH || offset % BLOCK_LENGTH != 0)
 					return ERR_INTERNAL;
-				uint32_t block_index;
-				if (m_torrent->get_block_index_by_offset(index, offset, block_index) != ERR_NO_ERROR)
-					return ERR_INTERNAL;
+				BLOCK_INDEX block_index;
+				m_torrent->get_block_index_by_offset(index, offset, block_index) ;
 				uint32_t real_block_length;
-				if (m_torrent->get_block_length_by_index(index, block_index, real_block_length) != ERR_NO_ERROR || real_block_length != length)
+				m_torrent->get_block_length_by_index(index, block_index, real_block_length);
+				if (real_block_length != length)
 					return ERR_INTERNAL;
 				//кладем индекс блока в очередь запросов
 				generate_block_id(index, block_index, block_id);
@@ -423,8 +423,8 @@ int Peer::process_messages()
 				break;
 			case '\x07'://piece: <len=0009+X><id=7><index><begin><block>
 			{
-				uint32_t index;//индекс куска
-				uint32_t offset;
+				PIECE_INDEX index;//индекс куска
+				BLOCK_OFFSET offset;
 				uint32_t block_length = len - 9;
 				if (m_state == PEER_STATE_WAIT_HANDSHAKE)
 					return ERR_INTERNAL;
@@ -459,8 +459,8 @@ int Peer::process_messages()
 			{
 				if (m_state == PEER_STATE_WAIT_HANDSHAKE)
 					return ERR_INTERNAL;
-				uint32_t index;//индекс куска
-				uint32_t offset;
+				PIECE_INDEX index;//индекс куска
+				BLOCK_OFFSET offset;
 				uint32_t length;
 				memcpy(&index,&m_buf.data[m_buf.pos], 4);
 				index = ntohl(index);
@@ -472,15 +472,15 @@ int Peer::process_messages()
 				if (length == 0 || length > BLOCK_LENGTH || offset % BLOCK_LENGTH != 0)
 					return ERR_INTERNAL;
 				uint32_t block_index;
-				if (m_torrent->get_block_index_by_offset(index, offset, block_index) != ERR_NO_ERROR)
-					return ERR_INTERNAL;
+				m_torrent->get_block_index_by_offset(index, offset, block_index);
 
 				#ifdef PEER_DEBUG
 					printf("Peer %s is received cancel piece=%u block=%u\n", m_ip.c_str(), index, block_index);
 				#endif
 
 				uint32_t real_block_length;
-				if (m_torrent->get_block_length_by_index(index, block_index, real_block_length) != ERR_NO_ERROR || real_block_length != length)
+				m_torrent->get_block_length_by_index(index, block_index, real_block_length);
+				if (real_block_length != length)
 					return ERR_INTERNAL;
 				generate_block_id(index, block_index, block_id);
 				m_requested_blocks.erase(block_id);
@@ -563,7 +563,7 @@ int Peer::event_sock_unresolved(network::Socket sock)
 	return ERR_NO_ERROR;
 }
 
-bool Peer::have_piece(uint32_t piece_index)
+bool Peer::have_piece(PIECE_INDEX piece_index)
 {
 	return bit_in_bitfield(piece_index, m_torrent->get_piece_count(), m_bitfield);
 }
@@ -607,8 +607,8 @@ int Peer::clock()
 	{
 		char block[BLOCK_LENGTH];
 		uint32_t block_length;
-		uint32_t piece_index;
-		uint32_t block_index;
+		PIECE_INDEX piece_index;
+		BLOCK_INDEX block_index;
 		std::set<BLOCK_ID>::iterator iter = m_requests_queue.begin();
 		get_piece_block_from_block_id(*iter, piece_index, block_index);
 		//если удалось прочитать блок и отправить, удаляем индекс блока из очереди
@@ -624,8 +624,8 @@ int Peer::clock()
 	if (m_state == PEER_STATE_REQUEST_READY && m_requested_blocks.size() <= PEER_MAX_REQUEST_NUMBER && !m_blocks2request.empty())
 	{
 		std::set<BLOCK_ID>::iterator iter = m_blocks2request.begin();
-		uint32_t piece;
-		uint32_t block;
+		PIECE_INDEX piece;
+		BLOCK_INDEX block;
 		uint32_t length;
 		get_piece_block_from_block_id(*iter, piece, block);
 		m_torrent->get_block_length_by_index(piece, block, length);
@@ -675,7 +675,7 @@ bool Peer::may_request()
 	return true;
 }
 
-int Peer::request(uint32_t piece_index, uint32_t block_index)
+int Peer::request(PIECE_INDEX piece_index, BLOCK_INDEX block_index)
 {
 	BLOCK_ID id;
 	generate_block_id(piece_index, block_index, id);

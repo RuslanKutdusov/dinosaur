@@ -27,7 +27,7 @@ file::file(const char * fn, uint64_t length, bool fictive, const FileAssociation
 #ifdef BITTORRENT_DEBUG
 	printf("file constructor fn=%s length=%llu\n", fn, length);
 #endif
-	if (fn == NULL || length == 0)
+	if (fn == NULL)
 		throw Exception("Can not create file");
 	int fn_str_len = strlen(fn);
 	m_fn = new char[fn_str_len + 1];
@@ -56,7 +56,9 @@ file::~file()
 
 int file::_open()
 {
-	//printf("opening file id=%d\n", m_id);
+#ifdef FS_DEBUG
+	printf("Opening file %s\n", m_fn);
+#endif
 	bool _new = false;
 	struct stat st;
 	//если файла нет, говорим что новый
@@ -64,10 +66,12 @@ int file::_open()
 		_new = true;
 	if (!_new)
 	{
-		//printf("file is not new, opening\n");
 		m_fd = open(m_fn, O_RDWR | O_LARGEFILE);
 		if (m_fd == -1)
 		{
+			#ifdef FS_DEBUG
+				printf("Fail: %s\n", sys_errlist[errno]);
+			#endif
 			return ERR_SYSCALL_ERROR;
 		}
 	}
@@ -75,43 +79,61 @@ int file::_open()
 	//если файл новый, то транкаем его
 	if (_new)
 	{
-		//printf("file is new, creating and opening\n");
 		m_fd = open(m_fn, O_RDWR | O_CREAT | O_LARGEFILE, S_IRWXU | S_IRWXG | S_IRWXO);
 		if (m_fd == -1)
 		{
+			#ifdef FS_DEBUG
+				printf("Fail: %s\n", sys_errlist[errno]);
+			#endif
 			return ERR_SYSCALL_ERROR;
 		}
 		//printf("truncating\n");
 		if (ftruncate64(m_fd, m_length) == -1)
 		{
+			#ifdef FS_DEBUG
+				printf("Fail: %s\n", sys_errlist[errno]);
+			#endif
 			return ERR_SYSCALL_ERROR;
 		}
 	}
-	//printf("ok\n");
+	#ifdef FS_DEBUG
+		printf("OK\n");
+	#endif
 	return ERR_NO_ERROR;
 }
 
 int file::_write(const char * buf, uint64_t offset, uint64_t length)
 {
-	//pFile = fopen ( m_files[file_index++].name , "r+"
+	#ifdef FS_DEBUG
+		printf("Writing to file %s offset=%llu length=%llu\n", m_fn,  offset, length);
+	#endif
 	int ret;
 	if (!is_opened())
+	{
+		#ifdef FS_DEBUG
+			printf("Fail: File is not opened\n");
+		#endif
 		return ERR_FILE_NOT_OPENED;
-	//printf("write id=%d %llu %llu\n", m_id, offset, length);
+	}
 	ret = lseek64 ( m_fd , offset , SEEK_SET );
 	if (ret == -1)
 	{
-		//_close();
-		//printf("lseek error\n");
+		#ifdef FS_DEBUG
+			printf("Fail: %s\n", sys_errlist[errno]);
+		#endif
 		return ERR_SYSCALL_ERROR;
 	}
 	ret = write(m_fd, buf, length);
 	if (ret == -1)
 	{
-		//_close();
+		#ifdef FS_DEBUG
+			printf("Fail: %s\n", sys_errlist[errno]);
+		#endif
 		return ERR_SYSCALL_ERROR;
 	}
-	//_close();
+	#ifdef FS_DEBUG
+		printf("OK\n");
+	#endif
 	return ret;
 }
 

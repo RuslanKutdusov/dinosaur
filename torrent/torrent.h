@@ -154,7 +154,7 @@ private:
 	std::string 					m_ip;
 	uint64_t 						m_downloaded;
 	uint64_t 						m_uploaded;
-	std::set<uint32_t> 				m_available_pieces;
+	std::set<PIECE_INDEX>			m_available_pieces;
 	bool 							m_peer_choking;//пир нас заблокирован
 	bool 							m_peer_interested;//пир в нас заинтересован
 	bool 							m_am_choking;//я блокирую пира
@@ -177,22 +177,22 @@ public:
 	int event_sock_accepted(network::Socket sock, network::Socket accepted_sock);
 	int event_sock_timeout(network::Socket sock);
 	int event_sock_unresolved(network::Socket sock);
-	int send_have(uint32_t piece_index);
+	int send_have(PIECE_INDEX piece_index);
 	int send_handshake();
 	int send_bitfield();
 	int send_choke();
 	int send_unchoke();
 	int send_interested();
 	int send_not_interested();
-	int send_request(uint32_t piece, uint32_t block, uint32_t block_length);
-	int send_piece(uint32_t piece, uint32_t offset, uint32_t length,  char * block);
-	bool have_piece(uint32_t piece_index);
+	int send_request(PIECE_INDEX piece, BLOCK_INDEX block, uint32_t block_length);
+	int send_piece(PIECE_INDEX piece, BLOCK_OFFSET offset, uint32_t length,  char * block);
+	bool have_piece(PIECE_INDEX piece_index);
 	bool is_choking();
 	int clock();
 	void goto_sleep();
 	bool is_sleep();
 	bool may_request();
-	int request(uint32_t piece_index, uint32_t block_index);
+	int request(PIECE_INDEX piece_index, BLOCK_INDEX block_index);
 	int request(const BLOCK_ID & block_id);
 	bool get_requested_block(BLOCK_ID & block_id);
 	double get_rx_speed();
@@ -223,16 +223,17 @@ private:
 	typedef std::list<uint32_t>::iterator uint32_list_iter;
 	struct piece_info
 	{
-		int 							file_index;//индекс файла, в котором начинается кусок
-		uint32_t 						length;//его длина
-		uint64_t 						offset;//смещение внутри файла до начала куска
-		uint32_t 						block_count;//кол-во блоков в куске
-		std::set<std::string>			taken_from;
-		std::set<uint32_t>	 			block2download;
-		std::set<uint32_t>				downloaded_blocks;
-		SHA1_HASH						hash;
-		PIECE_PRIORITY					prio;
-		uint32_list_iter				prio_iter;
+		FILE_INDEX 											file_index;//индекс файла, в котором начинается кусок
+		uint32_t 											length;//его длина
+		FILE_OFFSET 										offset;//смещение внутри файла до начала куска
+		uint32_t 											block_count;//кол-во блоков в куске
+		std::vector<std::pair<FILE_INDEX, FILE_OFFSET> >	block_info;
+		std::set<std::string>								taken_from;
+		std::set<BLOCK_INDEX>	 							block2download;
+		std::set<BLOCK_INDEX>								downloaded_blocks;
+		SHA1_HASH											hash;
+		PIECE_PRIORITY										prio;
+		uint32_list_iter									prio_iter;
 	};
 	struct download_queue
 	{
@@ -256,25 +257,26 @@ public:
 	PieceManager(const TorrentInterfaceInternalPtr & torrent, BITFIELD bitfield);
 	void reset();
 	~PieceManager();
-	int get_blocks_count_in_piece(uint32_t piece_index, uint32_t & blocks_count);
-	int get_piece_length(uint32_t piece_index, uint32_t & piece_length);
-	int get_block_index_by_offset(uint32_t piece_index, uint32_t block_offset, uint32_t & index);
-	int get_block_length_by_index(uint32_t piece_index, uint32_t block_index, uint32_t & block_length);
-	int get_piece_offset(uint32_t piece_index, uint64_t & offset);
-	int get_file_index_by_piece(uint32_t piece_index, int & index);
+	void get_blocks_count_in_piece(PIECE_INDEX piece_index, uint32_t & blocks_count);
+	void get_piece_length(PIECE_INDEX piece_index, uint32_t & piece_length);
+	void get_block_index_by_offset(PIECE_INDEX piece_index, BLOCK_OFFSET block_offset, BLOCK_INDEX & index);
+	void get_block_length_by_index(PIECE_INDEX piece_index, BLOCK_INDEX block_index, uint32_t & block_length);
+	void get_piece_offset(PIECE_INDEX piece_index, FILE_OFFSET & offset);
+	void get_block_info(PIECE_INDEX piece_index, BLOCK_INDEX block_index, FILE_INDEX & file_index, FILE_OFFSET & file_offset);
+	void get_file_index_by_piece(PIECE_INDEX piece_index, FILE_INDEX & index);
 	size_t get_bitfield_length();
 	void copy_bitfield(BITFIELD dst);
-	bool check_piece_hash(uint32_t piece_index);
-	int front_piece2download(uint32_t & piece_index);
+	bool check_piece_hash(PIECE_INDEX piece_index);
+	int front_piece2download(PIECE_INDEX & piece_index);
 	void pop_piece2download();
-	int set_piece_taken_from(uint32_t piece_index, const std::string & seed);
-	bool get_piece_taken_from(uint32_t piece_index, std::string & seed);
-	int clear_piece_taken_from(uint32_t piece_index);
-	int set_piece_priority(uint32_t piece_index, PIECE_PRIORITY priority);
-	int get_piece_priority(uint32_t piece_index, PIECE_PRIORITY & priority);
-	int get_block2download(uint32_t piece_index, uint32_t & block_index);
-	int get_block2download_count(uint32_t piece_index);
-	int push_block2download(uint32_t piece_index, uint32_t block_index);
+	int set_piece_taken_from(PIECE_INDEX piece_index, const std::string & seed);
+	bool get_piece_taken_from(PIECE_INDEX piece_index, std::string & seed);
+	int clear_piece_taken_from(PIECE_INDEX piece_index);
+	int set_piece_priority(PIECE_INDEX piece_index, PIECE_PRIORITY priority);
+	int get_piece_priority(PIECE_INDEX piece_index, PIECE_PRIORITY & priority);
+	int get_block2download(PIECE_INDEX piece_index, BLOCK_INDEX & block_index);
+	int get_block2download_count(PIECE_INDEX piece_index);
+	int push_block2download(PIECE_INDEX piece_index, BLOCK_INDEX block_index);
 	int event_file_write(const fs::write_event & we, PIECE_STATE & piece_state);
 
 };
@@ -290,9 +292,9 @@ private:
 	TorrentFile(const TorrentInterfaceInternalPtr & t);
 	void init(const std::string & path);
 public:
-	int save_block(uint32_t piece, uint32_t block_offset, uint32_t block_length, char * block);
-	int read_block(uint32_t piece, uint32_t block_index, char * block, uint32_t & block_length);
-	int read_piece(uint32_t piece_index, unsigned char * dst);
+	int save_block(PIECE_INDEX piece, BLOCK_OFFSET block_offset, uint32_t block_length, char * block);
+	int read_block(PIECE_INDEX piece, BLOCK_INDEX block_index, char * block, uint32_t & block_length);
+	int read_piece(PIECE_INDEX piece_index, unsigned char * dst);
 	int event_file_write(const fs::write_event & eo);
 	void ReleaseFiles();
 	~TorrentFile();
@@ -433,23 +435,24 @@ public:
 	uint64_t get_uploaded();
 	size_t get_bitfield_length();
 	dir_tree::DirTree * get_dirtree();
-	base_file_info * get_file_info(uint32_t file_index);
-	int get_blocks_count_in_piece(uint32_t piece, uint32_t & blocks_count);
-	int get_piece_length(uint32_t piece, uint32_t & piece_length);
-	int get_block_index_by_offset(uint32_t piece_index, uint32_t block_offset, uint32_t & index);
-	int get_block_length_by_index(uint32_t piece_index, uint32_t block_index, uint32_t & block_length);
-	int get_piece_offset(uint32_t piece_index, uint64_t & offset);
-	int get_file_index_by_piece(uint32_t piece_index, int & index);
+	base_file_info * get_file_info(FILE_INDEX file_index);
+	void get_blocks_count_in_piece(PIECE_INDEX piece, uint32_t & blocks_count);
+	void get_piece_length(PIECE_INDEX piece, uint32_t & piece_length);
+	void get_block_index_by_offset(PIECE_INDEX piece_index, BLOCK_OFFSET block_offset, BLOCK_INDEX & index);
+	void get_block_length_by_index(PIECE_INDEX piece_index, BLOCK_INDEX block_index, uint32_t & block_length);
+	void get_piece_offset(PIECE_INDEX piece_index, FILE_OFFSET & offset);
+	void get_block_info(PIECE_INDEX piece_index, BLOCK_INDEX block_index, FILE_INDEX & file_index, FILE_OFFSET & file_offset);
+	void get_file_index_by_piece(PIECE_INDEX piece_index, FILE_INDEX & index);
 	void copy_infohash_bin(SHA1_HASH dst);
 	int memcmp_infohash_bin(SHA1_HASH mem);
 	void copy_bitfield(BITFIELD dst);
 	void inc_uploaded(uint32_t bytes_num);
 	void inc_downloaded(uint32_t bytes_num);
 	void set_error(std::string err);
-	void copy_piece_hash(SHA1_HASH dst, uint32_t piece_index);
-	int save_block(uint32_t piece, uint32_t block_offset, uint32_t block_length, char * block);
-	int read_block(uint32_t piece, uint32_t block_index, char * block, uint32_t & block_length);
-	int read_piece(uint32_t piece, unsigned char * dst);
+	void copy_piece_hash(SHA1_HASH dst, PIECE_INDEX piece_index);
+	int save_block(PIECE_INDEX piece, BLOCK_OFFSET block_offset, uint32_t block_length, char * block);
+	int read_block(PIECE_INDEX piece, BLOCK_INDEX block_index, char * block, uint32_t & block_length);
+	int read_piece(PIECE_INDEX piece, unsigned char * dst);
 	virtual int event_file_write(const fs::write_event & we) = 0;
 	virtual void add_seeders(uint32_t count, sockaddr_in * addrs) = 0;
 };
