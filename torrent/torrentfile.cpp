@@ -34,9 +34,7 @@ void TorrentFile::init(const std::string & path)
 
 	if (files_count > 1)
 	{
-		if (m_torrent->get_dirtree() == NULL)
-			throw Exception(GENERAL_ERROR_UNDEF_ERROR);
-		m_torrent->get_dirtree()->make_dir_tree(i_path);
+		m_torrent->get_dirtree().make_dir_tree(i_path);
 		i_path.append(m_torrent->get_name() + "/");
 	}
 	for(uint32_t i = 0; i < files_count; i++)
@@ -46,7 +44,7 @@ void TorrentFile::init(const std::string & path)
 		f.length = fi->length;
 		f.name = i_path + fi->name;
 		f.download = true;
-		f.priority = FILE_PRIORITY_NORMAL;
+		f.priority = DOWNLOAD_PRIORITY_NORMAL;
 		m_fm->File_add(f.name, f.length, false, shared_from_this(), f.file_);
 		m_files.push_back(f);
 	}
@@ -136,13 +134,11 @@ int TorrentFile::read_piece(PIECE_INDEX piece_index, unsigned char * dst)
 	FILE_OFFSET offset;
 	FILE_INDEX file_index;
 	uint32_t piece_length;
-	uint32_t to_read;
 	uint32_t pos = 0;
 
 	m_torrent->get_piece_offset(piece_index, offset);
 	m_torrent->get_file_index_by_piece(piece_index, file_index);
 	m_torrent->get_piece_length(piece_index, piece_length);
-	to_read = piece_length;
 
 
 	while(pos < piece_length)
@@ -157,18 +153,6 @@ int TorrentFile::read_piece(PIECE_INDEX piece_index, unsigned char * dst)
 		pos += to_read;
 		offset = 0;
 	}
-
-	/*while(pos < piece_length)
-	{
-		int r = m_fm->File_read_immediately(m_files[file_index++].file_, (char*)&dst[pos], offset, to_read);
-		if (r < 0)
-		{
-			return ERR_INTERNAL;
-		}
-		pos += r;
-		to_read -= r;
-		offset = 0;
-	}*/
 	return ERR_NO_ERROR;
 }
 

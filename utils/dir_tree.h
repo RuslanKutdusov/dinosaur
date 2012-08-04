@@ -50,7 +50,7 @@ public:
 	int reset();
 	int put(const std::string & dir);
 	int put(const char * dir);
-	int make_dir_tree(std::string  current_dir);
+	int make_dir_tree(std::string current_dir);
 	~DirTree();
 };
 

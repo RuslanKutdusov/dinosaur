@@ -253,7 +253,8 @@ void FileManager::File_delete(File & file)
 	pthread_mutex_lock(&m_mutex);
 	m_files.erase(file);
 	m_fd_cache.remove(file);
-	file->m_instance2delete = true;
+	if (file != NULL)
+		file->m_instance2delete = true;
 	file.reset();
 	pthread_mutex_unlock(&m_mutex);
 }

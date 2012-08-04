@@ -435,13 +435,13 @@ public:
 	block_cache::Block_cache * get_bc();
 	uint32_t get_piece_count();
 	uint32_t get_piece_length();
-	int get_files_count();
+	size_t get_files_count();
 	uint64_t get_length();
 	std::string get_name();
 	uint64_t get_downloaded();
 	uint64_t get_uploaded();
 	size_t get_bitfield_length();
-	dir_tree::DirTree * get_dirtree();
+	dir_tree::DirTree & get_dirtree();
 	base_file_info * get_file_info(FILE_INDEX file_index);
 	void get_blocks_count_in_piece(PIECE_INDEX piece, uint32_t & blocks_count);
 	void get_piece_length(PIECE_INDEX piece, uint32_t & piece_length);

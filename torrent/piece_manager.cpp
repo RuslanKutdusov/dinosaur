@@ -79,7 +79,7 @@ void PieceManager::build_piece_info()
 {
 	uint32_t piece_length_ = m_torrent->get_piece_length();
 	uint64_t length = m_torrent->get_length();
-	int file_count = m_torrent->get_files_count();
+	size_t file_count = m_torrent->get_files_count();
 	uint32_t piece_count = m_torrent->get_piece_count();
 	m_piece_info.resize(piece_count);
 	FILE_INDEX file_index = 0;
@@ -99,9 +99,10 @@ void PieceManager::build_piece_info()
 
 		for(FILE_INDEX f = file_iter2; f < file_count; f++)
 		{
-			if (m_file_contains_pieces.size() <= (size_t)f)
+			if (m_file_contains_pieces.size() <= f)
 				m_file_contains_pieces.resize(f + 1);
 			m_file_contains_pieces[f].insert(piece_index);
+
 			base_file_info * finfo = m_torrent->get_file_info(f);
 			last_file_length2 += finfo->length;
 			if (last_file_length2 >= end_of_piece)
@@ -222,7 +223,7 @@ void PieceManager::get_block_info(PIECE_INDEX piece_index, BLOCK_INDEX block_ind
 	file_offset = m_piece_info[piece_index].block_info[block_index].second;
 }
 
-void PieceManager::get_file_index_by_piece(PIECE_INDEX piece_index, int & index)
+void PieceManager::get_file_index_by_piece(PIECE_INDEX piece_index, FILE_INDEX & index)
 {
 	index = m_piece_info[piece_index].file_index;
 }

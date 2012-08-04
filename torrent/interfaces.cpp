@@ -43,7 +43,7 @@ uint32_t TorrentInterfaceInternal::get_piece_length()
 }
 
 
-int TorrentInterfaceInternal::get_files_count()
+size_t TorrentInterfaceInternal::get_files_count()
 {
 	return m_metafile.files.size();
 }
@@ -78,9 +78,9 @@ base_file_info * TorrentInterfaceInternal::get_file_info(FILE_INDEX file_index)
 	return file_index >= (FILE_INDEX)m_metafile.files.size() ? NULL : &m_metafile.files[file_index];
 }
 
-dir_tree::DirTree * TorrentInterfaceInternal::get_dirtree()
+dir_tree::DirTree & TorrentInterfaceInternal::get_dirtree()
 {
-	return &m_metafile.dir_tree;
+	return m_metafile.dir_tree;
 }
 
 void TorrentInterfaceInternal::get_blocks_count_in_piece(uint32_t piece, uint32_t & blocks_count)
@@ -113,7 +113,7 @@ void TorrentInterfaceInternal::get_block_info(PIECE_INDEX piece_index, BLOCK_IND
 	 m_piece_manager->get_block_info(piece_index, block_index, file_index, file_offset);
 }
 
-void TorrentInterfaceInternal::get_file_index_by_piece(uint32_t piece_index, int & index)
+void TorrentInterfaceInternal::get_file_index_by_piece(uint32_t piece_index, FILE_INDEX & index)
 {
 	m_piece_manager->get_file_index_by_piece(piece_index, index);
 }
