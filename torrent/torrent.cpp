@@ -376,7 +376,7 @@ int TorrentBase::clock()
 	if (m_state == TORRENT_STATE_STARTED)
 	{
 		if (m_active_seeders.size() < m_g_cfg->get_max_active_seeders() &&
-				m_waiting_seeders.size() > 0)
+				m_waiting_seeders.size() > 0 && !is_downloaded())
 		{
 			PeerPtr seed = m_waiting_seeders.front();
 			m_waiting_seeders.pop_front();
@@ -518,6 +518,7 @@ int TorrentBase::event_file_write(const fs::write_event & we)
 		delete[] bitfield;
 		m_piece_manager->clear_piece_taken_from(piece_index);
 		m_work = m_downloaded == m_metafile.length ? TORRENT_UPLOADING : TORRENT_DOWNLOADING;
+		m_have_list.push_back(piece_index);
 		return ERR_NO_ERROR;
 	}
 	if (piece_state == PIECE_STATE_FIN_HASH_BAD)
@@ -594,4 +595,22 @@ int TorrentBase::erase_state()
 	return ERR_NO_ERROR;
 }
 
+int TorrentBase::set_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY prio)
+{
+	if (file >= m_metafile.files.size())
+		return ERR_BAD_ARG;
+
+	DOWNLOAD_PRIORITY old_prio;
+	m_torrent_file->get_file_priority(file, old_prio);
+
+	m_torrent_file->set_file_priority(file, prio);
+	if (m_piece_manager->set_file_priority(file, prio) != ERR_NO_ERROR)
+	{
+		m_torrent_file->set_file_priority(file, old_prio);
+		return ERR_INTERNAL;
+	}
+
+
+	return ERR_NO_ERROR;
+}
 } /* namespace TorrentNamespace */

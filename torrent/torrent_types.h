@@ -23,11 +23,11 @@ typedef uint32_t 			PIECE_INDEX;
 typedef uint32_t 			BLOCK_OFFSET;
 typedef uint64_t			FILE_OFFSET;
 
-enum PIECE_PRIORITY
+enum DOWNLOAD_PRIORITY
 {
-	PIECE_PRIORITY_LOW,
-	PIECE_PRIORITY_NORMAL,
-	PIECE_PRIORITY_HIGH
+	DOWNLOAD_PRIORITY_LOW,
+	DOWNLOAD_PRIORITY_NORMAL,
+	DOWNLOAD_PRIORITY_HIGH
 };
 
 enum PIECE_STATE
@@ -73,10 +73,11 @@ public:
 
 struct file
 {
-	uint64_t 		length;
-	std::string		name;
-	bool 			download;
-	fs::File 		file_;
+	uint64_t 			length;
+	std::string			name;
+	bool 				download;
+	fs::File 			file_;
+	DOWNLOAD_PRIORITY	priority;
 };
 
 struct base_file_info

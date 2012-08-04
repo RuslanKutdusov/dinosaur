@@ -12,6 +12,7 @@
 #include <set>
 #include <map>
 #include <vector>
+#include <deque>
 #include <list>
 #include <fstream>
 #include <sys/stat.h>
@@ -232,7 +233,7 @@ private:
 		std::set<BLOCK_INDEX>	 							block2download;
 		std::set<BLOCK_INDEX>								downloaded_blocks;
 		SHA1_HASH											hash;
-		PIECE_PRIORITY										prio;
+		DOWNLOAD_PRIORITY										prio;
 		uint32_list_iter									prio_iter;
 	};
 	struct download_queue
@@ -251,6 +252,7 @@ private:
 	uint32_list							m_tag_list;//хранит один элемент, на который будут ссылатся prio_iter у загруженных кусков
 	std::map<BLOCK_ID, uint32_t>		m_downloadable_blocks;
 	unsigned char *						m_piece_for_check_hash;
+	std::deque<std::set<PIECE_INDEX> >  m_file_contains_pieces;
 	void build_piece_info();
 	int push_piece2download(uint32_t piece_index);
 public:
@@ -272,8 +274,9 @@ public:
 	int set_piece_taken_from(PIECE_INDEX piece_index, const std::string & seed);
 	bool get_piece_taken_from(PIECE_INDEX piece_index, std::string & seed);
 	int clear_piece_taken_from(PIECE_INDEX piece_index);
-	int set_piece_priority(PIECE_INDEX piece_index, PIECE_PRIORITY priority);
-	int get_piece_priority(PIECE_INDEX piece_index, PIECE_PRIORITY & priority);
+	int set_piece_priority(PIECE_INDEX piece_index, DOWNLOAD_PRIORITY priority);
+	int get_piece_priority(PIECE_INDEX piece_index, DOWNLOAD_PRIORITY & priority);
+	int set_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY prio);
 	int get_block2download(PIECE_INDEX piece_index, BLOCK_INDEX & block_index);
 	int get_block2download_count(PIECE_INDEX piece_index);
 	int push_block2download(PIECE_INDEX piece_index, BLOCK_INDEX block_index);
@@ -296,6 +299,8 @@ public:
 	int read_block(PIECE_INDEX piece, BLOCK_INDEX block_index, char * block, uint32_t & block_length);
 	int read_piece(PIECE_INDEX piece_index, unsigned char * dst);
 	int event_file_write(const fs::write_event & eo);
+	void set_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY prio);
+	void get_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY  & prio);
 	void ReleaseFiles();
 	~TorrentFile();
 	static void CreateTorrentFile(const TorrentInterfaceInternalPtr & t, const std::string & path, TorrentFilePtr & ptr)
@@ -371,6 +376,7 @@ protected:
 	virtual int erase_state();
 	virtual void prepare2release();
 	virtual void forced_releasing();
+	virtual int set_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY prio);
 	TorrentBase(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc);
 	void init(const Metafile & metafile, const std::string & work_directory, const std::string & download_directory);
 	static void CreateTorrent(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc,
@@ -417,6 +423,7 @@ public:
 	virtual int erase_state() = 0;
 	virtual void prepare2release() = 0;
 	virtual void forced_releasing() = 0;
+	virtual int set_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY prio) = 0;
 };
 
 class TorrentInterfaceInternal : public TorrentBase

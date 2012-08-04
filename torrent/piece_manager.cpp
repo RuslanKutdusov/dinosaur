@@ -57,7 +57,7 @@ void PieceManager::reset()
 	uint32_t piece_count = m_torrent->get_piece_count();
 	for (uint32_t i = 0; i < piece_count; i++)
 	{
-		//m_piece_info[i].prio = PIECE_PRIORITY_NORMAL;
+		//m_piece_info[i].prio = DOWNLOAD_PRIORITY_NORMAL;
 
 		//m_download_queue.normal_prio_pieces.push_back(i);
 		//m_piece_info[i].prio_iter = --m_download_queue.normal_prio_pieces.end();
@@ -85,21 +85,41 @@ void PieceManager::build_piece_info()
 	FILE_INDEX file_index = 0;
 	FILE_INDEX file_iter = 0;
 	uint64_t last_files_length = 0;
+	FILE_INDEX file_iter2 = 0;
+	uint64_t last_file_length2 = 0;
 	for (PIECE_INDEX piece_index = 0; piece_index < piece_count; piece_index++)
 	{
 		FILE_OFFSET offset = piece_index * piece_length_;//смещение до начала куска
 		uint32_t piece_length = (piece_index == piece_count - 1) ? length - piece_length_ * piece_index : piece_length_; //размер последнего куска может быть меньше m_piece_length
+		FILE_OFFSET end_of_piece = offset + piece_length;
 
 		m_piece_info[piece_index].block_count = (uint32_t)ceil((double)piece_length / (double)BLOCK_LENGTH);
 		bool need2download = (!bit_in_bitfield(piece_index, piece_count, m_bitfield));
 
 
+		for(FILE_INDEX f = file_iter2; f < file_count; f++)
+		{
+			if (m_file_contains_pieces.size() <= (size_t)f)
+				m_file_contains_pieces.resize(f + 1);
+			m_file_contains_pieces[f].insert(piece_index);
+			base_file_info * finfo = m_torrent->get_file_info(f);
+			last_file_length2 += finfo->length;
+			if (last_file_length2 >= end_of_piece)
+			{
+				file_iter2 = f + 1;
+				if (last_file_length2 > end_of_piece)
+					m_file_contains_pieces[f].insert(piece_index + 1);
+				break;
+			}
+		}
+
 		for(BLOCK_INDEX block = 0; block < m_piece_info[piece_index].block_count; block++)
 		{
-			if (last_files_length <= offset || last_files_length == 0)
+			if (last_files_length <= offset)
 			{
 				for(FILE_INDEX j = file_iter; j < file_count; j++)
 				{
+
 					base_file_info * finfo = m_torrent->get_file_info(j);
 					last_files_length += finfo->length;//считает размер файлов, когда он станет больше смещения => кусок начинается в j-ом файле
 					if (last_files_length >= offset)
@@ -110,6 +130,7 @@ void PieceManager::build_piece_info()
 					}
 				}
 			}
+
 
 			base_file_info * finfo = m_torrent->get_file_info(file_index);
 			uint64_t file_offset = last_files_length - finfo->length;//смещение до file_index файла
@@ -135,7 +156,7 @@ void PieceManager::build_piece_info()
 
 		m_piece_info[piece_index].length = piece_length;
 		m_torrent->copy_piece_hash(m_piece_info[piece_index].hash, piece_index);
-		m_piece_info[piece_index].prio = PIECE_PRIORITY_NORMAL;
+		m_piece_info[piece_index].prio = DOWNLOAD_PRIORITY_NORMAL;
 
 		if (need2download)
 		{
@@ -147,8 +168,16 @@ void PieceManager::build_piece_info()
 			m_torrent->inc_downloaded(piece_length);
 			m_piece_info[piece_index].prio_iter = m_tag_list.begin();
 		}
-
 	}
+#ifdef BITTORRENT_DEBUG
+	for(size_t i = 0; i < m_file_contains_pieces.size(); i++)
+	{
+		printf("File %u contains: ", i);
+		for(std::set<PIECE_INDEX>::iterator iter = m_file_contains_pieces[i].begin(); iter != m_file_contains_pieces[i].end(); ++iter)
+			printf("%u", *iter);
+		printf("\n");
+	}
+#endif
 }
 
 void PieceManager::get_blocks_count_in_piece(PIECE_INDEX piece_index, uint32_t & blocks_count)
@@ -255,15 +284,15 @@ int PieceManager::push_piece2download(PIECE_INDEX piece_index)
 
 	switch(m_piece_info[piece_index].prio)
 	{
-	case(PIECE_PRIORITY_LOW):
+	case(DOWNLOAD_PRIORITY_LOW):
 			m_download_queue.low_prio_pieces.push_back(piece_index);
 			m_piece_info[piece_index].prio_iter = --m_download_queue.low_prio_pieces.end();
 			break;
-	case(PIECE_PRIORITY_NORMAL):
+	case(DOWNLOAD_PRIORITY_NORMAL):
 			m_download_queue.normal_prio_pieces.push_back(piece_index);
 			m_piece_info[piece_index].prio_iter = --m_download_queue.normal_prio_pieces.end();
 			break;
-	case(PIECE_PRIORITY_HIGH):
+	case(DOWNLOAD_PRIORITY_HIGH):
 			m_download_queue.high_prio_pieces.push_back(piece_index);
 			m_piece_info[piece_index].prio_iter = --m_download_queue.high_prio_pieces.end();
 			break;
@@ -298,9 +327,9 @@ int PieceManager::clear_piece_taken_from(PIECE_INDEX piece_index)
 	return ERR_NO_ERROR;
 }
 
-int PieceManager::set_piece_priority(PIECE_INDEX piece_index, PIECE_PRIORITY priority)
+int PieceManager::set_piece_priority(PIECE_INDEX piece_index, DOWNLOAD_PRIORITY priority)
 {
-	if (priority != PIECE_PRIORITY_LOW && priority != PIECE_PRIORITY_NORMAL && priority != PIECE_PRIORITY_HIGH)
+	if (priority != DOWNLOAD_PRIORITY_LOW && priority != DOWNLOAD_PRIORITY_NORMAL && priority != DOWNLOAD_PRIORITY_HIGH)
 		return ERR_BAD_ARG;
 	if (m_piece_info[piece_index].prio_iter == m_tag_list.begin())
 		return ERR_EMPTY_QUEUE;
@@ -309,13 +338,13 @@ int PieceManager::set_piece_priority(PIECE_INDEX piece_index, PIECE_PRIORITY pri
 
 	switch(m_piece_info[piece_index].prio)
 	{
-	case(PIECE_PRIORITY_LOW):
+	case(DOWNLOAD_PRIORITY_LOW):
 			m_download_queue.low_prio_pieces.erase(m_piece_info[piece_index].prio_iter);
 			break;
-	case(PIECE_PRIORITY_NORMAL):
+	case(DOWNLOAD_PRIORITY_NORMAL):
 			m_download_queue.normal_prio_pieces.erase(m_piece_info[piece_index].prio_iter);
 			break;
-	case(PIECE_PRIORITY_HIGH):
+	case(DOWNLOAD_PRIORITY_HIGH):
 			m_download_queue.high_prio_pieces.erase(m_piece_info[piece_index].prio_iter);
 			break;
 	default:
@@ -325,15 +354,15 @@ int PieceManager::set_piece_priority(PIECE_INDEX piece_index, PIECE_PRIORITY pri
 
 	switch(priority)
 	{
-	case(PIECE_PRIORITY_LOW):
+	case(DOWNLOAD_PRIORITY_LOW):
 			m_download_queue.low_prio_pieces.push_back(piece_index);
 			m_piece_info[piece_index].prio_iter = --m_download_queue.low_prio_pieces.end();
 			break;
-	case(PIECE_PRIORITY_NORMAL):
+	case(DOWNLOAD_PRIORITY_NORMAL):
 			m_download_queue.normal_prio_pieces.push_back(piece_index);
 			m_piece_info[piece_index].prio_iter = --m_download_queue.normal_prio_pieces.end();
 			break;
-	case(PIECE_PRIORITY_HIGH):
+	case(DOWNLOAD_PRIORITY_HIGH):
 			m_download_queue.high_prio_pieces.push_back(piece_index);
 			m_piece_info[piece_index].prio_iter = --m_download_queue.high_prio_pieces.end();
 			break;
@@ -346,9 +375,29 @@ int PieceManager::set_piece_priority(PIECE_INDEX piece_index, PIECE_PRIORITY pri
 	return ERR_NO_ERROR;
 }
 
-int PieceManager::get_piece_priority(PIECE_INDEX piece_index, PIECE_PRIORITY & priority)
+int PieceManager::get_piece_priority(PIECE_INDEX piece_index, DOWNLOAD_PRIORITY & priority)
 {
 	priority =  m_piece_info[piece_index].prio;
+	return ERR_NO_ERROR;
+}
+
+int PieceManager::set_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY prio)
+{
+	std::map<PIECE_INDEX, DOWNLOAD_PRIORITY> old_prios;
+	for(std::set<PIECE_INDEX>::iterator iter = m_file_contains_pieces[file].begin(); iter != m_file_contains_pieces[file].end(); ++iter)
+	{
+		PIECE_INDEX piece_index = *iter;
+		old_prios[piece_index] = m_piece_info[piece_index].prio;
+		int ret = set_piece_priority(piece_index, prio);
+		if (ret == ERR_INTERNAL || ret == ERR_BAD_ARG)
+		{
+			for(std::map<PIECE_INDEX, DOWNLOAD_PRIORITY>::iterator iter2 = old_prios.begin(); iter2 != old_prios.end(); ++iter2)
+			{
+				set_piece_priority(iter2->first, iter2->second);
+			}
+			return ERR_INTERNAL;
+		}
+	}
 	return ERR_NO_ERROR;
 }
 

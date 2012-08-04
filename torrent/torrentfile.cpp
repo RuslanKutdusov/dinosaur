@@ -46,6 +46,7 @@ void TorrentFile::init(const std::string & path)
 		f.length = fi->length;
 		f.name = i_path + fi->name;
 		f.download = true;
+		f.priority = FILE_PRIORITY_NORMAL;
 		m_fm->File_add(f.name, f.length, false, shared_from_this(), f.file_);
 		m_files.push_back(f);
 	}
@@ -184,5 +185,14 @@ void TorrentFile::ReleaseFiles()
 	}
 }
 
+void TorrentFile::set_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY prio)
+{
+	m_files[file].priority = prio;
+}
+
+void TorrentFile::get_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY & prio)
+{
+	prio = m_files[file].priority;
+}
 
 }
