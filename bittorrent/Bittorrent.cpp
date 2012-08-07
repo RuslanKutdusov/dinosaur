@@ -167,6 +167,9 @@ int Bittorrent::init_torrent(const torrent::Metafile & metafile, const std::stri
 
 int Bittorrent::AddTorrent(torrent::Metafile & metafile, const std::string & download_directory, std::string & hash)
 {
+	int ret = init_torrent(metafile, download_directory, hash);
+	if ( ret != ERR_NO_ERROR)
+		return ret;
 	std::ofstream fout;
 	std::string state_file = m_directory;
 
@@ -182,8 +185,7 @@ int Bittorrent::AddTorrent(torrent::Metafile & metafile, const std::string & dow
 		add_error_mes(err);
 		return ERR_SEE_ERROR;
 	}
-
-	return init_torrent(metafile, download_directory, hash);
+	return ERR_NO_ERROR;
 }
 
 int Bittorrent::StartTorrent(const std::string & hash)
