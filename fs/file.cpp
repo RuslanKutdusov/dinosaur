@@ -16,26 +16,26 @@ file::file()
 	printf("file default constructor\n");
 #endif
 	m_length = 0;
-	m_fictive = false;
+	m_should_exists = false;
 	m_fn = NULL;
 	m_fd = -1;
 	m_instance2delete = false;
 }
 
-file::file(const char * fn, uint64_t length, bool fictive, const FileAssociation::ptr & assoc)
+file::file(const char * fn, uint64_t length, bool should_exists, const FileAssociation::ptr & assoc)
 {
 #ifdef BITTORRENT_DEBUG
 	printf("file constructor fn=%s length=%llu\n", fn, length);
 #endif
 	if (fn == NULL)
-		throw Exception("Can not create file");
+		throw Exception(FS_ERROR_CAN_NOT_CREATE_FILE);
 	int fn_str_len = strlen(fn);
 	m_fn = new char[fn_str_len + 1];
 	//memset(m_fn, 0, strlen(fn) + 1);
 	strncpy(m_fn, fn, fn_str_len);
 	m_fn[fn_str_len] = '\0';
 	m_length = length;
-	m_fictive = fictive;
+	m_should_exists = should_exists;
 	m_assoc = assoc;
 	m_fd = -1;
 	m_instance2delete = false;
@@ -59,12 +59,19 @@ int file::_open()
 #ifdef FS_DEBUG
 	printf("Opening file %s\n", m_fn);
 #endif
-	bool _new = false;
+	bool not_exists = false;
 	struct stat st;
 	//если файла нет, говорим что новый
 	if (stat(m_fn, &st) == -1 || (uint64_t)st.st_size != m_length)
-		_new = true;
-	if (!_new)
+		not_exists = true;
+	if (not_exists && m_should_exists)
+	{
+			#ifdef FS_DEBUG
+				printf("Fail: file %s does not exists\n", m_fn);
+			#endif
+		return ERR_FILE_NOT_EXISTS;
+	}
+	if (!not_exists)
 	{
 		m_fd = open(m_fn, O_RDWR | O_LARGEFILE);
 		if (m_fd == -1)
@@ -77,7 +84,7 @@ int file::_open()
 	}
 	//создаем/открываем файл
 	//если файл новый, то транкаем его
-	if (_new)
+	if (not_exists)
 	{
 		m_fd = open(m_fn, O_RDWR | O_CREAT | O_LARGEFILE, S_IRWXU | S_IRWXG | S_IRWXO);
 		if (m_fd == -1)

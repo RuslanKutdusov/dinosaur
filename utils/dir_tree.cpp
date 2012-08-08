@@ -159,7 +159,7 @@ int DirTree::put(const char * dir2put)
 int DirTree::make_dir_tree(std::string  current_dir)
 {
 	if (m_root == NULL)
-		return ERR_INTERNAL;
+		return ERR_UNDEF;
 	if (current_dir.length() != 0 && current_dir[current_dir.length() - 1] != '/')
 		current_dir += "/";
 	return m_root->make(current_dir);

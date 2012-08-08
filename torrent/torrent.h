@@ -293,7 +293,7 @@ private:
 	TorrentInterfaceInternalPtr 	m_torrent;
 	std::vector<file>				m_files;
 	TorrentFile(const TorrentInterfaceInternalPtr & t);
-	void init(const std::string & path);
+	void init(const std::string & path, bool files_should_exists, uint32_t & files_exists);
 public:
 	int save_block(PIECE_INDEX piece, BLOCK_OFFSET block_offset, uint32_t block_length, char * block);
 	int read_block(PIECE_INDEX piece, BLOCK_INDEX block_index, char * block, uint32_t & block_length);
@@ -303,12 +303,12 @@ public:
 	void get_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY  & prio);
 	void ReleaseFiles();
 	~TorrentFile();
-	static void CreateTorrentFile(const TorrentInterfaceInternalPtr & t, const std::string & path, TorrentFilePtr & ptr)
+	static void CreateTorrentFile(const TorrentInterfaceInternalPtr & t, const std::string & path, bool files_should_exists, uint32_t & files_exists, TorrentFilePtr & ptr)
 	{
 		try
 		{
 			ptr.reset(new TorrentFile(t));
-			ptr->init(path);
+			ptr->init(path, files_should_exists, files_exists);
 		}
 		catch(Exception & e)
 		{
@@ -329,7 +329,8 @@ private:
 		TORRENT_STATE_STOPPED,
 		TORRENT_STATE_PAUSED,
 		TORRENT_STATE_CHECKING,
-		TORRENT_STATE_RELEASING
+		TORRENT_STATE_RELEASING,
+		TORRENT_STATE_FAILURE
 	};
 protected:
 	network::NetworkManager * 		m_nm;
@@ -369,6 +370,7 @@ protected:
 	virtual int pause();
 	virtual int continue_();
 	virtual int check();
+	virtual void set_failure();
 	virtual bool is_downloaded();
 	virtual int event_file_write(const fs::write_event & we);
 	virtual int clock();
@@ -455,11 +457,12 @@ public:
 	void copy_bitfield(BITFIELD dst);
 	void inc_uploaded(uint32_t bytes_num);
 	void inc_downloaded(uint32_t bytes_num);
-	void set_error(std::string err);
+	void set_error(const std::string & err);
 	void copy_piece_hash(SHA1_HASH dst, PIECE_INDEX piece_index);
 	int save_block(PIECE_INDEX piece, BLOCK_OFFSET block_offset, uint32_t block_length, char * block);
 	int read_block(PIECE_INDEX piece, BLOCK_INDEX block_index, char * block, uint32_t & block_length);
 	int read_piece(PIECE_INDEX piece, unsigned char * dst);
+	virtual void set_failure() = 0;
 	virtual int event_file_write(const fs::write_event & we) = 0;
 	virtual void add_seeders(uint32_t count, sockaddr_in * addrs) = 0;
 };

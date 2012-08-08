@@ -146,9 +146,9 @@ void PieceManager::build_piece_info()
 			block_info.second = offset - file_offset;
 			m_piece_info[piece_index].block_info.push_back(block_info);
 
-			#ifdef BITTORRENT_DEBUG
+			/*#ifdef BITTORRENT_DEBUG
 				printf("PIECE %u Block %u file %u offset %llu\n", piece_index, block, m_piece_info[piece_index].block_info[block].first, m_piece_info[piece_index].block_info[block].second);
-			#endif
+			#endif*/
 			offset += BLOCK_LENGTH;
 			if (need2download)
 				m_piece_info[piece_index].block2download.insert(block);
@@ -170,7 +170,7 @@ void PieceManager::build_piece_info()
 			m_piece_info[piece_index].prio_iter = m_tag_list.begin();
 		}
 	}
-#ifdef BITTORRENT_DEBUG
+/*#ifdef BITTORRENT_DEBUG
 	for(size_t i = 0; i < m_file_contains_pieces.size(); i++)
 	{
 		printf("File %u contains: ", i);
@@ -178,7 +178,7 @@ void PieceManager::build_piece_info()
 			printf("%u", *iter);
 		printf("\n");
 	}
-#endif
+#endif*/
 }
 
 void PieceManager::get_blocks_count_in_piece(PIECE_INDEX piece_index, uint32_t & blocks_count)
@@ -330,8 +330,6 @@ int PieceManager::clear_piece_taken_from(PIECE_INDEX piece_index)
 
 int PieceManager::set_piece_priority(PIECE_INDEX piece_index, DOWNLOAD_PRIORITY priority)
 {
-	if (priority != DOWNLOAD_PRIORITY_LOW && priority != DOWNLOAD_PRIORITY_NORMAL && priority != DOWNLOAD_PRIORITY_HIGH)
-		return ERR_BAD_ARG;
 	if (m_piece_info[piece_index].prio_iter == m_tag_list.begin())
 		return ERR_EMPTY_QUEUE;
 	if (m_piece_info[piece_index].prio == priority)
@@ -425,7 +423,8 @@ int PieceManager::push_block2download(PIECE_INDEX piece_index, BLOCK_INDEX block
 
 bool PieceManager::check_piece_hash(PIECE_INDEX piece_index)
 {
-	m_torrent->read_piece(piece_index, m_piece_for_check_hash);
+	if (m_torrent->read_piece(piece_index, m_piece_for_check_hash) != ERR_NO_ERROR)
+		return false;
 	SHA1_HASH sha1;
 	memset(sha1, 0, SHA1_LENGTH);
 	m_csha1.Update(m_piece_for_check_hash, m_piece_info[piece_index].length);
@@ -452,7 +451,6 @@ bool PieceManager::check_piece_hash(PIECE_INDEX piece_index)
 
 int PieceManager::event_file_write(const fs::write_event & we, PIECE_STATE & piece_state)
 {
-	piece_state = PIECE_STATE_NOT_FIN;
 	uint32_t piece_index;
 	uint32_t block_index;
 	uint32_t block_length = 0;
@@ -461,7 +459,7 @@ int PieceManager::event_file_write(const fs::write_event & we, PIECE_STATE & pie
 #ifdef BITTORRENT_DEBUG
 	//printf("event_file_write piece=%u block=%u writted=%d\n", piece_index, block_index, we->writted);
 #endif
-	if (we.writted == -1)
+	if (we.writted < 0)
 	{
 		m_downloadable_blocks.erase(we.block_id);
 		return push_block2download(piece_index, block_index);

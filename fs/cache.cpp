@@ -130,14 +130,14 @@ int cache::push(const File & file, const char * buf, uint32_t length, uint64_t o
 #ifdef FS_DEBUG
 		printf("NO AVAILABLE MEMORY IN CACHE front=%X, back=%X count=%u\n", m_front, m_back, m_count);
 #endif
-		return ERR_INTERNAL;
+		return ERR_FULL_CACHE;
 	}
 	if (length > BLOCK_LENGTH || length == 0)
 	{
 #ifdef FS_DEBUG
 		printf("Invalid length\n");
 #endif
-		return ERR_BAD_ARG;
+		return ERR_UNDEF;
 	}
 	if (m_count == 0)
 		m_front = m_back;

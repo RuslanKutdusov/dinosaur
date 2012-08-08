@@ -143,7 +143,7 @@ void TorrentInterfaceInternal::inc_downloaded(uint32_t bytes_num)
 	m_downloaded += bytes_num;
 }
 
-void TorrentInterfaceInternal::set_error(std::string err)
+void TorrentInterfaceInternal::set_error(const std::string & err)
 {
 	m_error = err;
 }

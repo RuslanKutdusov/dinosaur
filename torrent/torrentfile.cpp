@@ -21,7 +21,7 @@ TorrentFile::TorrentFile(const TorrentInterfaceInternalPtr & t)
 	m_fm = t->get_fm();
 }
 
-void TorrentFile::init(const std::string & path)
+void TorrentFile::init(const std::string & path, bool files_should_exists, uint32_t & files_exists)
 {
 	if (path == "" || path[0] != '/')
 		throw Exception(GENERAL_ERROR_UNDEF_ERROR);
@@ -34,9 +34,18 @@ void TorrentFile::init(const std::string & path)
 
 	if (files_count > 1)
 	{
-		m_torrent->get_dirtree().make_dir_tree(i_path);
+		int ret = m_torrent->get_dirtree().make_dir_tree(i_path);
+		if (ret == ERR_UNDEF)
+			throw Exception(GENERAL_ERROR_UNDEF_ERROR);
+		if (ret == ERR_SYSCALL_ERROR)
+		{
+			std::string err = GENERAL_ERROR_SYSCALL;
+			err += sys_errlist[errno];
+			throw Exception(err);
+		}
 		i_path.append(m_torrent->get_name() + "/");
 	}
+	files_exists = 0;
 	for(uint32_t i = 0; i < files_count; i++)
 	{
 		base_file_info * fi = m_torrent->get_file_info(i);
@@ -45,7 +54,14 @@ void TorrentFile::init(const std::string & path)
 		f.name = i_path + fi->name;
 		f.download = true;
 		f.priority = DOWNLOAD_PRIORITY_NORMAL;
-		m_fm->File_add(f.name, f.length, false, shared_from_this(), f.file_);
+		if (m_fm->File_exists(f.name, f.length))
+			files_exists++;
+		if (m_fm->File_add(f.name, f.length, false, shared_from_this(), f.file_) != ERR_NO_ERROR)
+		{
+			ReleaseFiles();
+			files_exists = 0;
+			throw Exception(m_fm->get_error());
+		}
 		m_files.push_back(f);
 	}
 }
@@ -85,10 +101,15 @@ int TorrentFile::save_block(PIECE_INDEX piece, BLOCK_OFFSET block_offset, uint32
 		uint32_t remain = m_files[file_index].length - offset;
 		//если данных для записи больше,чем это возможно, пишем в файл сколько можем(remain), иначе пишем все что есть
 		uint32_t to_write = block_length - pos > remain ? remain : block_length - pos;
-		if (m_fm->File_write(m_files[file_index++].file_, &block[pos], to_write, offset, block_id) != ERR_NO_ERROR)
+		int ret = m_fm->File_write(m_files[file_index++].file_, &block[pos], to_write, offset, block_id);
+		if (ret == ERR_UNDEF || ret == ERR_FILE_NOT_EXISTS || ret == ERR_SYSCALL_ERROR)
 		{
+			m_torrent->set_error(m_fm->get_error());
+			m_torrent->set_failure();
 			return ERR_INTERNAL;
 		}
+		if (ret == ERR_FULL_CACHE)
+			return ERR_INTERNAL;
 		pos += to_write;
 		offset = 0;
 	}
@@ -117,8 +138,12 @@ int TorrentFile::read_block(PIECE_INDEX piece, BLOCK_INDEX block_index, char * b
 		//если прочитать надо больше, чем это возможно, читаем сколько можем(remain), иначе читаем все
 		uint32_t to_read = block_length - pos > remain ? remain : block_length - pos;
 		int ret = m_fm->File_read_immediately(m_files[file_index++].file_, &block[pos], offset, to_read);
-		if (ret < 0)
+		if (ret == ERR_UNDEF || ret == ERR_FILE_NOT_EXISTS || ret == ERR_SYSCALL_ERROR)
+		{
+			m_torrent->set_error(m_fm->get_error());
+			m_torrent->set_failure();
 			return ERR_INTERNAL;
+		}
 		pos += to_read;
 		offset = 0;
 	}
@@ -148,8 +173,12 @@ int TorrentFile::read_piece(PIECE_INDEX piece_index, unsigned char * dst)
 		//если прочитать надо больше, чем это возможно, читаем сколько можем(remain), иначе читаем все
 		uint32_t to_read = piece_length - pos > remain ? remain : piece_length - pos;
 		int ret = m_fm->File_read_immediately(m_files[file_index++].file_, (char*)&dst[pos], offset, to_read);
-		if (ret < 0)
+		if (ret == ERR_UNDEF || ret == ERR_FILE_NOT_EXISTS || ret == ERR_SYSCALL_ERROR)
+		{
+			m_torrent->set_error(m_fm->get_error());
+			m_torrent->set_failure();
 			return ERR_INTERNAL;
+		}
 		pos += to_read;
 		offset = 0;
 	}

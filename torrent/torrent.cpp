@@ -43,6 +43,7 @@ void TorrentBase::init(const Metafile & metafile, const std::string & work_direc
 
 		StateSerializator s(m_state_file_name);
 		size_t bitfield_len = ceil(m_metafile.piece_count / 8.0f);
+		bool file_should_exists = true;
 		bitfield = new unsigned char[bitfield_len];
 		if (s.deserialize(m_uploaded, m_download_directory, bitfield, bitfield_len) == -1)
 		{
@@ -54,14 +55,34 @@ void TorrentBase::init(const Metafile & metafile, const std::string & work_direc
 			s.serialize(m_uploaded, m_download_directory, bitfield, bitfield_len);
 			delete[] bitfield;
 			bitfield = NULL;
+			file_should_exists = false;
 		}
 
-		TorrentFile::CreateTorrentFile(boost::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()), m_download_directory, m_torrent_file);
+		uint32_t files_exists;
+		TorrentFile::CreateTorrentFile(boost::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()), m_download_directory, file_should_exists, files_exists, m_torrent_file);
 
 		m_piece_manager.reset(new PieceManager(boost::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()), bitfield));
 
 		if (bitfield != NULL)
 			delete[] bitfield;
+
+
+		for (std::vector<std::string>::iterator iter = m_metafile.announces.begin(); iter != m_metafile.announces.end(); ++iter)
+		{
+			TrackerPtr temp;
+			try
+			{
+				temp.reset(new Tracker(boost::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()), *iter));
+				m_trackers[*iter] = temp;
+			}
+			catch(NoneCriticalException & e)
+			{
+				#ifdef BITTORRENT_DEBUG
+					e.print();
+				#endif
+				continue;
+			}
+		}
 	}
 	catch( std::bad_alloc & e)
 	{
@@ -209,22 +230,7 @@ int TorrentBase::start()
 		m_active_seeders.clear();
 		m_pieces2check.clear();
 		m_work = m_downloaded == m_metafile.length ? TORRENT_UPLOADING : TORRENT_DOWNLOADING;
-		for (std::vector<std::string>::iterator iter = m_metafile.announces.begin(); iter != m_metafile.announces.end(); ++iter)
-		{
-			TrackerPtr temp;
-			try
-			{
-				temp.reset(new Tracker(boost::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()), *iter));
-				m_trackers[*iter] = temp;
-			}
-			catch(NoneCriticalException & e)
-			{
-#ifdef BITTORRENT_DEBUG
-				e.print();
-#endif
-				continue;
-			}
-		}
+
 		sockaddr_in addr;
 		inet_aton("127.0.0.1", &addr.sin_addr);
 		addr.sin_family = AF_INET;
@@ -239,7 +245,7 @@ int TorrentBase::start()
 
 int TorrentBase::stop()
 {
-	if (m_state != TORRENT_STATE_STARTED && m_state != TORRENT_STATE_CHECKING)
+	if (m_state != TORRENT_STATE_STARTED && m_state != TORRENT_STATE_CHECKING && m_state != TORRENT_STATE_FAILURE)
 		return ERR_INTERNAL;
 	for(peer_list_iter p = m_active_seeders.begin(); p != m_active_seeders.end(); ++p)
 	{
@@ -251,6 +257,7 @@ int TorrentBase::stop()
 			get_piece_block_from_block_id(block_id, piece, block);
 			m_piece_manager->push_block2download(piece, block);
 		}
+		seed->goto_sleep();
 		m_waiting_seeders.push_back(seed);
 	}
 	m_active_seeders.clear();
@@ -283,6 +290,7 @@ int TorrentBase::pause()
 			get_piece_block_from_block_id(block_id, piece, block);
 			m_piece_manager->push_block2download(piece, block);
 		}
+		seed->goto_sleep();
 		m_waiting_seeders.push_back(seed);
 	}
 	m_active_seeders.clear();
@@ -323,7 +331,7 @@ bool TorrentBase::is_downloaded()
 
 int TorrentBase::check()
 {
-	if (m_state == TORRENT_STATE_NONE)
+	if (m_state == TORRENT_STATE_NONE || m_state == TORRENT_STATE_FAILURE)
 		return ERR_INTERNAL;
 
 	for(peer_list_iter p = m_active_seeders.begin(); p != m_active_seeders.end(); ++p)
@@ -336,6 +344,7 @@ int TorrentBase::check()
 			get_piece_block_from_block_id(block_id, piece, block);
 			m_piece_manager->push_block2download(piece, block);
 		}
+		seed->goto_sleep();
 		m_waiting_seeders.push_back(seed);
 	}
 	m_active_seeders.clear();
@@ -359,6 +368,15 @@ int TorrentBase::check()
 	return ERR_NO_ERROR;
 }
 
+void TorrentBase::set_failure()
+{
+	//m_leechers.clear();
+#ifdef BITTORRENT_DEBUG
+	printf("Torrent %s FAILURE, error=%s\n", m_metafile.name.c_str(), m_error.c_str());
+#endif
+	m_state = TORRENT_STATE_FAILURE;
+}
+
 int TorrentBase::clock()
 {
 	m_rx_speed = 0.0f;
@@ -373,6 +391,14 @@ int TorrentBase::clock()
 				m_trackers.erase(iter);
 		}
 
+	if (m_state == TORRENT_STATE_FAILURE)
+	{
+		#ifdef BITTORRENT_DEBUG
+		printf("Stopping due failure\n");
+		#endif
+		stop();
+		m_work = TORRENT_FAILURE;
+	}
 	if (m_state == TORRENT_STATE_STARTED)
 	{
 		if (m_active_seeders.size() < m_g_cfg->get_max_active_seeders() &&
@@ -508,6 +534,12 @@ int TorrentBase::event_file_write(const fs::write_event & we)
 	PIECE_STATE piece_state;
 	uint32_t piece_index = we.block_id.first;
 	m_piece_manager->event_file_write(we, piece_state);
+	if (we.writted == ERR_UNDEF || we.writted == ERR_FILE_NOT_EXISTS || we.writted == ERR_SYSCALL_ERROR)
+	{
+		m_error = m_fm->get_error();
+		set_failure();
+		return ERR_INTERNAL;
+	}
 	if (piece_state == PIECE_STATE_FIN_HASH_OK)
 	{
 		m_downloadable_pieces.remove(piece_index);

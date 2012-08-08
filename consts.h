@@ -40,8 +40,18 @@
 #define TORRENT_ERROR_CAN_NOT_START "Can not start torrent"
 #define TORRENT_ERROR_NO_STATE_FILE "Can not find state file"
 
+#define FS_ERROR_CAN_NOT_CREATE_CACHE "Can not create cache"
+#define FS_ERROR_CAN_NOT_CREATE_FILE "Can not create file"
+#define FS_ERROR_CACHE_ERROR "Cache error"
+#define FS_ERROR_CACHE_FULL "Cache full"
+#define FS_ERROR_FILE_NOT_EXISTS "File does not exists"
+#define FS_ERROR_CAN_NOT_CREATE_DIR "Can not create directory"
+
 #define GENERAL_ERROR_NO_MEMORY_AVAILABLE "No memory available"
 #define GENERAL_ERROR_UNDEF_ERROR "Something wrong"
+#define GENERAL_ERROR_CAN_NOT_CREATE_THREAD "Can not create thread"
+#define GENERAL_ERROR_NO_ERROR "No error"
+#define GENERAL_ERROR_SYSCALL "Syscall error: "
 
 
 #endif /* CONSTS_H_ */
