@@ -5,6 +5,8 @@
  *      Author: ruslan
  */
 #include "network.h"
+
+namespace dinosaur {
 namespace network
 {
 
@@ -879,4 +881,5 @@ void * NetworkManager::timeout_thread(void * arg)
 	return (void*)ret;
 }
 
+}
 }

@@ -8,6 +8,7 @@
 
 #include "torrent.h"
 
+namespace dinosaur {
 namespace torrent {
 
 Peer::Peer()
@@ -759,4 +760,5 @@ Peer::~Peer()
 #endif
 }
 
+}
 }

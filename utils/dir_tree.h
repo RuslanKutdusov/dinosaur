@@ -16,6 +16,7 @@
 #include <errno.h>
 #include "../err/err_code.h"
 
+namespace dinosaur {
 namespace dir_tree {
 
 class Dir
@@ -113,4 +114,5 @@ public:
 };
 
 } /* namespace Bittorrent */
+}
 #endif /* DIRTREE_H_ */

@@ -7,6 +7,8 @@
 
 #include "utils.h"
 
+namespace dinosaur {
+
 char *read_file(const char *file, uint64_t *len, uint64_t max_len)
 {
 	struct stat st;
@@ -55,4 +57,6 @@ void get_piece_block_from_block_id(const BLOCK_ID & id, uint32_t & piece, uint32
 {
 	piece = id.first;
 	block = id.second;
+}
+
 }

@@ -7,6 +7,7 @@
 
 #include "fs.h"
 
+namespace dinosaur {
 namespace fs
 {
 cache::cache()
@@ -160,4 +161,5 @@ bool cache::empty() const
 	return m_count == 0;
 }
 
+}
 }

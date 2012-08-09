@@ -34,7 +34,9 @@
 #include "state_serializator.h"
 #include "metafile.h"
 #include "torrent_types.h"
+#include "../types.h"
 
+namespace dinosaur {
 namespace torrent {
 
 
@@ -146,26 +148,26 @@ private:
 		PEER_STATE_SLEEP
 	};
 private:
-	network::NetworkManager * 		m_nm;
-	cfg::Glob_cfg * 				m_g_cfg;
-	TorrentInterfaceInternalPtr		m_torrent;
-	sockaddr_in 					m_addr;
-	network::Socket 				m_sock;
-	network::buffer 				m_buf;
-	std::string 					m_ip;
-	uint64_t 						m_downloaded;
-	uint64_t 						m_uploaded;
-	std::set<PIECE_INDEX>			m_available_pieces;
-	bool 							m_peer_choking;//пир нас заблокирован
-	bool 							m_peer_interested;//пир в нас заинтересован
-	bool 							m_am_choking;//я блокирую пира
-	bool 							m_am_interested;//я заинтересован в пире
-	int 							m_state;
-	BITFIELD 						m_bitfield;
-	std::set<BLOCK_ID> 				m_requested_blocks;//блоки, которые мы запросили
-	std::set<BLOCK_ID>				m_blocks2request;
-	std::set<BLOCK_ID> 				m_requests_queue;//блоки, которые у нас запросили(очередь запросов)
-	time_t 							m_sleep_time;
+	network::NetworkManager * 			m_nm;
+	cfg::Glob_cfg * 					m_g_cfg;
+	TorrentInterfaceInternalPtr			m_torrent;
+	sockaddr_in 						m_addr;
+	network::Socket 					m_sock;
+	network::buffer 					m_buf;
+	std::string 						m_ip;
+	uint64_t 							m_downloaded;
+	uint64_t 							m_uploaded;
+	std::set<PIECE_INDEX>	m_available_pieces;
+	bool 								m_peer_choking;//пир нас заблокирован
+	bool 								m_peer_interested;//пир в нас заинтересован
+	bool 								m_am_choking;//я блокирую пира
+	bool 								m_am_interested;//я заинтересован в пире
+	int 								m_state;
+	BITFIELD 				m_bitfield;
+	std::set<BLOCK_ID> 					m_requested_blocks;//блоки, которые мы запросили
+	std::set<BLOCK_ID>					m_blocks2request;
+	std::set<BLOCK_ID> 					m_requests_queue;//блоки, которые у нас запросили(очередь запросов)
+	time_t 								m_sleep_time;
 	int process_messages();
 public:
 	Peer();
@@ -224,34 +226,34 @@ private:
 	typedef std::list<uint32_t>::iterator uint32_list_iter;
 	struct piece_info
 	{
-		FILE_INDEX 											file_index;//индекс файла, в котором начинается кусок
-		uint32_t 											length;//его длина
-		FILE_OFFSET 										offset;//смещение внутри файла до начала куска
-		uint32_t 											block_count;//кол-во блоков в куске
+		FILE_INDEX 														file_index;//индекс файла, в котором начинается кусок
+		uint32_t 																	length;//его длина
+		FILE_OFFSET 													offset;//смещение внутри файла до начала куска
+		uint32_t 																	block_count;//кол-во блоков в куске
 		std::vector<std::pair<FILE_INDEX, FILE_OFFSET> >	block_info;
-		std::set<std::string>								taken_from;
-		std::set<BLOCK_INDEX>	 							block2download;
-		std::set<BLOCK_INDEX>								downloaded_blocks;
-		SHA1_HASH											hash;
-		DOWNLOAD_PRIORITY										prio;
-		uint32_list_iter									prio_iter;
+		std::set<std::string>														taken_from;
+		std::set<BLOCK_INDEX>	 										block2download;
+		std::set<BLOCK_INDEX>											downloaded_blocks;
+		SHA1_HASH														hash;
+		DOWNLOAD_PRIORITY												prio;
+		uint32_list_iter															prio_iter;
 	};
 	struct download_queue
 	{
-		uint32_list 					low_prio_pieces;
-		uint32_list 					normal_prio_pieces;
-		uint32_list 					high_prio_pieces;
+		uint32_list 								low_prio_pieces;
+		uint32_list 								normal_prio_pieces;
+		uint32_list 								high_prio_pieces;
 	};
 private:
-	TorrentInterfaceInternalPtr 		m_torrent;
+	TorrentInterfaceInternalPtr 					m_torrent;
 	BITFIELD 							m_bitfield;
-	size_t 								m_bitfield_len;
-	std::vector<piece_info> 			m_piece_info;
-	CSHA1 								m_csha1;
-	download_queue						m_download_queue;
-	uint32_list							m_tag_list;//хранит один элемент, на который будут ссылатся prio_iter у загруженных кусков
-	std::map<BLOCK_ID, uint32_t>		m_downloadable_blocks;
-	unsigned char *						m_piece_for_check_hash;
+	size_t 											m_bitfield_len;
+	std::vector<piece_info> 						m_piece_info;
+	CSHA1 											m_csha1;
+	download_queue									m_download_queue;
+	uint32_list										m_tag_list;//хранит один элемент, на который будут ссылатся prio_iter у загруженных кусков
+	std::map<BLOCK_ID, uint32_t>					m_downloadable_blocks;
+	unsigned char *									m_piece_for_check_hash;
 	std::deque<std::set<PIECE_INDEX> >  m_file_contains_pieces;
 	void build_piece_info();
 	int push_piece2download(uint32_t piece_index);
@@ -291,11 +293,11 @@ class TorrentFile : public fs::FileAssociation
 public:
 	struct file
 	{
-		uint64_t 					length;
-		std::string					name;
-		bool 						download;
-		fs::File 					file_;
-		DOWNLOAD_PRIORITY			priority;
+		uint64_t 						length;
+		std::string						name;
+		bool 							download;
+		fs::File 						file_;
+		DOWNLOAD_PRIORITY	priority;
 	};
 private:
 	fs::FileManager * 				m_fm;
@@ -369,7 +371,7 @@ protected:
 	double 							m_tx_speed;
 	TORRENT_STATE 					m_state;
 	std::string 					m_error;
-	TORRENT_WORK					m_work;
+	TORRENT_WORK		m_work;
 
 	virtual void add_seeders(uint32_t count, sockaddr_in * addrs);
 	virtual int add_leecher(network::Socket & sock);
@@ -494,3 +496,4 @@ bool bit_in_bitfield(uint32_t piece, uint32_t piece_count, BITFIELD bitfield);
 void get_peer_key(sockaddr_in * addr, std::string & key);
 
 } /* namespace TorrentNamespace */
+}

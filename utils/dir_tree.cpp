@@ -7,6 +7,7 @@
 
 #include "dir_tree.h"
 
+namespace dinosaur {
 namespace dir_tree {
 
 Dir::Dir()
@@ -166,3 +167,4 @@ int DirTree::make_dir_tree(std::string  current_dir)
 }
 
 } /* namespace Bittorrent */
+}

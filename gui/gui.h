@@ -10,7 +10,7 @@
 #include <gtk/gtk.h>
 #include <list>
 #include <string>
-#include "../bittorrent/Bittorrent.h"
+#include "../dinosaur.h"
 #include "../torrent/torrent.h"
 #include "../torrent/torrent_types.h"
 

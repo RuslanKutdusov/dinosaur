@@ -7,7 +7,7 @@
 
 
 #include "fs.h"
-
+namespace dinosaur {
 namespace fs
 {
 
@@ -90,5 +90,5 @@ void FD_LRU_Cache::dump()
 }
 
 
-
+}
 }

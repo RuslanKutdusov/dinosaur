@@ -7,6 +7,7 @@
 
 #include "torrent.h"
 
+namespace dinosaur {
 namespace torrent
 {
 
@@ -498,4 +499,5 @@ int PieceManager::event_file_write(const fs::write_event & we, PIECE_STATE & pie
 	return ERR_NO_ERROR;
 }
 
+}
 }

@@ -7,6 +7,7 @@
 
 #include "torrent.h"
 
+namespace dinosaur {
 namespace torrent {
 
 TorrentBase::TorrentBase(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc)
@@ -676,3 +677,4 @@ int TorrentBase::set_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY prio)
 	return ERR_NO_ERROR;
 }
 } /* namespace TorrentNamespace */
+}

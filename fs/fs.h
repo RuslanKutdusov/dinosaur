@@ -28,6 +28,7 @@
 //#define CACHE_ELEMENT_SIZE BLOCK_LENGTH
 #define MAX_OPENED_FILES 512
 
+namespace dinosaur {
 namespace fs {
 
 struct buffer
@@ -174,6 +175,6 @@ public:
 	}
 };
 
-
+}
 }
 

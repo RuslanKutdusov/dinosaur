@@ -6,6 +6,7 @@
  */
 #include "torrent.h"
 
+namespace dinosaur {
 namespace torrent
 {
 
@@ -208,4 +209,5 @@ void TorrentFile::get_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY & prio)
 	prio = m_files[file].priority;
 }
 
+}
 }

@@ -7,6 +7,7 @@
 
 #include "torrent.h"
 
+namespace dinosaur {
 namespace torrent {
 
 Tracker::Tracker()
@@ -442,4 +443,5 @@ Tracker::~Tracker()
 #endif
 }
 
+}
 }

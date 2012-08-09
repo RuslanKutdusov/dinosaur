@@ -9,6 +9,7 @@
 
 #include "torrent.h"
 
+namespace dinosaur {
 namespace torrent
 {
 
@@ -168,4 +169,5 @@ int TorrentInterfaceInternal::read_piece(uint32_t piece, unsigned char * dst)
 	return m_torrent_file->read_piece(piece, dst);
 }
 
+}
 }

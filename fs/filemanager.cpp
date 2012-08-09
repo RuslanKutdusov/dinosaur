@@ -6,7 +6,7 @@
  */
 
 #include "fs.h"
-
+namespace dinosaur {
 namespace fs {
 
 FileManager::FileManager()
@@ -30,7 +30,7 @@ int FileManager::Init(cfg::Glob_cfg * cfg) {
 		return ERR_NULL_REF;
 	m_count = 0;
 	m_cfg = cfg;
-	m_cache_size = m_cfg->get_cache_size();
+	m_cache_size = m_cfg->get_write_cache_size();
 	m_write_cache.init_cache(m_cache_size);
 
 	if (m_fd_cache.Init(MAX_OPENED_FILES) != ERR_NO_ERROR)
@@ -430,5 +430,5 @@ void * FileManager::cache_thread(void * arg)
 		return (void*)ret;
 	}
 
-
+}
 } /* namespace file */

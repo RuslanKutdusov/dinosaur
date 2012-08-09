@@ -22,6 +22,7 @@
 #include "../exceptions/exceptions.h"
 #include "../err/err_code.h"
 
+namespace dinosaur {
 namespace network
 {
 
@@ -245,4 +246,5 @@ public:
 	void notify();
 };
 
+}
 }

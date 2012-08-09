@@ -7,6 +7,7 @@
 
 #include "fs.h"
 
+namespace dinosaur {
 namespace fs
 {
 
@@ -187,5 +188,5 @@ uint64_t file::get_length()
 	return m_length;
 }
 
-
+}
 }

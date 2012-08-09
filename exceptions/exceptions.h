@@ -13,6 +13,8 @@
 #include <signal.h>
 #include <sys/epoll.h>
 
+
+namespace dinosaur {
 class Exception
 {
 protected:
@@ -82,3 +84,4 @@ public:
 		std::cout<<"None critical exception (internal error): "<<m_str<<std::endl;
 	}
 };
+}

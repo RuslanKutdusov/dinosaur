@@ -7,6 +7,7 @@
 
 #include "metafile.h"
 
+namespace dinosaur {
 namespace torrent {
 
 Metafile::Metafile()
@@ -374,3 +375,4 @@ void Metafile::dump()
 }
 
 } /* namespace torrent */
+}
