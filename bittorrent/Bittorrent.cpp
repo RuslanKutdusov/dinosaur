@@ -315,7 +315,8 @@ int Bittorrent::DeleteTorrent(const std::string & hash)
 	return ERR_NO_ERROR;
 }
 
-int Bittorrent::Torrent_info(const std::string & hash, torrent::torrent_info * info)
+
+int Bittorrent::get_torrent_info_stat(const std::string & hash, torrent::info::torrent_stat & ref)
 {
 	if (m_torrents.count(hash) == 0)
 	{
@@ -324,16 +325,108 @@ int Bittorrent::Torrent_info(const std::string & hash, torrent::torrent_info * i
 		return ERR_SEE_ERROR;
 	}
 	pthread_mutex_lock(&m_mutex);
-	m_torrents[hash]->get_info(info);
+	m_torrents[hash]->get_info_stat(ref);
 	pthread_mutex_unlock(&m_mutex);
 	return ERR_NO_ERROR;
 }
 
-int Bittorrent::get_TorrentList(std::list<std::string> * list)
+int Bittorrent::get_torrent_info_dyn(const std::string & hash, torrent::info::torrent_dyn & ref)
 {
+	if (m_torrents.count(hash) == 0)
+	{
+		std::string err = TORRENT_ERROR_NOT_EXISTS;
+		add_error_mes(err);
+		return ERR_SEE_ERROR;
+	}
+	pthread_mutex_lock(&m_mutex);
+	m_torrents[hash]->get_info_dyn(ref);
+	pthread_mutex_unlock(&m_mutex);
+	return ERR_NO_ERROR;
+}
+
+int Bittorrent::get_torrent_info_trackers(const std::string & hash, torrent::info::trackers & ref)
+{
+	if (m_torrents.count(hash) == 0)
+	{
+		std::string err = TORRENT_ERROR_NOT_EXISTS;
+		add_error_mes(err);
+		return ERR_SEE_ERROR;
+	}
+	pthread_mutex_lock(&m_mutex);
+	m_torrents[hash]->get_info_trackers(ref);
+	pthread_mutex_unlock(&m_mutex);
+	return ERR_NO_ERROR;
+}
+
+int Bittorrent::get_torrent_info_files(const std::string & hash, torrent::info::files & ref)
+{
+	if (m_torrents.count(hash) == 0)
+	{
+		std::string err = TORRENT_ERROR_NOT_EXISTS;
+		add_error_mes(err);
+		return ERR_SEE_ERROR;
+	}
+	pthread_mutex_lock(&m_mutex);
+	m_torrents[hash]->get_info_files(ref);
+	pthread_mutex_unlock(&m_mutex);
+	return ERR_NO_ERROR;
+}
+
+int  Bittorrent::get_torrent_info_file_dyn(const std::string & hash, torrent::FILE_INDEX index, torrent::info::file_dyn & ref)
+{
+	if (m_torrents.count(hash) == 0)
+	{
+		std::string err = TORRENT_ERROR_NOT_EXISTS;
+		add_error_mes(err);
+		return ERR_SEE_ERROR;
+	}
+	pthread_mutex_lock(&m_mutex);
+	if (m_torrents[hash]->get_info_file_dyn(index, ref) != ERR_NO_ERROR)
+	{
+		std::string err = GENERAL_ERROR_UNDEF_ERROR;
+		add_error_mes(err);
+		pthread_mutex_unlock(&m_mutex);
+		return ERR_SEE_ERROR;
+	}
+	pthread_mutex_unlock(&m_mutex);
+	return ERR_NO_ERROR;
+}
+
+int Bittorrent::get_torrent_info_seeders(const std::string & hash, torrent::info::peers & ref)
+{
+	if (m_torrents.count(hash) == 0)
+	{
+		std::string err = TORRENT_ERROR_NOT_EXISTS;
+		add_error_mes(err);
+		return ERR_SEE_ERROR;
+	}
+	pthread_mutex_lock(&m_mutex);
+	m_torrents[hash]->get_info_seeders(ref);
+	pthread_mutex_unlock(&m_mutex);
+	return ERR_NO_ERROR;
+}
+
+int Bittorrent::get_torrent_info_leechers(const std::string & hash, torrent::info::peers & ref)
+{
+	if (m_torrents.count(hash) == 0)
+	{
+		std::string err = TORRENT_ERROR_NOT_EXISTS;
+		add_error_mes(err);
+		return ERR_SEE_ERROR;
+	}
+	pthread_mutex_lock(&m_mutex);
+	m_torrents[hash]->get_info_leechers(ref);
+	pthread_mutex_unlock(&m_mutex);
+	return ERR_NO_ERROR;
+}
+
+
+int Bittorrent::get_TorrentList(std::list<std::string> & ref)
+{
+	ref.clear();
 	pthread_mutex_lock(&m_mutex);
 	for (torrent_map_iter iter = m_torrents.begin(); iter != m_torrents.end(); ++iter)
-		list->push_back((*iter).first);
+		ref.push_back((*iter).first);
 	pthread_mutex_unlock(&m_mutex);
 	return ERR_NO_ERROR;
 }

@@ -128,7 +128,7 @@ public:
 	int clock(bool & release_me);
 	int send_stopped();
 	int send_started();
-	int get_info(tracker_info * info);
+	int get_info(info::tracker & ref);
 };
 
 class Peer : public network::SocketAssociation
@@ -199,7 +199,7 @@ public:
 	double get_rx_speed();
 	double get_tx_speed();
 	const std::string & get_ip_str();
-	int get_info(peer_info * info);
+	int get_info(info::peer & ref);
 	int prepare2release();
 	void forced_releasing();
 	~Peer();
@@ -288,6 +288,15 @@ typedef boost::shared_ptr<PieceManager> PieceManagerPtr;
 
 class TorrentFile : public fs::FileAssociation
 {
+public:
+	struct file
+	{
+		uint64_t 					length;
+		std::string					name;
+		bool 						download;
+		fs::File 					file_;
+		DOWNLOAD_PRIORITY			priority;
+	};
 private:
 	fs::FileManager * 				m_fm;
 	TorrentInterfaceInternalPtr 	m_torrent;
@@ -374,7 +383,13 @@ protected:
 	virtual bool is_downloaded();
 	virtual int event_file_write(const fs::write_event & we);
 	virtual int clock();
-	virtual int get_info(torrent_info * info);
+	virtual void get_info_stat(info::torrent_stat & ref);
+	virtual void get_info_dyn(info::torrent_dyn & ref);
+	virtual void get_info_trackers(info::trackers & ref);
+	virtual void get_info_files(info::files & ref);
+	virtual int get_info_file_dyn(FILE_INDEX index, info::file_dyn & ref);
+	virtual void get_info_seeders(info::peers & ref);
+	virtual void get_info_leechers(info::peers & ref);
 	virtual int erase_state();
 	virtual void prepare2release();
 	virtual void forced_releasing();
@@ -421,7 +436,13 @@ public:
 	virtual int check() = 0;
 	virtual bool is_downloaded() = 0;
 	virtual int clock() = 0;
-	virtual int get_info(torrent_info * info) = 0;
+	virtual void get_info_stat(info::torrent_stat & ref) = 0;
+	virtual void get_info_dyn(info::torrent_dyn & ref) = 0;
+	virtual void get_info_trackers(info::trackers & ref) = 0;
+	virtual void get_info_files(info::files & ref) = 0;
+	virtual int get_info_file_dyn(FILE_INDEX index, info::file_dyn & ref) = 0;
+	virtual void get_info_seeders(info::peers & ref) = 0;
+	virtual void get_info_leechers(info::peers & ref) = 0;
 	virtual int erase_state() = 0;
 	virtual void prepare2release() = 0;
 	virtual void forced_releasing() = 0;
@@ -444,7 +465,7 @@ public:
 	uint64_t get_uploaded();
 	size_t get_bitfield_length();
 	dir_tree::DirTree & get_dirtree();
-	base_file_info * get_file_info(FILE_INDEX file_index);
+	Metafile::file_info * get_file_info(FILE_INDEX file_index);
 	void get_blocks_count_in_piece(PIECE_INDEX piece, uint32_t & blocks_count);
 	void get_piece_length(PIECE_INDEX piece, uint32_t & piece_length);
 	void get_block_index_by_offset(PIECE_INDEX piece_index, BLOCK_OFFSET block_offset, BLOCK_INDEX & index);

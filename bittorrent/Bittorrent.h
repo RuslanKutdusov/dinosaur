@@ -62,8 +62,14 @@ public:
 	int ContinueTorrent(const std::string & hash);
 	int CheckTorrent(const std::string & hash);
 	int DeleteTorrent(const std::string & hash);
-	int Torrent_info(const std::string & hash, torrent::torrent_info * info);
-	int get_TorrentList(std::list<std::string> * list);
+	int get_torrent_info_stat(const std::string & hash, torrent::info::torrent_stat & ref);
+	int get_torrent_info_dyn(const std::string & hash, torrent::info::torrent_dyn & ref);
+	int get_torrent_info_trackers(const std::string & hash, torrent::info::trackers & ref);
+	int get_torrent_info_files(const std::string & hash, torrent::info::files & ref);
+	int  get_torrent_info_file_dyn(const std::string & hash, torrent::FILE_INDEX index, torrent::info::file_dyn & ref);
+	int get_torrent_info_seeders(const std::string & hash, torrent::info::peers & ref);
+	int get_torrent_info_leechers(const std::string & hash, torrent::info::peers & ref);
+	int get_TorrentList(std::list<std::string>  & ref);
 	const std::string & get_DownloadDirectory();
 	//uint16_t Torrent_peers(std::string & hash, torrent::peer_info ** peers);
 	int event_sock_ready2read(network::Socket sock);

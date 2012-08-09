@@ -723,17 +723,15 @@ const std::string & Peer::get_ip_str()
 	return m_ip;
 }
 
-int Peer::get_info(peer_info * info)
+int Peer::get_info(info::peer & ref)
 {
-	if (info == NULL)
-		return ERR_NULL_REF;
-	info->downSpeed = get_rx_speed();
-	info->upSpeed = get_tx_speed();
-	info->downloaded = m_downloaded;
-	info->uploaded = m_uploaded;
-	info->available = m_available_pieces.size() / m_torrent->get_piece_count();
-	memset(info->ip, 0, 22);
-	memcpy(info->ip, m_ip.c_str(), 22);
+	ref.downSpeed = get_rx_speed();
+	ref.upSpeed = get_tx_speed();
+	ref.downloaded = m_downloaded;
+	ref.uploaded = m_uploaded;
+	ref.available = m_available_pieces.size() / m_torrent->get_piece_count();
+	memset(ref.ip, 0, 22);
+	memcpy(ref.ip, m_ip.c_str(), 22);
 	return ERR_NO_ERROR;
 }
 

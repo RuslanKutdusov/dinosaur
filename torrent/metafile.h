@@ -26,6 +26,12 @@
 namespace torrent {
 
 class Metafile {
+public:
+	struct file_info
+	{
+		uint64_t 				length;
+		std::string				name;
+	};
 private:
 	bencode::be_node * 			m_metafile;
 	uint64_t 					m_metafile_len;
@@ -42,7 +48,7 @@ public:
 	uint64_t 					creation_date;
 	uint64_t 					private_;
 	uint64_t 					length;
-	std::vector<base_file_info> 		files;
+	std::vector<file_info> files;
 	dir_tree::DirTree			dir_tree;
 	std::string 				name;
 	uint64_t 					piece_length;

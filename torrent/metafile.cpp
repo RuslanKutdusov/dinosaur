@@ -364,7 +364,7 @@ void Metafile::dump()
 	std::cout<<"PRIVATE: "<<private_<<std::endl;
 	std::cout<<"LENGHT: "<<length<<std::endl;
 	std::cout<<"FILES:"<<std::endl;
-	for(std::vector<base_file_info>::iterator iter = files.begin(); iter != files.end(); ++iter)
+	for(std::vector<file_info>::iterator iter = files.begin(); iter != files.end(); ++iter)
 	{
 		std::cout<<"	"<<iter->name<<"	"<<iter->length<<std::endl;
 	}

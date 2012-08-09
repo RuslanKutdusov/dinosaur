@@ -417,15 +417,13 @@ int Tracker::send_started()
 	return ERR_NO_ERROR;
 }
 
-int Tracker::get_info(tracker_info * info)
+int Tracker::get_info(info::tracker & ref)
 {
-	if (info == NULL)
-		return ERR_NULL_REF;
-	info->announce = m_announce;
-	info->leechers = m_leechers;
-	info->seeders = m_seeders == 0 ? m_peers_count : m_seeders;
-	info->status = m_status;
-	info->update_in = (time_t)m_interval - time(NULL) + m_last_update;
+	ref.announce = m_announce;
+	ref.leechers = m_leechers;
+	ref.seeders = m_seeders == 0 ? m_peers_count : m_seeders;
+	ref.status = m_status;
+	ref.update_in = (time_t)m_interval - time(NULL) + m_last_update;
 	return ERR_NO_ERROR;
 }
 

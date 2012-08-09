@@ -565,61 +565,89 @@ int TorrentBase::event_file_write(const fs::write_event & we)
 	return ERR_NO_ERROR;
 }
 
-int TorrentBase::get_info(torrent_info * info)
+void TorrentBase::get_info_stat(info::torrent_stat & ref)
 {
-	if (info == NULL)
-		return ERR_NULL_REF;
-	info->comment = m_metafile.comment;
-	info->created_by = m_metafile.created_by;
-	info->creation_date = m_metafile.creation_date;
-	info->download_directory = m_download_directory;
-	info->downloaded = m_downloaded;
-	info->length = m_metafile.length;
-	info->name = m_metafile.name;
-	info->piece_count = m_metafile.piece_count;
-	info->piece_length = m_metafile.piece_length;
-	info->private_ = m_metafile.private_;
-	info->rx_speed = m_rx_speed;
-	info->tx_speed = m_tx_speed;
-	info->uploaded = m_uploaded;
-	info->total_seeders = m_seeders.size();
-	memcpy(info->info_hash_hex, m_metafile.info_hash_hex, SHA1_HEX_LENGTH);
-	for(peer_list_iter iter = m_active_seeders.begin(); iter != m_active_seeders.end(); ++iter)
-	{
-		PeerPtr seeder = *iter;
-		peer_info pi;
-		seeder->get_info(&pi);
-		info->seeders.push_back(pi);
-	}
-	for(peer_map_iter iter = m_leechers.begin(); iter != m_leechers.end(); ++iter)
-	{
-		PeerPtr leecher = (*iter).second;
-		if (!leecher->is_sleep())
-		{
-			peer_info pi;
-			leecher->get_info(&pi);
-			info->leechers.push_back(pi);
-		}
-	}
+	ref.comment = m_metafile.comment;
+	ref.created_by = m_metafile.created_by;
+	ref.creation_date = m_metafile.creation_date;
+	ref.download_directory = m_download_directory;
+	ref.length = m_metafile.length;
+	ref.name = m_metafile.name;
+	ref.piece_count = m_metafile.piece_count;
+	ref.piece_length = m_metafile.piece_length;
+	ref.private_ = m_metafile.private_;
+	memcpy(ref.info_hash_hex, m_metafile.info_hash_hex, SHA1_HEX_LENGTH);
+}
+
+void TorrentBase::get_info_dyn(info::torrent_dyn & ref)
+{
+	ref.downloaded = m_downloaded;
+	ref.uploaded = m_uploaded;
+	ref.rx_speed = m_rx_speed;
+	ref.tx_speed = m_tx_speed;
+	ref.seeders  = m_active_seeders.size();
+	ref.total_seeders = m_seeders.size();
+	ref.leechers = m_leechers.size();
+	if (m_state == TORRENT_STATE_CHECKING)
+		ref.progress = ((m_metafile.piece_count - m_pieces2check.size()) * 100) / m_metafile.piece_count;
+	else
+		ref.progress = (m_downloaded * 100) / m_metafile.length;
+	ref.work = m_work;
+}
+
+void TorrentBase::get_info_trackers(info::trackers & ref)
+{
+	ref.clear();
 	for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
 	{
-		tracker_info ti;
-		(*iter).second->get_info(&ti);
-		info->trackers.push_back(ti);
+		info::tracker t;
+		(*iter).second->get_info(t);
+		ref.push_back(t);
 	}
+}
+
+void TorrentBase::get_info_files(info::files & ref)
+{
+	ref.clear();
 	for(size_t i = 0; i < m_metafile.files.size(); i++)
 	{
-		torrent_info::file f;
-		f.first = m_metafile.files[i].name;
-		f.second = m_metafile.files[i].length;
-		info->file_list_.push_back(f);
+		info::file_stat f;
+		f.path = m_metafile.files[i].name;
+		f.length = m_metafile.files[i].length;
+		f.index = i;
+		ref.push_back(f);
 	}
-	if (m_state == TORRENT_STATE_CHECKING)
-		info->progress = ((m_metafile.piece_count - m_pieces2check.size()) * 100) / m_metafile.piece_count;
-	else
-		info->progress = (m_downloaded * 100) / m_metafile.length;
+}
+
+int TorrentBase::get_info_file_dyn(FILE_INDEX index, info::file_dyn & ref)
+{
+	if (index >= m_metafile.files.size())
+		return ERR_BAD_ARG;
+	m_torrent_file->get_file_priority(index, ref.priority);
+	ref.downloaded = 0;
 	return ERR_NO_ERROR;
 }
+
+void TorrentBase::get_info_seeders(info::peers & ref)
+{
+	for(peer_list_iter iter = m_active_seeders.begin(); iter != m_active_seeders.end(); ++iter)
+	{
+		info::peer p;
+		(*iter)->get_info(p);
+		ref.push_back(p);
+	}
+}
+
+void TorrentBase::get_info_leechers(info::peers & ref)
+{
+	for(peer_map_iter iter = m_leechers.begin(); iter != m_leechers.end(); ++iter)
+	{
+		info::peer l;
+		(*iter).second->get_info(l);
+		ref.push_back(l);
+	}
+}
+
 
 int TorrentBase::erase_state()
 {
