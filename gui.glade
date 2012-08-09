@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <interface>
   <!-- interface-requires gtk+ 3.0 -->
+  <!-- interface-naming-policy toplevel-contextual -->
   <object class="GtkListStore" id="peer_list">
     <columns>
       <!-- column-name ip -->
@@ -74,7 +75,6 @@
             <child>
               <object class="GtkButton" id="button_open">
                 <property name="label" translatable="yes">Open</property>
-                <property name="use_action_appearance">False</property>
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
                 <property name="receives_default">True</property>
@@ -90,7 +90,6 @@
             <child>
               <object class="GtkButton" id="button_start">
                 <property name="label" translatable="yes">Start</property>
-                <property name="use_action_appearance">False</property>
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
                 <property name="receives_default">True</property>
@@ -106,7 +105,6 @@
             <child>
               <object class="GtkButton" id="button_stop">
                 <property name="label" translatable="yes">Stop</property>
-                <property name="use_action_appearance">False</property>
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
                 <property name="receives_default">True</property>
@@ -124,7 +122,6 @@
             <child>
               <object class="GtkButton" id="button_delete">
                 <property name="label" translatable="yes">Delete</property>
-                <property name="use_action_appearance">False</property>
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
                 <property name="receives_default">True</property>
@@ -140,7 +137,6 @@
             <child>
               <object class="GtkButton" id="button_check">
                 <property name="label" translatable="yes">Check</property>
-                <property name="use_action_appearance">False</property>
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
                 <property name="receives_default">True</property>
@@ -151,6 +147,21 @@
                 <property name="expand">True</property>
                 <property name="fill">True</property>
                 <property name="position">4</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkButton" id="button_cfg">
+                <property name="label" translatable="yes">Config</property>
+                <property name="visible">True</property>
+                <property name="can_focus">True</property>
+                <property name="receives_default">True</property>
+                <property name="use_action_appearance">False</property>
+                <signal name="clicked" handler="on_button_cfg_clicked" swapped="no"/>
+              </object>
+              <packing>
+                <property name="expand">True</property>
+                <property name="fill">True</property>
+                <property name="position">5</property>
               </packing>
             </child>
           </object>
@@ -179,9 +190,6 @@
                         <property name="can_focus">True</property>
                         <property name="model">torrent_list</property>
                         <signal name="cursor-changed" handler="on_torrent_view_cursor_changed" swapped="no"/>
-                        <child internal-child="selection">
-                          <object class="GtkTreeSelection" id="treeview-selection1"/>
-                        </child>
                         <child>
                           <object class="GtkTreeViewColumn" id="treeviewcolumn1">
                             <property name="resizable">True</property>
@@ -312,9 +320,6 @@
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
                             <property name="model">tracker_list</property>
-                            <child internal-child="selection">
-                              <object class="GtkTreeSelection" id="treeview-selection2"/>
-                            </child>
                             <child>
                               <object class="GtkTreeViewColumn" id="treeviewcolumn8">
                                 <property name="resizable">True</property>
@@ -400,9 +405,6 @@
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
                             <property name="model">peer_list</property>
-                            <child internal-child="selection">
-                              <object class="GtkTreeSelection" id="treeview-selection3"/>
-                            </child>
                             <child>
                               <object class="GtkTreeViewColumn" id="treeviewcolumn13">
                                 <property name="title" translatable="yes">IP</property>
@@ -690,6 +692,18 @@
             <property name="expand">True</property>
             <property name="fill">True</property>
             <property name="position">1</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkStatusbar" id="statusbar">
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+            <property name="spacing">2</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+            <property name="position">2</property>
           </packing>
         </child>
       </object>
