@@ -630,6 +630,7 @@ int TorrentBase::get_info_file_dyn(FILE_INDEX index, info::file_dyn & ref)
 
 void TorrentBase::get_info_seeders(info::peers & ref)
 {
+	ref.clear();
 	for(peer_list_iter iter = m_active_seeders.begin(); iter != m_active_seeders.end(); ++iter)
 	{
 		info::peer p;
@@ -640,6 +641,7 @@ void TorrentBase::get_info_seeders(info::peers & ref)
 
 void TorrentBase::get_info_leechers(info::peers & ref)
 {
+	ref.clear();
 	for(peer_map_iter iter = m_leechers.begin(); iter != m_leechers.end(); ++iter)
 	{
 		info::peer l;

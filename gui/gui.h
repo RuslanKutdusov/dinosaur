@@ -12,6 +12,7 @@
 #include <string>
 #include "../bittorrent/Bittorrent.h"
 #include "../torrent/torrent.h"
+#include "../torrent/torrent_types.h"
 
 
 //extern "C" void on_window1_destroy (GtkObject *object, gpointer user_data);
