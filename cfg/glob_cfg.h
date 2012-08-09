@@ -132,7 +132,7 @@ public:
 		if (cfg.download_directory[cfg.download_directory.length() - 1] != '/')
 			cfg.download_directory.append("/");
 
-		cfg.port = 23412;
+		cfg.port = 6881;
 		cfg.write_cache_size = 512;
 		cfg.read_cache_size = 512;
 		cfg.tracker_default_interval = 600;
