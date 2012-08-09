@@ -53,7 +53,9 @@ Dinosaur::Dinosaur()
 
 void Dinosaur::init_listen_socket()
 {
-	m_nm.ListenSocket_add(m_gcfg.get_port(), shared_from_this(), m_sock);
+	in_addr addr;
+	m_gcfg.get_listen_on(&addr);
+	m_nm.ListenSocket_add(m_gcfg.get_port(), &addr, shared_from_this(), m_sock);
 }
 
 Dinosaur::~Dinosaur() {

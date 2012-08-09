@@ -222,10 +222,9 @@ int NetworkManager::Socket_add(int sock_fd, struct sockaddr_in * addr, const Soc
 	return ERR_NO_ERROR;
 }
 
-int NetworkManager::ListenSocket_add(uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock)
+int NetworkManager::ListenSocket_add(sockaddr_in * addr, const SocketAssociation::ptr & assoc, Socket & sock)
 {
 	struct epoll_event event;
-	struct sockaddr_in addr;
 	const unsigned int yes = 1;
 	//struct socket_ * sock = (struct socket_ *)malloc(sizeof(struct socket_));
 	sock.reset(new socket_());
@@ -250,11 +249,11 @@ int NetworkManager::ListenSocket_add(uint16_t port, const SocketAssociation::ptr
 		return ERR_INTERNAL;
 	}
 
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons (port);
-	inet_pton(AF_INET,"0.0.0.0",&addr.sin_addr);
-	memcpy((void *)&sock->m_peer, (void *)&addr, sizeof(struct sockaddr_in));
-	if (bind (sock->m_socket, (const struct sockaddr *) &addr, sizeof (addr)))
+	//addr.sin_family = AF_INET;
+	//addr.sin_port = htons (port);
+	//inet_pton(AF_INET,"0.0.0.0",&addr.sin_addr);
+	memcpy((void *)&sock->m_peer, (void *)addr, sizeof(struct sockaddr_in));
+	if (bind (sock->m_socket, (const struct sockaddr *) addr, sizeof (struct sockaddr)))
 	{
 		close(sock->m_socket);
 		sock.reset();
@@ -287,6 +286,38 @@ int NetworkManager::ListenSocket_add(uint16_t port, const SocketAssociation::ptr
 	//if (lock_mutex)
 	pthread_mutex_unlock(&m_mutex_sockets);
 	return ERR_NO_ERROR;
+}
+
+int NetworkManager::ListenSocket_add(uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock)
+{
+	sockaddr_in addr;
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons (port);
+	inet_pton(AF_INET, "0.0.0.0", &addr.sin_addr);
+	return ListenSocket_add(&addr, assoc, sock);
+}
+
+int NetworkManager::ListenSocket_add(uint16_t port, in_addr * addr, const SocketAssociation::ptr & assoc, Socket & sock)
+{
+	sockaddr_in sockaddr;
+	sockaddr.sin_family = AF_INET;
+	sockaddr.sin_port = htons (port);
+	memcpy(&sockaddr.sin_addr, addr, sizeof(in_addr));
+	return ListenSocket_add(&sockaddr, assoc, sock);
+}
+
+int NetworkManager::ListenSocket_add(uint16_t port, const char * ip, const SocketAssociation::ptr & assoc, Socket & sock)
+{
+	sockaddr_in addr;
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons (port);
+	inet_pton(AF_INET, ip, &addr.sin_addr);
+	return ListenSocket_add(&addr, assoc, sock);
+}
+
+int NetworkManager::ListenSocket_add(uint16_t port, const std::string & ip, const SocketAssociation::ptr & assoc, Socket & sock)
+{
+	return ListenSocket_add(port, ip.c_str(), assoc, sock);
 }
 
 int NetworkManager::clock()

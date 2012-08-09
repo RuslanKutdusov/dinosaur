@@ -551,7 +551,8 @@ int TorrentBase::event_file_write(const fs::write_event & we)
 		delete[] bitfield;
 		m_piece_manager->clear_piece_taken_from(piece_index);
 		m_work = m_downloaded == m_metafile.length ? TORRENT_UPLOADING : TORRENT_DOWNLOADING;
-		m_have_list.push_back(piece_index);
+		if (m_g_cfg->get_send_have())
+			m_have_list.push_back(piece_index);
 		return ERR_NO_ERROR;
 	}
 	if (piece_state == PIECE_STATE_FIN_HASH_BAD)

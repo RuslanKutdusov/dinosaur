@@ -184,7 +184,11 @@ public:
 	int Socket_add(int sock_fd, struct sockaddr_in * addr, const SocketAssociation::ptr & assoc, Socket & sock);
 	int Socket_add_domain(const char *domain_name, uint16_t port, const SocketAssociation::ptr & assoc, Socket & socket);
 	int Socket_add_domain(std::string & domain_name, uint16_t port, const SocketAssociation::ptr & assoc, Socket & socket);
+	int ListenSocket_add(sockaddr_in * addr, const SocketAssociation::ptr & assoc, Socket & sock);
 	int ListenSocket_add(uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock);
+	int ListenSocket_add(uint16_t port, in_addr * addr, const SocketAssociation::ptr & assoc, Socket & sock);
+	int ListenSocket_add(uint16_t port, const char * ip, const SocketAssociation::ptr & assoc, Socket & sock);
+	int ListenSocket_add(uint16_t port, const std::string & ip, const SocketAssociation::ptr & assoc, Socket & sock);
 	int Socket_send(Socket & sock, const void * data, size_t len, bool full = true);//full == 1 => надо отправить все сразу
 	int Socket_recv(Socket & sock, void * data, size_t len);
 	ssize_t Socket_datalen(Socket & sock);
