@@ -24,6 +24,8 @@
 //  also see bnbt.h
 //
 
+namespace dinosaur {
+
 #if defined( __APPLE__ ) || defined( __SOLARIS__ )
  #define BNBT_BIG_ENDIAN
 #endif
@@ -88,5 +90,7 @@ private:
 	// Private SHA-1 transformation
 	void Transform(unsigned long state[5], unsigned char buffer[64]);
 };
+
+}
 
 #endif // ___SHA1_H___

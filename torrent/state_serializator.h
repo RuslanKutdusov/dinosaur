@@ -15,6 +15,7 @@
 #include <string.h>
 #include <string>
 
+namespace dinosaur {
 namespace torrent
 {
 
@@ -109,5 +110,6 @@ public:
 	}
 };
 
+}
 }
 #endif /* STATE_SERIALIZATOR_H_ */

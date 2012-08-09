@@ -7,6 +7,7 @@
 
 #include "fs.h"
 
+namespace dinosaur {
 namespace fs
 {
 
@@ -16,26 +17,26 @@ file::file()
 	printf("file default constructor\n");
 #endif
 	m_length = 0;
-	m_fictive = false;
+	m_should_exists = false;
 	m_fn = NULL;
 	m_fd = -1;
 	m_instance2delete = false;
 }
 
-file::file(const char * fn, uint64_t length, bool fictive, const FileAssociation::ptr & assoc)
+file::file(const char * fn, uint64_t length, bool should_exists, const FileAssociation::ptr & assoc)
 {
 #ifdef BITTORRENT_DEBUG
 	printf("file constructor fn=%s length=%llu\n", fn, length);
 #endif
-	if (fn == NULL || length == 0)
-		throw Exception("Can not create file");
+	if (fn == NULL)
+		throw Exception(FS_ERROR_CAN_NOT_CREATE_FILE);
 	int fn_str_len = strlen(fn);
 	m_fn = new char[fn_str_len + 1];
 	//memset(m_fn, 0, strlen(fn) + 1);
 	strncpy(m_fn, fn, fn_str_len);
 	m_fn[fn_str_len] = '\0';
 	m_length = length;
-	m_fictive = fictive;
+	m_should_exists = should_exists;
 	m_assoc = assoc;
 	m_fd = -1;
 	m_instance2delete = false;
@@ -56,62 +57,91 @@ file::~file()
 
 int file::_open()
 {
-	//printf("opening file id=%d\n", m_id);
-	bool _new = false;
+#ifdef FS_DEBUG
+	printf("Opening file %s\n", m_fn);
+#endif
+	bool not_exists = false;
 	struct stat st;
 	//если файла нет, говорим что новый
 	if (stat(m_fn, &st) == -1 || (uint64_t)st.st_size != m_length)
-		_new = true;
-	if (!_new)
+		not_exists = true;
+	if (not_exists && m_should_exists)
 	{
-		//printf("file is not new, opening\n");
+			#ifdef FS_DEBUG
+				printf("Fail: file %s does not exists\n", m_fn);
+			#endif
+		return ERR_FILE_NOT_EXISTS;
+	}
+	if (!not_exists)
+	{
 		m_fd = open(m_fn, O_RDWR | O_LARGEFILE);
 		if (m_fd == -1)
 		{
+			#ifdef FS_DEBUG
+				printf("Fail: %s\n", sys_errlist[errno]);
+			#endif
 			return ERR_SYSCALL_ERROR;
 		}
 	}
 	//создаем/открываем файл
 	//если файл новый, то транкаем его
-	if (_new)
+	if (not_exists)
 	{
-		//printf("file is new, creating and opening\n");
 		m_fd = open(m_fn, O_RDWR | O_CREAT | O_LARGEFILE, S_IRWXU | S_IRWXG | S_IRWXO);
 		if (m_fd == -1)
 		{
+			#ifdef FS_DEBUG
+				printf("Fail: %s\n", sys_errlist[errno]);
+			#endif
 			return ERR_SYSCALL_ERROR;
 		}
 		//printf("truncating\n");
 		if (ftruncate64(m_fd, m_length) == -1)
 		{
+			#ifdef FS_DEBUG
+				printf("Fail: %s\n", sys_errlist[errno]);
+			#endif
 			return ERR_SYSCALL_ERROR;
 		}
 	}
-	//printf("ok\n");
+	#ifdef FS_DEBUG
+		printf("OK\n");
+	#endif
 	return ERR_NO_ERROR;
 }
 
 int file::_write(const char * buf, uint64_t offset, uint64_t length)
 {
-	//pFile = fopen ( m_files[file_index++].name , "r+"
+	#ifdef FS_DEBUG
+		printf("Writing to file %s offset=%llu length=%llu\n", m_fn,  offset, length);
+	#endif
 	int ret;
 	if (!is_opened())
+	{
+		#ifdef FS_DEBUG
+			printf("Fail: File is not opened\n");
+		#endif
 		return ERR_FILE_NOT_OPENED;
-	//printf("write id=%d %llu %llu\n", m_id, offset, length);
+	}
 	ret = lseek64 ( m_fd , offset , SEEK_SET );
 	if (ret == -1)
 	{
-		//_close();
-		//printf("lseek error\n");
+		#ifdef FS_DEBUG
+			printf("Fail: %s\n", sys_errlist[errno]);
+		#endif
 		return ERR_SYSCALL_ERROR;
 	}
 	ret = write(m_fd, buf, length);
 	if (ret == -1)
 	{
-		//_close();
+		#ifdef FS_DEBUG
+			printf("Fail: %s\n", sys_errlist[errno]);
+		#endif
 		return ERR_SYSCALL_ERROR;
 	}
-	//_close();
+	#ifdef FS_DEBUG
+		printf("OK\n");
+	#endif
 	return ret;
 }
 
@@ -158,5 +188,5 @@ uint64_t file::get_length()
 	return m_length;
 }
 
-
+}
 }

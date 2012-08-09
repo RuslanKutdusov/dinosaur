@@ -8,6 +8,7 @@
 
 #include "torrent.h"
 
+namespace dinosaur {
 namespace torrent
 {
 
@@ -54,5 +55,6 @@ void get_peer_key(sockaddr_in * addr, std::string & key)
 	key.append(port_c);
 }
 
+}
 }
 

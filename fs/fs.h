@@ -28,6 +28,7 @@
 //#define CACHE_ELEMENT_SIZE BLOCK_LENGTH
 #define MAX_OPENED_FILES 512
 
+namespace dinosaur {
 namespace fs {
 
 struct buffer
@@ -67,22 +68,22 @@ public:
 	{
 		return shared_from_this();
 	}
-	virtual int event_file_write(write_event * eo) = 0;
+	virtual int event_file_write(const write_event & eo) = 0;
 };
 
 
 class file
 {
 private:
-	uint64_t m_length;
-	uint16_t m_fictive;
-	char * m_fn;
-	int m_fd;
-	FileAssociation::ptr m_assoc;
-	bool m_instance2delete;
+	uint64_t 				m_length;
+	bool 					m_should_exists;
+	char * 					m_fn;
+	int 					m_fd;
+	FileAssociation::ptr 	m_assoc;
+	bool 					m_instance2delete;
 public:
 	file();
-	file(const char * fn, uint64_t length, bool fictive, const FileAssociation::ptr & assoc);
+	file(const char * fn, uint64_t length, bool should_exists, const FileAssociation::ptr & assoc);
 	int _open();
 	int _write(const char * buf, uint64_t offset, uint64_t length);
 	int _read(char * buf, uint64_t offset, uint64_t length);
@@ -150,6 +151,7 @@ private:
 	FD_LRU_Cache m_fd_cache;
 	std::set<File> m_files;
 	std::list<write_event> m_write_event;
+	std::string m_error;
 	static void * cache_thread(void * arg);
 	int prepare_file(File & file);
 public:
@@ -157,14 +159,22 @@ public:
 	int Init(cfg::Glob_cfg * cfg);
 	int Init_for_tests(uint16_t write_cache_size, uint16_t fd_cache_size);
 	~FileManager();
-	int File_add(const char * fn, uint64_t length, bool fictive, const FileAssociation::ptr & assoc, File & file);
-	int File_add(const std::string & fn, uint64_t length, bool fictive, const FileAssociation::ptr & assoc, File & file);
+	int File_add(const char * fn, uint64_t length, bool should_exists, const FileAssociation::ptr & assoc, File & file);
+	int File_add(const std::string & fn, uint64_t length, bool should_exists, const FileAssociation::ptr & assoc, File & file);
 	int File_write(File & file, const char * buf, uint32_t length, uint64_t offset, const BLOCK_ID & block_id );
 	int File_read_immediately(File & file, char * buf, uint64_t offset, uint64_t length);
 	void File_delete(File & file);
+	bool File_exists(const char *fn) const;
+	bool File_exists(const std::string & fn) const;
+	bool File_exists(const char *fn, uint64_t length) const;
+	bool File_exists(const std::string & fn, uint64_t length) const;
 	void notify();
+	const std::string & get_error()
+	{
+		return m_error;
+	}
 };
 
-
+}
 }
 

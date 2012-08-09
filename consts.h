@@ -10,7 +10,7 @@
 
 #define MAX_FILENAME_LENGTH 2048
 #define STATE_FILE_VERSION 1
-#define CONFIG_FILE_VERSION 2
+#define CONFIG_FILE_VERSION 3
 #define CLIENT_ID "-DI-0001-35345343441"
 #define BLOCK_LENGTH 16384
 #define HANDSHAKE_LENGHT 68
@@ -22,6 +22,7 @@
 #define PEER_ID_LENGTH 20
 #define PEER_SLEEP_TIME 60
 #define PEER_MAX_REQUEST_NUMBER 64
+#define IP_CHAR_LENGHT 16 //xxx.xxx.xxx.xxx\0
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////STRING CONSTS////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,8 +41,20 @@
 #define TORRENT_ERROR_CAN_NOT_START "Can not start torrent"
 #define TORRENT_ERROR_NO_STATE_FILE "Can not find state file"
 
+#define FS_ERROR_CAN_NOT_CREATE_CACHE "Can not create cache"
+#define FS_ERROR_CAN_NOT_CREATE_FILE "Can not create file"
+#define FS_ERROR_CACHE_ERROR "Cache error"
+#define FS_ERROR_CACHE_FULL "Cache full"
+#define FS_ERROR_FILE_NOT_EXISTS "File does not exists"
+#define FS_ERROR_CAN_NOT_CREATE_DIR "Can not create directory"
+
 #define GENERAL_ERROR_NO_MEMORY_AVAILABLE "No memory available"
 #define GENERAL_ERROR_UNDEF_ERROR "Something wrong"
+#define GENERAL_ERROR_CAN_NOT_CREATE_THREAD "Can not create thread"
+#define GENERAL_ERROR_NO_ERROR "No error"
+#define GENERAL_ERROR_SYSCALL "Syscall error: "
+
+#define CFG_CAN_NOT_SAVE_CFG "Can not save configs"
 
 
 #endif /* CONSTS_H_ */

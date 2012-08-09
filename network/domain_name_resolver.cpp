@@ -7,6 +7,7 @@
 
 #include "network.h"
 
+namespace dinosaur {
 namespace network
 {
 
@@ -108,4 +109,5 @@ int DomainNameResolver::split_domain_and_port()
 	return ERR_NO_ERROR;
 }
 
+}
 }

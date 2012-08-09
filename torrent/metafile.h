@@ -21,11 +21,19 @@
 #include "../utils/sha1.h"
 #include "../exceptions/exceptions.h"
 #include "../utils/utils.h"
+#include "../types.h"
 #include "torrent_types.h"
 
+namespace dinosaur {
 namespace torrent {
 
 class Metafile {
+public:
+	struct file_info
+	{
+		uint64_t 				length;
+		std::string				name;
+	};
 private:
 	bencode::be_node * 			m_metafile;
 	uint64_t 					m_metafile_len;
@@ -42,14 +50,14 @@ public:
 	uint64_t 					creation_date;
 	uint64_t 					private_;
 	uint64_t 					length;
-	std::vector<base_file_info> 		files;
+	std::vector<file_info> files;
 	dir_tree::DirTree			dir_tree;
 	std::string 				name;
 	uint64_t 					piece_length;
 	uint32_t 					piece_count;
 	char * 						pieces;
-	SHA1_HASH 					info_hash_bin;
-	SHA1_HASH_HEX 				info_hash_hex;
+	dinosaur::SHA1_HASH 		info_hash_bin;
+	dinosaur::SHA1_HASH_HEX 	info_hash_hex;
 	Metafile();
 	Metafile(const Metafile & metafile);
 	Metafile & operator = (const Metafile & metafile);
@@ -63,4 +71,5 @@ public:
 typedef boost::shared_ptr<Metafile> MetafilePtr;
 
 } /* namespace torrent */
+}
 #endif /* METAFILE_H_ */

@@ -17,7 +17,7 @@
 #include "../err/err_code.h"
 
 
-
+namespace dinosaur {
 namespace lru_cache
 {
 
@@ -204,5 +204,5 @@ int LRU_Cache<cache_key, cache_element>::remove(cache_key key)
 	return ERR_NO_ERROR;
 }
 
-
+}
 } /* namespace Bittorrent */

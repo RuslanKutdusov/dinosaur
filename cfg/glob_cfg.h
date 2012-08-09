@@ -19,110 +19,92 @@
 #include "../exceptions/exceptions.h"
 #include "../err/err_code.h"
 #include "../consts.h"
+#include "../types.h"
+#include <fstream>
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/archive/archive_exception.hpp>
+#include <boost/serialization/version.hpp>
 
+namespace dinosaur {
 namespace cfg {
 
-struct config_file
+struct config
 {
-	int version;
-	char download_directory[MAX_FILENAME_LENGTH];
-	uint16_t port;
-	uint16_t cache_size;
-	uint64_t tracker_default_interval;
-	uint32_t tracker_numwant;
-	uint32_t max_active_seeders;
-	uint32_t max_active_leechers;
+	std::string 		download_directory;
+	uint16_t 			port;
+	uint16_t 			write_cache_size;
+	uint16_t 			read_cache_size;
+	uint64_t 			tracker_default_interval;
+	uint32_t			tracker_numwant;
+	uint32_t 			max_active_seeders;
+	uint32_t 			max_active_leechers;
+	bool 				send_have;
+	uint32_t 			listen_on;
+	uint16_t			max_active_torrents;
+	friend class boost::serialization::access;
+	template<class Archive>
+	void serialize(Archive & ar, const unsigned int version)
+	{
+		ar & download_directory;
+		ar & port;
+		ar & write_cache_size;
+		ar & read_cache_size;
+		ar & tracker_default_interval;
+		ar & tracker_numwant;
+		ar & max_active_seeders;
+		ar & max_active_leechers;
+		ar & send_have;
+		ar & max_active_torrents;
+	}
 };
+//BOOST_CLASS_VERSION(config, 1)
 
 class Glob_cfg {
 private:
-	std::string m_work_directory;
-	std::string m_download_directory; //папка для торрентов
-	char m_peer_id[20];
-	uint16_t m_port;
-	uint16_t m_cache_size;
-	uint64_t m_tracker_default_interval;
-	uint32_t m_tracker_numwant;
-	uint32_t m_max_active_seeders;
-	uint32_t m_max_active_leechers;
-public:
-	Glob_cfg(){}
-	Glob_cfg(std::string work_directory)
+	std::string				m_work_directory;
+	std::string 			m_cfg_file_name;
+	config 					cfg;
+	dinosaur::PEER_ID		m_peer_id;
+	int serialize()
 	{
-		m_work_directory = work_directory;
-
-		struct stat st;
-			//формируем путь к файлу вида $HOME/.dinosaur/config
-		std::string cfg_file_name = m_work_directory;
-		cfg_file_name.append("config");
-		bool _new = false;
-		//если файла нет или его длина не равна размеру структуры => косяк, делаем заново
-		if (stat(cfg_file_name.c_str(), &st) == -1 || (uint64_t)st.st_size != sizeof(config_file))
-			_new = true;
-		int fd = open(cfg_file_name.c_str(), O_RDWR | O_CREAT, S_IRWXU);
-		if (fd == -1)
-			throw Exception();
-		if (_new)
+		std::ofstream ofs(m_cfg_file_name.c_str());
+		if (ofs.fail())
+			return -1;
+		try
 		{
-			if (init_default_config() != ERR_NO_ERROR || save_config(fd) != ERR_NO_ERROR)
-			{
-				close(fd);
-				throw Exception();
-			}
+			boost::archive::text_oarchive oa(ofs);
+			oa << cfg;
 		}
-		else
+		catch(boost::archive::archive_exception & e)
 		{
-			if (read_config(fd) != ERR_NO_ERROR)
-			{
-				close(fd);
-				throw Exception();
-			}
+			return -1;
 		}
-		close(fd);
-		strncpy(m_peer_id, CLIENT_ID, 20);
+		catch(...)
+		{
+			return -1;
+		}
+		return 0;
 	}
-	int save_config(int fd)
+	int deserialize()
 	{
-		config_file cf;
-		cf.version = CONFIG_FILE_VERSION;
-		if (m_download_directory.length() > MAX_FILENAME_LENGTH)
-			return ERR_INTERNAL;
-		strncpy(cf.download_directory, m_download_directory.c_str(), m_download_directory.length());
-		cf.port = m_port;
-		cf.cache_size = m_cache_size;
-		cf.tracker_default_interval = m_tracker_default_interval;
-		cf.tracker_numwant = m_tracker_numwant;
-		cf.max_active_seeders = m_max_active_seeders;
-		cf.max_active_leechers = m_max_active_leechers;
-		ssize_t ret = write(fd, &cf, sizeof(config_file));
-		if (ret == -1)
-			return ERR_SYSCALL_ERROR;
-		return ERR_NO_ERROR;
-	}
-	int read_config(int fd)
-	{
-		config_file cf;
-		ssize_t ret = read(fd, &cf, sizeof(config_file));
-		if (ret == -1)
+		std::ifstream ifs(m_cfg_file_name.c_str());
+		if (ifs.fail())
+			return -1;
+		try
 		{
-			if (init_default_config() != ERR_NO_ERROR || save_config(fd) != ERR_NO_ERROR)
-					return ERR_INTERNAL;
-			return ERR_NO_ERROR;
+			boost::archive::text_iarchive ia(ifs);
+			ia >> cfg;
 		}
-		if (cf.version != CONFIG_FILE_VERSION)
+		catch(boost::archive::archive_exception & e)
 		{
-			if (init_default_config() != ERR_NO_ERROR || save_config(fd) != ERR_NO_ERROR)
-				return ERR_INTERNAL;
-			return ERR_NO_ERROR;
+			return -1;
 		}
-		m_port = cf.port;
-		m_cache_size = cf.cache_size;
-		m_tracker_default_interval = cf.tracker_default_interval;
-		m_tracker_numwant = cf.tracker_numwant;
-		m_download_directory = cf.download_directory;
-		m_max_active_seeders = cf.max_active_seeders;
-		m_max_active_leechers = cf.max_active_leechers;
-		return ERR_NO_ERROR;
+		catch(...)
+		{
+			return -1;
+		}
+		return 0;
 	}
 	int init_default_config()
 	{
@@ -130,54 +112,183 @@ public:
 		passwd *pw = getpwuid(getuid());
 		if (pw == NULL)
 			return ERR_SYSCALL_ERROR;
-		m_download_directory = pw->pw_dir;
-		if (m_download_directory.length() <= 0)
-			throw Exception();
-		if (m_download_directory[m_download_directory.length() - 1] != '/')
-			m_download_directory.append("/");
-		m_port = 23412;
-		m_tracker_numwant = 300;
-		m_cache_size = 512;
-		m_tracker_default_interval = 600;
-		m_max_active_seeders = 20;
-		m_max_active_leechers = 10;
+		cfg.download_directory = pw->pw_dir;
+
+		if (cfg.download_directory[cfg.download_directory.length() - 1] != '/')
+			cfg.download_directory.append("/");
+
+		cfg.port = 6881;
+		cfg.write_cache_size = 512;
+		cfg.read_cache_size = 512;
+		cfg.tracker_default_interval = 600;
+		cfg.tracker_numwant = 300;
+		cfg.max_active_seeders = 20;
+		cfg.max_active_leechers = 10;
+		cfg.send_have = true;
+		inet_pton(AF_INET, "0.0.0.0", &cfg.listen_on);
+		cfg.max_active_torrents = 5;
 		return ERR_NO_ERROR;
+	}
+public:
+	Glob_cfg(){}
+	Glob_cfg(std::string work_directory)
+	{
+		m_work_directory = work_directory;
+		//формируем путь к файлу вида $HOME/.dinosaur/config
+		m_cfg_file_name = m_work_directory;
+		m_cfg_file_name.append("config");
+		if (deserialize() == -1)
+		{
+			init_default_config();
+			serialize();
+		}
+		strncpy(m_peer_id, CLIENT_ID, PEER_ID_LENGTH);
+	}
+	int save()
+	{
+		return serialize() == -1 ? ERR_UNDEF : ERR_NO_ERROR;
 	}
 	const std::string & get_download_directory()
 	{
-		return m_download_directory;
+		return cfg.download_directory;
 	}
-	void get_peer_id(char * c)
+	void get_peer_id(dinosaur::PEER_ID c)
 	{
-		if (c == NULL)
-			return;
-		strncpy(c, m_peer_id, 20);
+		strncpy(c, m_peer_id, PEER_ID_LENGTH);
 	}
 	uint16_t get_port()
 	{
-		return m_port;
+		return cfg.port;
 	}
-	uint16_t get_cache_size()
+	uint16_t get_write_cache_size()
 	{
-		return m_cache_size;
+		return cfg.write_cache_size;
+	}
+	uint16_t get_read_cache_size()
+	{
+		return cfg.read_cache_size;
 	}
 	uint32_t get_tracker_numwant()
 	{
-		return m_tracker_numwant;
+		return cfg.tracker_numwant;
 	}
 	uint64_t get_tracker_default_interval()
 	{
-		return m_tracker_default_interval;
+		return cfg.tracker_default_interval;
 	}
 	uint32_t get_max_active_seeders()
 	{
-		return m_max_active_seeders;
+		return cfg.max_active_seeders;
 	}
 	uint32_t get_max_active_leechers()
 	{
-		return m_max_active_leechers;
+		return cfg.max_active_leechers;
+	}
+	bool get_send_have()
+	{
+		return cfg.send_have;
+	}
+	void get_listen_on(IP_CHAR ip)
+	{
+		inet_ntop(AF_INET,  &cfg.listen_on, ip, INET_ADDRSTRLEN);
+	}
+	void get_listen_on(in_addr * addr)
+	{
+		memcpy(addr, &cfg.listen_on, sizeof(in_addr));
+	}
+	uint16_t get_max_active_torrents()
+	{
+		return cfg.max_active_torrents;
+	}
+
+
+	int set_download_directory(const char * dir)
+	{
+		struct stat st;
+		if(stat(dir, &st) == 0)
+		{
+			if (S_ISDIR(st.st_mode))
+			{
+				cfg.download_directory = dir;
+				return ERR_NO_ERROR;
+			}
+			else
+				return ERR_DIR_NOT_EXISTS;
+		}
+		else
+			return ERR_SYSCALL_ERROR;
+	}
+
+	int set_download_directory(const std::string & dir)
+	{
+		return set_download_directory(dir.c_str());
+	}
+	void set_port(uint16_t port)
+	{
+		cfg.port = port;
+	}
+	int set_write_cache_size(uint16_t s)
+	{
+		if (s == 0)
+			return ERR_BAD_ARG;
+		cfg.write_cache_size = s;
+		return ERR_NO_ERROR;
+	}
+	int set_read_cache_size(uint16_t s)
+	{
+		if (s == 0)
+			return ERR_BAD_ARG;
+		cfg.read_cache_size = s;
+		return ERR_NO_ERROR;
+	}
+	void set_tracker_numwant(uint32_t v)
+	{
+		cfg.tracker_numwant = v;
+	}
+	int set_tracker_default_interval(uint64_t v)
+	{
+		if (v == 0)
+			return ERR_BAD_ARG;
+		cfg.tracker_default_interval = v;
+		return ERR_NO_ERROR;
+	}
+	int set_max_active_seeders(uint32_t v)
+	{
+		if (v == 0)
+			return ERR_BAD_ARG;
+		cfg.max_active_seeders = v;
+		return ERR_NO_ERROR;
+	}
+	int set_max_active_leechers(uint32_t v)
+	{
+		if (v == 0)
+			return ERR_BAD_ARG;
+		cfg.max_active_leechers = v;
+		return ERR_NO_ERROR;
+	}
+	void set_send_have(bool v)
+	{
+		cfg.send_have = v;
+	}
+	int set_listen_on(IP_CHAR ip)
+	{
+		if (inet_pton(AF_INET, ip, &cfg.listen_on) <= 0)
+			return ERR_BAD_ARG;
+		return ERR_NO_ERROR;
+	}
+	void set_listen_on(in_addr * addr)
+	{
+		memcpy(&cfg.listen_on, addr, sizeof(in_addr));
+	}
+	int set_max_active_torrents(uint16_t v)
+	{
+		if (v == 0)
+		return ERR_BAD_ARG;
+		cfg.max_active_torrents = v;
+		return ERR_NO_ERROR;
 	}
 	~Glob_cfg(){}
 };
 
 } /* namespace cfg */
+}

@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+namespace dinosaur {
 namespace bencode
 {
 
@@ -85,6 +86,6 @@ void dump(be_node *node);
 void _free(be_node * data);
 
 }
-
+}
 
 

@@ -19,7 +19,7 @@
 
 #include "sha1.h"
 
-
+namespace dinosaur {
 CSHA1::CSHA1()
 {
 	Reset();
@@ -187,4 +187,6 @@ void CSHA1::ReportHash(char *szReport, unsigned char uReportType)
 void CSHA1::GetHash(unsigned char *uDest)
 {
 	memcpy(uDest, m_digest, 20);
+}
+
 }

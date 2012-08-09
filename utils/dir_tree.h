@@ -16,6 +16,7 @@
 #include <errno.h>
 #include "../err/err_code.h"
 
+namespace dinosaur {
 namespace dir_tree {
 
 class Dir
@@ -50,7 +51,7 @@ public:
 	int reset();
 	int put(const std::string & dir);
 	int put(const char * dir);
-	int make_dir_tree(std::string  current_dir);
+	int make_dir_tree(std::string current_dir);
 	~DirTree();
 };
 
@@ -113,4 +114,5 @@ public:
 };
 
 } /* namespace Bittorrent */
+}
 #endif /* DIRTREE_H_ */

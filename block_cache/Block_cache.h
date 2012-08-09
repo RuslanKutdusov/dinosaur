@@ -19,6 +19,7 @@
 #include "../lru_cache/lru_cache.h"
 #include "../utils/utils.h"
 
+namespace dinosaur{
 namespace block_cache {
 
 //то что ссылка нормально, всего 4 байт вместо 60, если ставить хэш, ссылкой пользуемся лишь для сравнения
@@ -32,3 +33,4 @@ struct cache_element
 typedef lru_cache::LRU_Cache<cache_key, cache_element> Block_cache;
 
 } /* namespace Bittorrent */
+}

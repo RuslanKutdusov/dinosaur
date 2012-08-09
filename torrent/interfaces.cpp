@@ -9,6 +9,7 @@
 
 #include "torrent.h"
 
+namespace dinosaur {
 namespace torrent
 {
 
@@ -43,7 +44,7 @@ uint32_t TorrentInterfaceInternal::get_piece_length()
 }
 
 
-int TorrentInterfaceInternal::get_files_count()
+size_t TorrentInterfaceInternal::get_files_count()
 {
 	return m_metafile.files.size();
 }
@@ -73,44 +74,49 @@ size_t TorrentInterfaceInternal::get_bitfield_length()
 	return m_piece_manager->get_bitfield_length();
 }
 
-base_file_info * TorrentInterfaceInternal::get_file_info(uint32_t file_index)
+Metafile::file_info * TorrentInterfaceInternal::get_file_info(FILE_INDEX file_index)
 {
-	return file_index >= m_metafile.files.size() ? NULL : &m_metafile.files[file_index];
+	return file_index >= (FILE_INDEX)m_metafile.files.size() ? NULL : &m_metafile.files[file_index];
 }
 
-dir_tree::DirTree * TorrentInterfaceInternal::get_dirtree()
+dir_tree::DirTree & TorrentInterfaceInternal::get_dirtree()
 {
-	return &m_metafile.dir_tree;
+	return m_metafile.dir_tree;
 }
 
-int TorrentInterfaceInternal::get_blocks_count_in_piece(uint32_t piece, uint32_t & blocks_count)
+void TorrentInterfaceInternal::get_blocks_count_in_piece(uint32_t piece, uint32_t & blocks_count)
 {
-	return m_piece_manager->get_blocks_count_in_piece(piece, blocks_count);
+	m_piece_manager->get_blocks_count_in_piece(piece, blocks_count);
 }
 
-int TorrentInterfaceInternal::get_piece_length(uint32_t piece, uint32_t & piece_length)
+void TorrentInterfaceInternal::get_piece_length(uint32_t piece, uint32_t & piece_length)
 {
-	return m_piece_manager->get_piece_length(piece, piece_length);
+	m_piece_manager->get_piece_length(piece, piece_length);
 }
 
-int TorrentInterfaceInternal::get_block_index_by_offset(uint32_t piece_index, uint32_t block_offset, uint32_t & index)
+void TorrentInterfaceInternal::get_block_index_by_offset(uint32_t piece_index, uint32_t block_offset, uint32_t & index)
 {
-	return m_piece_manager->get_block_index_by_offset(piece_index, block_offset, index);
+	m_piece_manager->get_block_index_by_offset(piece_index, block_offset, index);
 }
 
-int TorrentInterfaceInternal::get_block_length_by_index(uint32_t piece_index, uint32_t block_index, uint32_t & block_length)
+void TorrentInterfaceInternal::get_block_length_by_index(uint32_t piece_index, uint32_t block_index, uint32_t & block_length)
 {
-	return m_piece_manager->get_block_length_by_index(piece_index, block_index, block_length);
+	m_piece_manager->get_block_length_by_index(piece_index, block_index, block_length);
 }
 
-int TorrentInterfaceInternal::get_piece_offset(uint32_t piece_index, uint64_t & offset)
+void TorrentInterfaceInternal::get_piece_offset(uint32_t piece_index, uint64_t & offset)
 {
-	return m_piece_manager->get_piece_offset(piece_index, offset);
+	m_piece_manager->get_piece_offset(piece_index, offset);
 }
 
-int TorrentInterfaceInternal::get_file_index_by_piece(uint32_t piece_index, int & index)
+void TorrentInterfaceInternal::get_block_info(PIECE_INDEX piece_index, BLOCK_INDEX block_index, FILE_INDEX & file_index, FILE_OFFSET & file_offset)
 {
-	return m_piece_manager->get_file_index_by_piece(piece_index, index);
+	 m_piece_manager->get_block_info(piece_index, block_index, file_index, file_offset);
+}
+
+void TorrentInterfaceInternal::get_file_index_by_piece(uint32_t piece_index, FILE_INDEX & index)
+{
+	m_piece_manager->get_file_index_by_piece(piece_index, index);
 }
 
 void TorrentInterfaceInternal::copy_infohash_bin(SHA1_HASH dst)
@@ -138,7 +144,7 @@ void TorrentInterfaceInternal::inc_downloaded(uint32_t bytes_num)
 	m_downloaded += bytes_num;
 }
 
-void TorrentInterfaceInternal::set_error(std::string err)
+void TorrentInterfaceInternal::set_error(const std::string & err)
 {
 	m_error = err;
 }
@@ -163,4 +169,5 @@ int TorrentInterfaceInternal::read_piece(uint32_t piece, unsigned char * dst)
 	return m_torrent_file->read_piece(piece, dst);
 }
 
+}
 }

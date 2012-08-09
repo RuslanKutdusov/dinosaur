@@ -12,6 +12,7 @@
 #include <set>
 #include <map>
 #include <vector>
+#include <deque>
 #include <list>
 #include <fstream>
 #include <sys/stat.h>
@@ -33,7 +34,9 @@
 #include "state_serializator.h"
 #include "metafile.h"
 #include "torrent_types.h"
+#include "../types.h"
 
+namespace dinosaur {
 namespace torrent {
 
 
@@ -127,7 +130,7 @@ public:
 	int clock(bool & release_me);
 	int send_stopped();
 	int send_started();
-	int get_info(tracker_info * info);
+	int get_info(info::tracker & ref);
 };
 
 class Peer : public network::SocketAssociation
@@ -145,26 +148,26 @@ private:
 		PEER_STATE_SLEEP
 	};
 private:
-	network::NetworkManager * 		m_nm;
-	cfg::Glob_cfg * 				m_g_cfg;
-	TorrentInterfaceInternalPtr		m_torrent;
-	sockaddr_in 					m_addr;
-	network::Socket 				m_sock;
-	network::buffer 				m_buf;
-	std::string 					m_ip;
-	uint64_t 						m_downloaded;
-	uint64_t 						m_uploaded;
-	std::set<uint32_t> 				m_available_pieces;
-	bool 							m_peer_choking;//пир нас заблокирован
-	bool 							m_peer_interested;//пир в нас заинтересован
-	bool 							m_am_choking;//я блокирую пира
-	bool 							m_am_interested;//я заинтересован в пире
-	int 							m_state;
-	BITFIELD 						m_bitfield;
-	std::set<BLOCK_ID> 				m_requested_blocks;//блоки, которые мы запросили
-	std::set<BLOCK_ID>				m_blocks2request;
-	std::set<BLOCK_ID> 				m_requests_queue;//блоки, которые у нас запросили(очередь запросов)
-	time_t 							m_sleep_time;
+	network::NetworkManager * 			m_nm;
+	cfg::Glob_cfg * 					m_g_cfg;
+	TorrentInterfaceInternalPtr			m_torrent;
+	sockaddr_in 						m_addr;
+	network::Socket 					m_sock;
+	network::buffer 					m_buf;
+	std::string 						m_ip;
+	uint64_t 							m_downloaded;
+	uint64_t 							m_uploaded;
+	std::set<PIECE_INDEX>	m_available_pieces;
+	bool 								m_peer_choking;//пир нас заблокирован
+	bool 								m_peer_interested;//пир в нас заинтересован
+	bool 								m_am_choking;//я блокирую пира
+	bool 								m_am_interested;//я заинтересован в пире
+	int 								m_state;
+	BITFIELD 				m_bitfield;
+	std::set<BLOCK_ID> 					m_requested_blocks;//блоки, которые мы запросили
+	std::set<BLOCK_ID>					m_blocks2request;
+	std::set<BLOCK_ID> 					m_requests_queue;//блоки, которые у нас запросили(очередь запросов)
+	time_t 								m_sleep_time;
 	int process_messages();
 public:
 	Peer();
@@ -177,28 +180,28 @@ public:
 	int event_sock_accepted(network::Socket sock, network::Socket accepted_sock);
 	int event_sock_timeout(network::Socket sock);
 	int event_sock_unresolved(network::Socket sock);
-	int send_have(uint32_t piece_index);
+	int send_have(PIECE_INDEX piece_index);
 	int send_handshake();
 	int send_bitfield();
 	int send_choke();
 	int send_unchoke();
 	int send_interested();
 	int send_not_interested();
-	int send_request(uint32_t piece, uint32_t block, uint32_t block_length);
-	int send_piece(uint32_t piece, uint32_t offset, uint32_t length,  char * block);
-	bool have_piece(uint32_t piece_index);
+	int send_request(PIECE_INDEX piece, BLOCK_INDEX block, uint32_t block_length);
+	int send_piece(PIECE_INDEX piece, BLOCK_OFFSET offset, uint32_t length,  char * block);
+	bool have_piece(PIECE_INDEX piece_index);
 	bool is_choking();
 	int clock();
 	void goto_sleep();
 	bool is_sleep();
 	bool may_request();
-	int request(uint32_t piece_index, uint32_t block_index);
+	int request(PIECE_INDEX piece_index, BLOCK_INDEX block_index);
 	int request(const BLOCK_ID & block_id);
 	bool get_requested_block(BLOCK_ID & block_id);
 	double get_rx_speed();
 	double get_tx_speed();
 	const std::string & get_ip_str();
-	int get_info(peer_info * info);
+	int get_info(info::peer & ref);
 	int prepare2release();
 	void forced_releasing();
 	~Peer();
@@ -223,59 +226,63 @@ private:
 	typedef std::list<uint32_t>::iterator uint32_list_iter;
 	struct piece_info
 	{
-		int 							file_index;//индекс файла, в котором начинается кусок
-		uint32_t 						length;//его длина
-		uint64_t 						offset;//смещение внутри файла до начала куска
-		uint32_t 						block_count;//кол-во блоков в куске
-		std::set<std::string>			taken_from;
-		std::set<uint32_t>	 			block2download;
-		std::set<uint32_t>				downloaded_blocks;
-		SHA1_HASH						hash;
-		PIECE_PRIORITY					prio;
-		uint32_list_iter				prio_iter;
+		FILE_INDEX 														file_index;//индекс файла, в котором начинается кусок
+		uint32_t 																	length;//его длина
+		FILE_OFFSET 													offset;//смещение внутри файла до начала куска
+		uint32_t 																	block_count;//кол-во блоков в куске
+		std::vector<std::pair<FILE_INDEX, FILE_OFFSET> >	block_info;
+		std::set<std::string>														taken_from;
+		std::set<BLOCK_INDEX>	 										block2download;
+		std::set<BLOCK_INDEX>											downloaded_blocks;
+		SHA1_HASH														hash;
+		DOWNLOAD_PRIORITY												prio;
+		uint32_list_iter															prio_iter;
 	};
 	struct download_queue
 	{
-		uint32_list 					low_prio_pieces;
-		uint32_list 					normal_prio_pieces;
-		uint32_list 					high_prio_pieces;
+		uint32_list 								low_prio_pieces;
+		uint32_list 								normal_prio_pieces;
+		uint32_list 								high_prio_pieces;
 	};
 private:
-	TorrentInterfaceInternalPtr 		m_torrent;
+	TorrentInterfaceInternalPtr 					m_torrent;
 	BITFIELD 							m_bitfield;
-	size_t 								m_bitfield_len;
-	std::vector<piece_info> 			m_piece_info;
-	CSHA1 								m_csha1;
-	download_queue						m_download_queue;
-	uint32_list							m_tag_list;//хранит один элемент, на который будут ссылатся prio_iter у загруженных кусков
-	std::map<BLOCK_ID, uint32_t>		m_downloadable_blocks;
-	unsigned char *						m_piece_for_check_hash;
+	size_t 											m_bitfield_len;
+	std::vector<piece_info> 						m_piece_info;
+	CSHA1 											m_csha1;
+	download_queue									m_download_queue;
+	uint32_list										m_tag_list;//хранит один элемент, на который будут ссылатся prio_iter у загруженных кусков
+	std::map<BLOCK_ID, uint32_t>					m_downloadable_blocks;
+	unsigned char *									m_piece_for_check_hash;
+	std::deque<std::set<PIECE_INDEX> >  m_file_contains_pieces;
 	void build_piece_info();
 	int push_piece2download(uint32_t piece_index);
 public:
 	PieceManager(const TorrentInterfaceInternalPtr & torrent, BITFIELD bitfield);
 	void reset();
 	~PieceManager();
-	int get_blocks_count_in_piece(uint32_t piece_index, uint32_t & blocks_count);
-	int get_piece_length(uint32_t piece_index, uint32_t & piece_length);
-	int get_block_index_by_offset(uint32_t piece_index, uint32_t block_offset, uint32_t & index);
-	int get_block_length_by_index(uint32_t piece_index, uint32_t block_index, uint32_t & block_length);
-	int get_piece_offset(uint32_t piece_index, uint64_t & offset);
-	int get_file_index_by_piece(uint32_t piece_index, int & index);
+	void get_blocks_count_in_piece(PIECE_INDEX piece_index, uint32_t & blocks_count);
+	void get_piece_length(PIECE_INDEX piece_index, uint32_t & piece_length);
+	void get_block_index_by_offset(PIECE_INDEX piece_index, BLOCK_OFFSET block_offset, BLOCK_INDEX & index);
+	void get_block_length_by_index(PIECE_INDEX piece_index, BLOCK_INDEX block_index, uint32_t & block_length);
+	void get_piece_offset(PIECE_INDEX piece_index, FILE_OFFSET & offset);
+	void get_block_info(PIECE_INDEX piece_index, BLOCK_INDEX block_index, FILE_INDEX & file_index, FILE_OFFSET & file_offset);
+	void get_file_index_by_piece(PIECE_INDEX piece_index, FILE_INDEX & index);
 	size_t get_bitfield_length();
 	void copy_bitfield(BITFIELD dst);
-	bool check_piece_hash(uint32_t piece_index);
-	int front_piece2download(uint32_t & piece_index);
+	bool check_piece_hash(PIECE_INDEX piece_index);
+	int front_piece2download(PIECE_INDEX & piece_index);
 	void pop_piece2download();
-	int set_piece_taken_from(uint32_t piece_index, const std::string & seed);
-	bool get_piece_taken_from(uint32_t piece_index, std::string & seed);
-	int clear_piece_taken_from(uint32_t piece_index);
-	int set_piece_priority(uint32_t piece_index, PIECE_PRIORITY priority);
-	int get_piece_priority(uint32_t piece_index, PIECE_PRIORITY & priority);
-	int get_block2download(uint32_t piece_index, uint32_t & block_index);
-	int get_block2download_count(uint32_t piece_index);
-	int push_block2download(uint32_t piece_index, uint32_t block_index);
-	int event_file_write(fs::write_event * we, PIECE_STATE & piece_state);
+	int set_piece_taken_from(PIECE_INDEX piece_index, const std::string & seed);
+	bool get_piece_taken_from(PIECE_INDEX piece_index, std::string & seed);
+	int clear_piece_taken_from(PIECE_INDEX piece_index);
+	int set_piece_priority(PIECE_INDEX piece_index, DOWNLOAD_PRIORITY priority);
+	int get_piece_priority(PIECE_INDEX piece_index, DOWNLOAD_PRIORITY & priority);
+	int set_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY prio);
+	int get_block2download(PIECE_INDEX piece_index, BLOCK_INDEX & block_index);
+	int get_block2download_count(PIECE_INDEX piece_index);
+	int push_block2download(PIECE_INDEX piece_index, BLOCK_INDEX block_index);
+	int event_file_write(const fs::write_event & we, PIECE_STATE & piece_state);
 
 };
 typedef boost::shared_ptr<PieceManager> PieceManagerPtr;
@@ -283,25 +290,36 @@ typedef boost::shared_ptr<PieceManager> PieceManagerPtr;
 
 class TorrentFile : public fs::FileAssociation
 {
+public:
+	struct file
+	{
+		uint64_t 						length;
+		std::string						name;
+		bool 							download;
+		fs::File 						file_;
+		DOWNLOAD_PRIORITY	priority;
+	};
 private:
 	fs::FileManager * 				m_fm;
 	TorrentInterfaceInternalPtr 	m_torrent;
 	std::vector<file>				m_files;
 	TorrentFile(const TorrentInterfaceInternalPtr & t);
-	void init(const std::string & path);
+	void init(const std::string & path, bool files_should_exists, uint32_t & files_exists);
 public:
-	int save_block(uint32_t piece, uint32_t block_offset, uint32_t block_length, char * block);
-	int read_block(uint32_t piece, uint32_t block_index, char * block, uint32_t & block_length);
-	int read_piece(uint32_t piece_index, unsigned char * dst);
-	int event_file_write(fs::write_event * eo);
+	int save_block(PIECE_INDEX piece, BLOCK_OFFSET block_offset, uint32_t block_length, char * block);
+	int read_block(PIECE_INDEX piece, BLOCK_INDEX block_index, char * block, uint32_t & block_length);
+	int read_piece(PIECE_INDEX piece_index, unsigned char * dst);
+	int event_file_write(const fs::write_event & eo);
+	void set_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY prio);
+	void get_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY  & prio);
 	void ReleaseFiles();
 	~TorrentFile();
-	static void CreateTorrentFile(const TorrentInterfaceInternalPtr & t, const std::string & path, TorrentFilePtr & ptr)
+	static void CreateTorrentFile(const TorrentInterfaceInternalPtr & t, const std::string & path, bool files_should_exists, uint32_t & files_exists, TorrentFilePtr & ptr)
 	{
 		try
 		{
 			ptr.reset(new TorrentFile(t));
-			ptr->init(path);
+			ptr->init(path, files_should_exists, files_exists);
 		}
 		catch(Exception & e)
 		{
@@ -322,7 +340,8 @@ private:
 		TORRENT_STATE_STOPPED,
 		TORRENT_STATE_PAUSED,
 		TORRENT_STATE_CHECKING,
-		TORRENT_STATE_RELEASING
+		TORRENT_STATE_RELEASING,
+		TORRENT_STATE_FAILURE
 	};
 protected:
 	network::NetworkManager * 		m_nm;
@@ -352,7 +371,7 @@ protected:
 	double 							m_tx_speed;
 	TORRENT_STATE 					m_state;
 	std::string 					m_error;
-	TORRENT_WORK					m_work;
+	TORRENT_WORK		m_work;
 
 	virtual void add_seeders(uint32_t count, sockaddr_in * addrs);
 	virtual int add_leecher(network::Socket & sock);
@@ -362,13 +381,21 @@ protected:
 	virtual int pause();
 	virtual int continue_();
 	virtual int check();
+	virtual void set_failure();
 	virtual bool is_downloaded();
-	virtual int event_file_write(fs::write_event * we);
+	virtual int event_file_write(const fs::write_event & we);
 	virtual int clock();
-	virtual int get_info(torrent_info * info);
+	virtual void get_info_stat(info::torrent_stat & ref);
+	virtual void get_info_dyn(info::torrent_dyn & ref);
+	virtual void get_info_trackers(info::trackers & ref);
+	virtual void get_info_files(info::files & ref);
+	virtual int get_info_file_dyn(FILE_INDEX index, info::file_dyn & ref);
+	virtual void get_info_seeders(info::peers & ref);
+	virtual void get_info_leechers(info::peers & ref);
 	virtual int erase_state();
 	virtual void prepare2release();
 	virtual void forced_releasing();
+	virtual int set_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY prio);
 	TorrentBase(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc);
 	void init(const Metafile & metafile, const std::string & work_directory, const std::string & download_directory);
 	static void CreateTorrent(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc,
@@ -411,10 +438,17 @@ public:
 	virtual int check() = 0;
 	virtual bool is_downloaded() = 0;
 	virtual int clock() = 0;
-	virtual int get_info(torrent_info * info) = 0;
+	virtual void get_info_stat(info::torrent_stat & ref) = 0;
+	virtual void get_info_dyn(info::torrent_dyn & ref) = 0;
+	virtual void get_info_trackers(info::trackers & ref) = 0;
+	virtual void get_info_files(info::files & ref) = 0;
+	virtual int get_info_file_dyn(FILE_INDEX index, info::file_dyn & ref) = 0;
+	virtual void get_info_seeders(info::peers & ref) = 0;
+	virtual void get_info_leechers(info::peers & ref) = 0;
 	virtual int erase_state() = 0;
 	virtual void prepare2release() = 0;
 	virtual void forced_releasing() = 0;
+	virtual int set_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY prio) = 0;
 };
 
 class TorrentInterfaceInternal : public TorrentBase
@@ -426,31 +460,33 @@ public:
 	block_cache::Block_cache * get_bc();
 	uint32_t get_piece_count();
 	uint32_t get_piece_length();
-	int get_files_count();
+	size_t get_files_count();
 	uint64_t get_length();
 	std::string get_name();
 	uint64_t get_downloaded();
 	uint64_t get_uploaded();
 	size_t get_bitfield_length();
-	dir_tree::DirTree * get_dirtree();
-	base_file_info * get_file_info(uint32_t file_index);
-	int get_blocks_count_in_piece(uint32_t piece, uint32_t & blocks_count);
-	int get_piece_length(uint32_t piece, uint32_t & piece_length);
-	int get_block_index_by_offset(uint32_t piece_index, uint32_t block_offset, uint32_t & index);
-	int get_block_length_by_index(uint32_t piece_index, uint32_t block_index, uint32_t & block_length);
-	int get_piece_offset(uint32_t piece_index, uint64_t & offset);
-	int get_file_index_by_piece(uint32_t piece_index, int & index);
+	dir_tree::DirTree & get_dirtree();
+	Metafile::file_info * get_file_info(FILE_INDEX file_index);
+	void get_blocks_count_in_piece(PIECE_INDEX piece, uint32_t & blocks_count);
+	void get_piece_length(PIECE_INDEX piece, uint32_t & piece_length);
+	void get_block_index_by_offset(PIECE_INDEX piece_index, BLOCK_OFFSET block_offset, BLOCK_INDEX & index);
+	void get_block_length_by_index(PIECE_INDEX piece_index, BLOCK_INDEX block_index, uint32_t & block_length);
+	void get_piece_offset(PIECE_INDEX piece_index, FILE_OFFSET & offset);
+	void get_block_info(PIECE_INDEX piece_index, BLOCK_INDEX block_index, FILE_INDEX & file_index, FILE_OFFSET & file_offset);
+	void get_file_index_by_piece(PIECE_INDEX piece_index, FILE_INDEX & index);
 	void copy_infohash_bin(SHA1_HASH dst);
 	int memcmp_infohash_bin(SHA1_HASH mem);
 	void copy_bitfield(BITFIELD dst);
 	void inc_uploaded(uint32_t bytes_num);
 	void inc_downloaded(uint32_t bytes_num);
-	void set_error(std::string err);
-	void copy_piece_hash(SHA1_HASH dst, uint32_t piece_index);
-	int save_block(uint32_t piece, uint32_t block_offset, uint32_t block_length, char * block);
-	int read_block(uint32_t piece, uint32_t block_index, char * block, uint32_t & block_length);
-	int read_piece(uint32_t piece, unsigned char * dst);
-	virtual int event_file_write(fs::write_event * we) = 0;
+	void set_error(const std::string & err);
+	void copy_piece_hash(SHA1_HASH dst, PIECE_INDEX piece_index);
+	int save_block(PIECE_INDEX piece, BLOCK_OFFSET block_offset, uint32_t block_length, char * block);
+	int read_block(PIECE_INDEX piece, BLOCK_INDEX block_index, char * block, uint32_t & block_length);
+	int read_piece(PIECE_INDEX piece, unsigned char * dst);
+	virtual void set_failure() = 0;
+	virtual int event_file_write(const fs::write_event & we) = 0;
 	virtual void add_seeders(uint32_t count, sockaddr_in * addrs) = 0;
 };
 
@@ -460,3 +496,4 @@ bool bit_in_bitfield(uint32_t piece, uint32_t piece_count, BITFIELD bitfield);
 void get_peer_key(sockaddr_in * addr, std::string & key);
 
 } /* namespace TorrentNamespace */
+}

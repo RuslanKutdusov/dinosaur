@@ -7,6 +7,7 @@
 
 #include "metafile.h"
 
+namespace dinosaur {
 namespace torrent {
 
 Metafile::Metafile()
@@ -301,7 +302,6 @@ int Metafile::calculate_info_hash(bencode::be_node * info, uint64_t metafile_len
 		delete[] bencoded_info;
 		return ERR_INTERNAL;
 	}
-	bencode::dump(info);
 	CSHA1 csha1;
 	csha1.Update((unsigned char*)bencoded_info,bencoded_info_len);
 	csha1.Final();
@@ -365,7 +365,7 @@ void Metafile::dump()
 	std::cout<<"PRIVATE: "<<private_<<std::endl;
 	std::cout<<"LENGHT: "<<length<<std::endl;
 	std::cout<<"FILES:"<<std::endl;
-	for(std::vector<base_file_info>::iterator iter = files.begin(); iter != files.end(); ++iter)
+	for(std::vector<file_info>::iterator iter = files.begin(); iter != files.end(); ++iter)
 	{
 		std::cout<<"	"<<iter->name<<"	"<<iter->length<<std::endl;
 	}
@@ -375,3 +375,4 @@ void Metafile::dump()
 }
 
 } /* namespace torrent */
+}

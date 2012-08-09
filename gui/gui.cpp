@@ -19,8 +19,9 @@ GtkLabel* label_length;
 GtkLabel* label_dir;
 GtkLabel* label_piece_number;
 GtkLabel* label_piece_length;
-bittorrent::BittorrentPtr bt;
-torrent::MetafilePtr metafile;
+GtkStatusbar * statusbar;
+dinosaur::DinosaurPtr bt;
+dinosaur::torrent::MetafilePtr metafile;
 
 enum
 {
@@ -30,6 +31,9 @@ enum
 	TORRENT_LIST_COL_UPLOADED,
 	TORRENT_LIST_COL_DOWN_SPEED,
 	TORRENT_LIST_COL_UP_SPEED,
+	TORRENT_LIST_COL_WORK,
+	TORRENT_LIST_COL_SEEDS,
+	TORRENT_LIST_COL_LEECHS,
 	TORRENT_LIST_COL_HASH,
 	TORRENT_LIST_COLS
 };
@@ -54,6 +58,31 @@ enum
 	PEER_LIST_COL_AVAILABLE,
 	PEER_LIST_COLS
 };
+
+void int_bytes2str(uint64_t i, char * str, bool speed = false)
+{
+	char c[3];
+	strncpy(c, speed ? "/s\0" : "\0", 3);
+	if (i < 1024)
+	{
+		sprintf(str, "%llu B%s", i,c);
+		return;
+	}
+	if (i < 1048576)
+	{
+		float kb = i /  1024.0f;
+		sprintf(str, "%.2f KB%s", kb, c);
+		return;
+	}
+	if (i < 1073741824)
+	{
+		float mb = i / 1048576.0f;
+		sprintf(str, "%.2f MB%s", mb, c);
+		return;
+	}
+	float gb = i / 1073741824.0f;
+	sprintf(str, "%.2f MB%s", gb, c);
+}
 
 void messagebox(const char * message)
 {
@@ -83,11 +112,11 @@ extern "C" void on_button_open_clicked (GtkWidget *object, gpointer user_data)
 		filename = gtk_file_chooser_get_filename (GTK_FILE_CHOOSER (dialog));
 		try
 		{
-			metafile.reset(new torrent::Metafile(filename));
+			metafile.reset(new dinosaur::torrent::Metafile(filename));
 			gtk_widget_destroy (dialog);
 			show_open_dialog();
 		}
-		catch(Exception & e)
+		catch(dinosaur::Exception & e)
 		{
 			gtk_widget_destroy (dialog);
 			messagebox(e.get_error().c_str());
@@ -161,12 +190,17 @@ extern "C" void on_button_check_clicked(GtkWidget *object, gpointer user_data)
 		g_free(g_hash);
 		bt->CheckTorrent(hash);
 	}
+}
 
+extern "C" void on_button_cfg_clicked(GtkWidget *object, gpointer user_data)
+{
+	if (!cfg_opened())
+		show_cfg_dialog();
 }
 
 extern "C" void on_window1_destroy (GtkWidget *object, gpointer user_data)
 {
-	bittorrent::Bittorrent::DeleteBittorrent(bt);
+	dinosaur::Dinosaur::DeleteDinosaur(bt);
 	gtk_main_quit();
 }
 
@@ -223,26 +257,68 @@ extern "C" void on_window1_show (GtkWidget *object, gpointer user_data)
 	GtkTreeIter   iter;
 	gtk_list_store_clear(torrent_list);
 	std::list<std::string> torrents;
-	bt->get_TorrentList(&torrents);
+	bt->get_TorrentList(torrents);
 	if (torrents.empty())
 		return;
 	for(std::list<std::string>::iterator i = torrents.begin(); i != torrents.end(); ++i)
 	{
+		std::string hash = *i;
 		gtk_list_store_append(torrent_list, &iter);
-		torrent::torrent_info info;
-		bt->Torrent_info(*i, &info);
-		float downloaded = info.downloaded / 1048576;
-		float uploaded = info.uploaded / 1048576;
-		float up_speed = info.tx_speed;
-		float down_speed = info.rx_speed;
+		dinosaur::info::torrent_dyn dyn;
+		dinosaur::info::torrent_stat stat;
+		bt->get_torrent_info_dyn(hash, dyn);
+		bt->get_torrent_info_stat(hash, stat);
+
+
+		char downloaded[256];
+		int_bytes2str(dyn.downloaded, downloaded);
+
+		char uploaded[256];
+		int_bytes2str(dyn.uploaded, uploaded);
+
+		char rx_speed[256];
+		int_bytes2str(dyn.rx_speed, rx_speed, true);
+
+		char tx_speed[256];
+		int_bytes2str(dyn.tx_speed, tx_speed, true);
+
+		std::string work;
+		switch(dyn.work)
+		{
+		case(dinosaur::TORRENT_DOWNLOADING):
+				work = "Downloading";
+				break;
+		case(dinosaur::TORRENT_UPLOADING):
+				work = "Uploading";
+				break;
+		case(dinosaur::TORRENT_CHECKING):
+				work = "Checking";
+				break;
+		case(dinosaur::TORRENT_PAUSED):
+				work = "Paused";
+				break;
+		case(dinosaur::TORRENT_FAILURE):
+				work = "Failure";
+				break;
+		}
+
+		char seeds[256];
+		sprintf(seeds, "%u(%u)", dyn.seeders, dyn.total_seeders);
+
+		char leechs[256];
+		sprintf(leechs, "%u", dyn.leechers);
+
 		gtk_list_store_set (torrent_list, &iter,
-										TORRENT_LIST_COL_NAME, info.name.c_str(),
-										TORRENT_LIST_COL_PROGRESS, (gint)info.progress,
-										TORRENT_LIST_COL_DOWNLOADED, (gfloat)downloaded,
-										TORRENT_LIST_COL_UPLOADED, (gfloat)uploaded,
-										TORRENT_LIST_COL_DOWN_SPEED, (gfloat)down_speed,
-										TORRENT_LIST_COL_UP_SPEED, (gfloat)up_speed,
-										TORRENT_LIST_COL_HASH, (*i).c_str(),
+							TORRENT_LIST_COL_NAME, stat.name.c_str(),
+							TORRENT_LIST_COL_PROGRESS, (gint)dyn.progress,
+							TORRENT_LIST_COL_DOWNLOADED, downloaded,
+							TORRENT_LIST_COL_UPLOADED, uploaded,
+							TORRENT_LIST_COL_DOWN_SPEED, rx_speed,
+							TORRENT_LIST_COL_UP_SPEED, tx_speed,
+							TORRENT_LIST_COL_WORK, work.c_str(),
+							TORRENT_LIST_COL_SEEDS, seeds,
+							TORRENT_LIST_COL_LEECHS, leechs,
+							TORRENT_LIST_COL_HASH, hash.c_str(),
 						  -1);
 	}
 }
@@ -258,29 +334,31 @@ extern "C" void  on_torrent_view_cursor_changed(GtkWidget *object, gpointer user
 		gchar *g_hash;
 		gtk_tree_model_get (model, &iter, TORRENT_LIST_COL_HASH, &g_hash, -1);
 		std::string hash = g_hash;
-		//g_print ("selected row is: %s\n", name);
 		g_free(g_hash);
 
-		//GtkTreeIter   iter;
 		gtk_list_store_clear(tracker_list);
 		gtk_list_store_clear(peer_list);
 
-		torrent::torrent_info info;
-		bt->Torrent_info(hash, &info);
+		dinosaur::info::torrent_dyn dyn;
+		dinosaur::info::torrent_stat stat;
+		bt->get_torrent_info_dyn(hash, dyn);
+		bt->get_torrent_info_stat(hash, stat);
 
 		gtk_label_set_text(label_hash, hash.c_str());
-		gtk_label_set_text(label_dir, info.download_directory.c_str());
+		gtk_label_set_text(label_dir, stat.download_directory.c_str());
 		char chars[100];
-		sprintf(chars, "%llu", info.length);
+		sprintf(chars, "%llu", stat.length);
 		gtk_label_set_text(label_length, chars);
 
-		sprintf(chars, "%llu", info.piece_length);
+		sprintf(chars, "%llu", stat.piece_length);
 		gtk_label_set_text(label_piece_length, chars);
 
-		sprintf(chars, "%u", info.piece_count);
+		sprintf(chars, "%u", stat.piece_count);
 		gtk_label_set_text(label_piece_number, chars);
 
-		for(torrent::torrent_info::tracker_info_iter i = info.trackers.begin(); i != info.trackers.end(); ++i)
+		dinosaur::info::trackers trackers;
+		bt->get_torrent_info_trackers(hash, trackers);
+		for(dinosaur::info::trackers::iterator i = trackers.begin(); i != trackers.end(); ++i)
 		{
 			gtk_list_store_append(tracker_list, &iter);
 			gtk_list_store_set (tracker_list, &iter,
@@ -291,7 +369,10 @@ extern "C" void  on_torrent_view_cursor_changed(GtkWidget *object, gpointer user
 					TRACKER_LIST_COL_SEEDERS,(gint)(*i).seeders,
 						  -1);
 		}
-		for(torrent::torrent_info::peer_info_iter i = info.seeders.begin(); i != info.seeders.end(); ++i)
+
+		/*torrent::info::peers peers;
+		bt->get_torrent_info_seeders(hash, peers);
+		for(torrent::info::peers::iterator i = peers.begin(); i != peers.end(); ++i)
 		{
 			gtk_list_store_append(peer_list, &iter);
 			gtk_list_store_set (peer_list, &iter,
@@ -303,7 +384,9 @@ extern "C" void  on_torrent_view_cursor_changed(GtkWidget *object, gpointer user
 					PEER_LIST_COL_AVAILABLE, (gfloat)(*i).available,
 					-1);
 		}
-		for(torrent::torrent_info::peer_info_iter i = info.leechers.begin(); i != info.leechers.end(); ++i)
+
+		bt->get_torrent_info_leechers(hash, peers);
+		for(torrent::info::peers::iterator i = peers.begin(); i != peers.end(); ++i)
 		{
 			gtk_list_store_append(peer_list, &iter);
 			gtk_list_store_set (peer_list, &iter,
@@ -314,7 +397,7 @@ extern "C" void  on_torrent_view_cursor_changed(GtkWidget *object, gpointer user
 					PEER_LIST_COL_UP_SPEED, (gfloat)(*i).upSpeed,
 					PEER_LIST_COL_AVAILABLE, (gfloat)(*i).available,
 					-1);
-		}
+		}*/
 	}
 	else
 	{
@@ -332,20 +415,60 @@ gboolean foreach_torrent_list (GtkTreeModel *model,
 			TORRENT_LIST_COL_HASH, &g_hash,
 			-1);
 
-	torrent::torrent_info info;
 	std::string hash = g_hash;
-	bt->Torrent_info(hash, &info);
-	float downloaded = info.downloaded / 1048576;
-	float uploaded = info.uploaded / 1048576;
-	float up_speed = info.tx_speed;
-	float down_speed = info.rx_speed;
+
+	dinosaur::info::torrent_dyn  dyn;
+	bt->get_torrent_info_dyn(hash, dyn);
+
+	char downloaded[256];
+	int_bytes2str(dyn.downloaded, downloaded);
+
+	char uploaded[256];
+	int_bytes2str(dyn.uploaded, uploaded);
+
+	char rx_speed[256];
+	int_bytes2str(dyn.rx_speed, rx_speed, true);
+
+	char tx_speed[256];
+	int_bytes2str(dyn.tx_speed, tx_speed, true);
+
+	std::string work;
+	switch(dyn.work)
+	{
+	case(dinosaur::TORRENT_DOWNLOADING):
+			work = "Downloading";
+			break;
+	case(dinosaur::TORRENT_UPLOADING):
+			work = "Uploading";
+			break;
+	case(dinosaur::TORRENT_CHECKING):
+			work = "Checking";
+			break;
+	case(dinosaur::TORRENT_PAUSED):
+			work = "Paused";
+			break;
+	case(dinosaur::TORRENT_FAILURE):
+			work = "Failure";
+			break;
+	}
+
+	char seeds[256];
+	memset(seeds, 0, 256);
+	sprintf(seeds, "%u(%u)", dyn.seeders, dyn.total_seeders);
+
+	char leechs[256];
+	sprintf(leechs, "%u", dyn.leechers);
+
 	gtk_list_store_set (torrent_list, iter,
-						TORRENT_LIST_COL_NAME, info.name.c_str(),
-						TORRENT_LIST_COL_PROGRESS, (gint)info.progress,
-						TORRENT_LIST_COL_DOWNLOADED, (gfloat)downloaded,
-						TORRENT_LIST_COL_UPLOADED, (gfloat)uploaded,
-						TORRENT_LIST_COL_DOWN_SPEED, (gfloat)down_speed,
-						TORRENT_LIST_COL_UP_SPEED, (gfloat)up_speed,
+						//TORRENT_LIST_COL_NAME, stat.name.c_str(),
+						TORRENT_LIST_COL_PROGRESS, (gint)dyn.progress,
+						TORRENT_LIST_COL_DOWNLOADED, downloaded,
+						TORRENT_LIST_COL_UPLOADED, uploaded,
+						TORRENT_LIST_COL_DOWN_SPEED, rx_speed,
+						TORRENT_LIST_COL_UP_SPEED, tx_speed,
+						TORRENT_LIST_COL_WORK, work.c_str(),
+						TORRENT_LIST_COL_SEEDS, seeds,
+						TORRENT_LIST_COL_LEECHS, leechs,
 					  -1);
 
 	//g_free(tree_path_str);
@@ -358,12 +481,12 @@ gboolean foreach_tracker_list (GtkTreeModel *model,
                 GtkTreeIter  *iter,
                 gpointer      user_data)
 {
-	torrent::torrent_info * info = (torrent::torrent_info*)user_data;
+	dinosaur::info::trackers * trackers = (dinosaur::info::trackers *)user_data;
 	gchar * g_announce;
 	gtk_tree_model_get (model, iter,TRACKER_LIST_COL_ANNOUNCE, &g_announce,-1);
 	std::string announce = g_announce;
 	g_free(g_announce);
-	for(torrent::torrent_info::tracker_info_iter i = info->trackers.begin(); i != info->trackers.end(); ++i)
+	for(dinosaur::info::trackers::iterator i = trackers->begin(); i != trackers->end(); ++i)
 	{
 		if (announce == (*i).announce)
 		{
@@ -394,36 +517,71 @@ gboolean on_timer(gpointer data)
 		gtk_tree_model_get (model, &selected_iter, TORRENT_LIST_COL_HASH, &g_hash, -1);
 		std::string hash = g_hash;
 		g_free(g_hash);
-		torrent::torrent_info info;
-		bt->Torrent_info(hash, &info);
 
-		gtk_tree_model_foreach(GTK_TREE_MODEL(tracker_list), foreach_tracker_list, (gpointer)&info);
+		dinosaur::info::trackers trackers;
+		bt->get_torrent_info_trackers(hash, trackers);
+		gtk_tree_model_foreach(GTK_TREE_MODEL(tracker_list), foreach_tracker_list, (gpointer)&trackers);
 
+		dinosaur::info::peers peers;
+		bt->get_torrent_info_seeders(hash, peers);
 		gtk_list_store_clear(peer_list);
-		for(torrent::torrent_info::peer_info_iter i = info.seeders.begin(); i != info.seeders.end(); ++i)
+		for(dinosaur::info::peers::iterator i = peers.begin(); i != peers.end(); ++i)
 		{
 			GtkTreeIter iter;
 			gtk_list_store_append(peer_list, &iter);
+
+			char downloaded[256];
+			int_bytes2str((*i).downloaded, downloaded);
+
+			char uploaded[256];
+			int_bytes2str((*i).uploaded, uploaded);
+
+			char downSpeed[256];
+			int_bytes2str((*i).downSpeed, downSpeed, true);
+
+			char upSpeed[256];
+			int_bytes2str((*i).upSpeed, upSpeed, true);
+
+			char available[256];
+			sprintf(available, "%.3f", (*i).available);
+
 			gtk_list_store_set (peer_list, &iter,
 					PEER_LIST_COL_IP, (*i).ip,
-					PEER_LIST_COL_DOWNLOADED, (gfloat)(*i).downloaded,
-					PEER_LIST_COL_UPLOADED, (gfloat)(*i).uploaded,
-					PEER_LIST_COL_DOWN_SPEED, (gfloat)(*i).downSpeed,
-					PEER_LIST_COL_UP_SPEED, (gfloat)(*i).upSpeed,
-					PEER_LIST_COL_AVAILABLE, (gfloat)(*i).available,
+					PEER_LIST_COL_DOWNLOADED, downloaded,
+					PEER_LIST_COL_UPLOADED, uploaded,
+					PEER_LIST_COL_DOWN_SPEED, downSpeed,
+					PEER_LIST_COL_UP_SPEED, upSpeed,
+					PEER_LIST_COL_AVAILABLE, available,
 					-1);
 		}
-		for(torrent::torrent_info::peer_info_iter i = info.leechers.begin(); i != info.leechers.end(); ++i)
+		bt->get_torrent_info_leechers(hash, peers);
+		for(dinosaur::info::peers::iterator i = peers.begin(); i != peers.end(); ++i)
 		{
 			GtkTreeIter iter;
 			gtk_list_store_append(peer_list, &iter);
+
+			char downloaded[256];
+			int_bytes2str((*i).downloaded, downloaded);
+
+			char uploaded[256];
+			int_bytes2str((*i).uploaded, uploaded);
+
+			char downSpeed[256];
+			int_bytes2str((*i).downSpeed, downSpeed, true);
+
+			char upSpeed[256];
+			int_bytes2str((*i).upSpeed, upSpeed, true);
+
+			char available[256];
+			sprintf(available, "%.3f", (*i).available);
+
 			gtk_list_store_set (peer_list, &iter,
 					PEER_LIST_COL_IP, (*i).ip,
-					PEER_LIST_COL_DOWNLOADED, (gfloat)(*i).downloaded,
-					PEER_LIST_COL_UPLOADED, (gfloat)(*i).uploaded,
-					PEER_LIST_COL_DOWN_SPEED, (gfloat)(*i).downSpeed,
-					PEER_LIST_COL_UP_SPEED, (gfloat)(*i).upSpeed,
-					PEER_LIST_COL_AVAILABLE, (gfloat)(*i).available,
+					PEER_LIST_COL_DOWNLOADED, downloaded,
+					PEER_LIST_COL_UPLOADED, uploaded,
+					PEER_LIST_COL_DOWN_SPEED, downSpeed,
+					PEER_LIST_COL_UP_SPEED, upSpeed,
+					PEER_LIST_COL_AVAILABLE, available,
 					-1);
 		}
 	}
@@ -435,6 +593,18 @@ gboolean on_timer(gpointer data)
 	return TRUE;
 }
 
+void update_statusbar()
+{
+	//gtk_statusbar_remove_all(statusbar, 0);
+	if (bt->get_socket_status() == dinosaur::SOCKET_STATUS_OK)
+		 gtk_statusbar_push(statusbar, 0, "Socket status: ok");
+	else
+	{
+		char chars[256];
+		sprintf(chars, "Socket status: %s", bt->get_error().c_str());
+		gtk_statusbar_push(statusbar, 0, chars);
+	}
+}
 
 
 /* создание окна в этот раз мы вынесли в отдельную функцию */
@@ -442,9 +612,9 @@ void init_gui()
 {
 	try
 	{
-		bittorrent::Bittorrent::CreateBittorrent(bt);
+		dinosaur::Dinosaur::CreateDinosaur(bt);
 	}
-	catch(Exception e)
+	catch(dinosaur::Exception e)
 	{
 		e.print();
 		return;
@@ -538,9 +708,18 @@ void init_gui()
 			g_critical ("Ошибка при получении виджета диалога");
 	}
 
+	statusbar = GTK_STATUSBAR(gtk_builder_get_object (builder, "statusbar"));
+	if (!statusbar)
+	{
+			/* что-то не так, наверное, ошиблись в имени */
+			g_critical ("Ошибка при получении виджета диалога");
+	}
+
 	g_object_unref (builder);
 
 	g_timeout_add_seconds(1,on_timer,NULL);
+
+	update_statusbar();
 
 	gtk_widget_show_all (window);
 	open_dialog = NULL;
@@ -642,5 +821,4 @@ void show_open_dialog()
 							-1);
 	}
 	gtk_widget_show_all (GTK_WIDGET(open_dialog));
-
 }

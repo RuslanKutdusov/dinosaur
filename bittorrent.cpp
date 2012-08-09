@@ -15,7 +15,7 @@
 #include "utils/bencode.h"
 #include "torrent/torrent.h"
 #include "cfg/glob_cfg.h"
-#include "bittorrent/Bittorrent.h"
+#include "dinosaur.h"
 #include <sys/epoll.h>
 #include <set>
 #include <map>
@@ -157,7 +157,7 @@ void test_lru_cache()
 		lc.put(k,&d);
 		lc.dump_all();
 	}
-}*/
+}
 
 void bencode_test()
 {
@@ -205,7 +205,7 @@ void bencode_test()
 
 	cout<<hash_hex1<<endl;
 	cout<<hash_hex2<<endl;
-}
+}*/
 void catchCrash(int signum)
 {
 	void *callstack[128];
@@ -230,11 +230,12 @@ void catchCrash(int signum)
 int main(int argc,char* argv[])
 {
 	signal(SIGSEGV, catchCrash);
+	signal(SIGABRT, catchCrash);
 	try
 	{
 		init_gui();
 	}
-	catch(Exception  &e)
+	catch(dinosaur::Exception  &e)
 	{
 		e.print();
 	}

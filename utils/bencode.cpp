@@ -7,6 +7,7 @@
 
 #include "bencode.h"
 
+namespace dinosaur {
 namespace bencode
 {
 
@@ -762,4 +763,5 @@ be_node * copy(be_node * src)
 	return NULL;
 }
 
+}
 }
