@@ -141,7 +141,7 @@ int NetworkManager::Socket_add(struct sockaddr_in * addr, const SocketAssociatio
 #endif
 	sock.reset(new socket_());
 	if (sock == NULL)
-		return ERR_INTERNAL;
+		return ERR_UNDEF;
 	struct epoll_event event;
 	sock->m_closed = false;
 	sock->m_assoc = assoc;
@@ -151,7 +151,7 @@ int NetworkManager::Socket_add(struct sockaddr_in * addr, const SocketAssociatio
 	if ((sock->m_socket = socket (AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0)) == -1)
 	{
 		sock.reset();
-		return ERR_INTERNAL;
+		return ERR_SYSCALL_ERROR;
 	}
 	event.data.ptr=(void*)sock.get();
 	event.events = EPOLLOUT;
@@ -160,7 +160,7 @@ int NetworkManager::Socket_add(struct sockaddr_in * addr, const SocketAssociatio
 	{
 		close(sock->m_socket);
 		sock.reset();
-		return ERR_INTERNAL;
+		return ERR_SYSCALL_ERROR;
 	}
 	memcpy((void *)&sock->m_peer, (void *)addr, sizeof(struct sockaddr_in));
 	if (connect(sock->m_socket, (const struct sockaddr *)addr, sizeof(struct sockaddr_in)) == -1)
@@ -172,7 +172,7 @@ int NetworkManager::Socket_add(struct sockaddr_in * addr, const SocketAssociatio
 		}
 		close(sock->m_socket);
 		sock.reset();
-		return ERR_INTERNAL;
+		return ERR_SYSCALL_ERROR;
 	}
 	sock->m_state = STATE_TRANSMISSION;
 	m_connected_sockets.insert(sock);
@@ -192,7 +192,7 @@ int NetworkManager::Socket_add(int sock_fd, struct sockaddr_in * addr, const Soc
 {
 	sock.reset(new socket_());
 	if (sock == NULL)
-		return ERR_INTERNAL;
+		return ERR_UNDEF;
 	struct epoll_event event;
 	sock->m_closed = false;
 	sock->m_assoc = assoc;
@@ -209,7 +209,7 @@ int NetworkManager::Socket_add(int sock_fd, struct sockaddr_in * addr, const Soc
 	{
 		close(sock->m_socket);
 		sock.reset();
-		return ERR_INTERNAL;
+		return ERR_SYSCALL_ERROR;
 	}
 	sock->m_state = STATE_TRANSMISSION;
 
@@ -229,7 +229,7 @@ int NetworkManager::ListenSocket_add(sockaddr_in * addr, const SocketAssociation
 	//struct socket_ * sock = (struct socket_ *)malloc(sizeof(struct socket_));
 	sock.reset(new socket_());
 	if (sock == NULL)
-		return ERR_INTERNAL;
+		return ERR_UNDEF;
 
 	sock->m_closed = false;
 	sock->m_assoc = assoc;
@@ -239,14 +239,14 @@ int NetworkManager::ListenSocket_add(sockaddr_in * addr, const SocketAssociation
 	if ((sock->m_socket = socket (AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0)) == -1)
 	{
 		sock.reset();
-		return ERR_INTERNAL;
+		return ERR_SYSCALL_ERROR;
 	}
 
 	if (setsockopt (sock->m_socket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof (yes)) == -1)
 	{
 		close(sock->m_socket);
 		sock.reset();
-		return ERR_INTERNAL;
+		return ERR_SYSCALL_ERROR;
 	}
 
 	//addr.sin_family = AF_INET;
@@ -257,14 +257,14 @@ int NetworkManager::ListenSocket_add(sockaddr_in * addr, const SocketAssociation
 	{
 		close(sock->m_socket);
 		sock.reset();
-		return ERR_INTERNAL;
+		return ERR_SYSCALL_ERROR;
 	}
 
 	if (listen (sock->m_socket, SOMAXCONN) == -1)
 	{
 		close(sock->m_socket);
 		sock.reset();
-		return ERR_INTERNAL;
+		return ERR_SYSCALL_ERROR;
 	}
 
 	event.data.ptr = (void*)sock.get();
@@ -274,7 +274,7 @@ int NetworkManager::ListenSocket_add(sockaddr_in * addr, const SocketAssociation
 	{
 		close(sock->m_socket);
 		sock.reset();
-		return ERR_INTERNAL;
+		return ERR_SYSCALL_ERROR;
 	}
 
 	sock->m_state = STATE_LISTEN;

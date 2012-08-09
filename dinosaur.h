@@ -35,18 +35,18 @@ class Dinosaur : public network::SocketAssociation {
 private:
 	typedef std::map<std::string, torrent::TorrentInterfaceBasePtr> torrent_map;
 	typedef torrent_map::iterator torrent_map_iter;
-	network::NetworkManager m_nm;
-	cfg::Glob_cfg m_gcfg;
-	fs::FileManager m_fm;
-	block_cache::Block_cache m_bc;
-	network::Socket m_sock;
-	torrent_map m_torrents;
-	std::string m_directory;
-	std::string m_error;
-	pthread_t m_thread;
-	pthread_mutex_t m_mutex;
-	bool m_thread_stop;
-	bool m_thread_pause;
+	network::NetworkManager 		m_nm;
+	fs::FileManager 				m_fm;
+	block_cache::Block_cache 		m_bc;
+	network::Socket 				m_sock;
+	SOCKET_STATUS					m_sock_status;
+	torrent_map 					m_torrents;
+	std::string 					m_directory;
+	std::string 					m_error;
+	pthread_t 						m_thread;
+	pthread_mutex_t					m_mutex;
+	bool 							m_thread_stop;
+	bool 							m_thread_pause;
 	static void * thread(void * arg);
 	void bin2hex(unsigned char * bin, char * hex, int len);
 	void add_error_mes(const std::string & mes);
@@ -55,6 +55,7 @@ private:
 	Dinosaur();
 	void init_listen_socket();
 public:
+	cfg::Glob_cfg Config;
 	int AddTorrent(torrent::Metafile & metafile, const std::string & download_directory, std::string & hash);
 	int StartTorrent(const std::string & hash);
 	int StopTorrent(const std::string & hash);
@@ -70,8 +71,7 @@ public:
 	int get_torrent_info_seeders(const std::string & hash, info::peers & ref);
 	int get_torrent_info_leechers(const std::string & hash, info::peers & ref);
 	int get_TorrentList(std::list<std::string>  & ref);
-	const std::string & get_DownloadDirectory();
-	//uint16_t Torrent_peers(std::string & hash, torrent::peer_info ** peers);
+	int UpdateConfigs();
 	int event_sock_ready2read(network::Socket sock);
 	int event_sock_closed(network::Socket sock);
 	int event_sock_sended(network::Socket sock);
@@ -83,9 +83,14 @@ public:
 	{
 		return m_error;
 	}
+	SOCKET_STATUS get_socket_status()
+	{
+		return m_sock_status;
+	}
 	void DeleteSocket()
 	{
 		m_nm.Socket_delete(m_sock);
+		m_sock_status = SOCKET_STATUS_CLOSED;
 	}
 	~Dinosaur();
 	static void CreateDinosaur(DinosaurPtr & ptr)

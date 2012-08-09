@@ -10,6 +10,7 @@
 namespace dinosaur {
 
 Dinosaur::Dinosaur()
+	:m_sock_status(SOCKET_STATUS_CLOSED)
  {
 	m_thread = 0;
 	//создаем рабочую папку в пользовательской папке
@@ -26,12 +27,12 @@ Dinosaur::Dinosaur()
 
 	m_error = TORRENT_ERROR_NO_ERROR;
 	//инициализация всего и вся
-	m_gcfg = cfg::Glob_cfg(m_directory);
+	Config = cfg::Glob_cfg(m_directory);
 	if (m_nm.Init() != ERR_NO_ERROR)
 		throw Exception();
-	if (m_fm.Init(&m_gcfg) != ERR_NO_ERROR)
+	if (m_fm.Init(&Config) != ERR_NO_ERROR)
 		throw Exception();
-	if (m_bc.Init(m_gcfg.get_read_cache_size()) != ERR_NO_ERROR)
+	if (m_bc.Init(Config.get_read_cache_size()) != ERR_NO_ERROR)
 		throw Exception();
 
 	//m_thread_stop = false;
@@ -48,14 +49,30 @@ Dinosaur::Dinosaur()
 	if (pthread_create(&m_thread, &attr, Dinosaur::thread, (void *)this))
 		throw Exception(GENERAL_ERROR_CAN_NOT_CREATE_THREAD);
 	pthread_attr_destroy(&attr);
+
 	load_our_torrents();
 }
 
 void Dinosaur::init_listen_socket()
 {
 	in_addr addr;
-	m_gcfg.get_listen_on(&addr);
-	m_nm.ListenSocket_add(m_gcfg.get_port(), &addr, shared_from_this(), m_sock);
+	Config.get_listen_on(&addr);
+	int ret = m_nm.ListenSocket_add(Config.get_port(), &addr, shared_from_this(), m_sock);
+	if (ret == ERR_UNDEF)
+	{
+		m_sock_status = SOCKET_STATUS_CLOSED;
+		m_error = GENERAL_ERROR_UNDEF_ERROR;
+		return;
+	}
+	if (ret == ERR_SYSCALL_ERROR)
+	{
+		m_sock_status = SOCKET_STATUS_CLOSED;
+		m_error = GENERAL_ERROR_SYSCALL;
+		m_error += sys_errlist[errno];
+		return;
+	}
+	m_sock_status = SOCKET_STATUS_OK;
+	return;
 }
 
 Dinosaur::~Dinosaur() {
@@ -111,7 +128,7 @@ int Dinosaur::load_our_torrents()
 	{
 		std::string full_path2torrent_file = m_directory + fname;
 		//std::cout<<full_path2torrent_file<<std::endl;
-		init_torrent(full_path2torrent_file, m_gcfg.get_download_directory(), hash);
+		init_torrent(full_path2torrent_file, Config.get_download_directory(), hash);
 		StartTorrent(hash);
 	}
 	fin.close();
@@ -142,7 +159,7 @@ int Dinosaur::init_torrent(const torrent::Metafile & metafile, const std::string
 	torrent::TorrentInterfaceBasePtr torrent;
 	try
 	{
-		torrent::TorrentInterfaceBase::CreateTorrent(&m_nm, &m_gcfg, &m_fm, &m_bc, metafile, m_directory, download_directory, torrent);
+		torrent::TorrentInterfaceBase::CreateTorrent(&m_nm, &Config, &m_fm, &m_bc, metafile, m_directory, download_directory, torrent);
 	}
 	catch (Exception & e)
 	{
@@ -433,11 +450,21 @@ int Dinosaur::get_TorrentList(std::list<std::string> & ref)
 	return ERR_NO_ERROR;
 }
 
-const std::string & Dinosaur::get_DownloadDirectory()
+int Dinosaur::UpdateConfigs()
 {
-	return m_gcfg.get_download_directory();
+	pthread_mutex_lock(&m_mutex);
+	if (Config.save() != ERR_NO_ERROR)
+	{
+		std::string err = CFG_CAN_NOT_SAVE_CFG;
+		add_error_mes(err);
+		pthread_mutex_unlock(&m_mutex);
+		return ERR_SEE_ERROR;
+	}
+	m_nm.Socket_delete(m_sock);
+	init_listen_socket();
+	pthread_mutex_unlock(&m_mutex);
+	return ERR_NO_ERROR;
 }
-
 
 int Dinosaur::event_sock_ready2read(network::Socket sock)
 {

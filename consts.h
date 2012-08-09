@@ -54,5 +54,7 @@
 #define GENERAL_ERROR_NO_ERROR "No error"
 #define GENERAL_ERROR_SYSCALL "Syscall error: "
 
+#define CFG_CAN_NOT_SAVE_CFG "Can not save configs"
+
 
 #endif /* CONSTS_H_ */

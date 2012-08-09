@@ -10,6 +10,7 @@
 #include <gtk/gtk.h>
 #include <list>
 #include <string>
+#include <errno.h>
 #include "../dinosaur.h"
 #include "../torrent/torrent.h"
 #include "../torrent/torrent_types.h"
@@ -19,6 +20,12 @@
 //extern "C" void on_button_open_clicked (GtkObject *object, gpointer user_data);
 void init_gui();
 void show_open_dialog();
+void show_cfg_dialog();
+bool cfg_opened();
+void update_statusbar();
+void messagebox(const char * message);
 extern "C" void on_window1_show (GtkWidget *object, gpointer user_data);
+
+extern dinosaur::DinosaurPtr bt;
 
 #endif /* GUI_H_ */

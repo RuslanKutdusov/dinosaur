@@ -106,21 +106,6 @@ private:
 		}
 		return 0;
 	}
-public:
-	Glob_cfg(){}
-	Glob_cfg(std::string work_directory)
-	{
-		m_work_directory = work_directory;
-		//формируем путь к файлу вида $HOME/.dinosaur/config
-		m_cfg_file_name = m_work_directory;
-		m_cfg_file_name.append("config");
-		if (deserialize() == -1)
-		{
-			init_default_config();
-			serialize();
-		}
-		strncpy(m_peer_id, CLIENT_ID, PEER_ID_LENGTH);
-	}
 	int init_default_config()
 	{
 		//дефолтная папка для загрузок - пользовательская директория
@@ -143,6 +128,25 @@ public:
 		inet_pton(AF_INET, "0.0.0.0", &cfg.listen_on);
 		cfg.max_active_torrents = 5;
 		return ERR_NO_ERROR;
+	}
+public:
+	Glob_cfg(){}
+	Glob_cfg(std::string work_directory)
+	{
+		m_work_directory = work_directory;
+		//формируем путь к файлу вида $HOME/.dinosaur/config
+		m_cfg_file_name = m_work_directory;
+		m_cfg_file_name.append("config");
+		if (deserialize() == -1)
+		{
+			init_default_config();
+			serialize();
+		}
+		strncpy(m_peer_id, CLIENT_ID, PEER_ID_LENGTH);
+	}
+	int save()
+	{
+		return serialize() == -1 ? ERR_UNDEF : ERR_NO_ERROR;
 	}
 	const std::string & get_download_directory()
 	{
@@ -191,6 +195,97 @@ public:
 	void get_listen_on(in_addr * addr)
 	{
 		memcpy(addr, &cfg.listen_on, sizeof(in_addr));
+	}
+	uint16_t get_max_active_torrents()
+	{
+		return cfg.max_active_torrents;
+	}
+
+
+	int set_download_directory(const char * dir)
+	{
+		struct stat st;
+		if(stat(dir, &st) == 0)
+		{
+			if (S_ISDIR(st.st_mode))
+			{
+				cfg.download_directory = dir;
+				return ERR_NO_ERROR;
+			}
+			else
+				return ERR_DIR_NOT_EXISTS;
+		}
+		else
+			return ERR_SYSCALL_ERROR;
+	}
+
+	int set_download_directory(const std::string & dir)
+	{
+		return set_download_directory(dir.c_str());
+	}
+	void set_port(uint16_t port)
+	{
+		cfg.port = port;
+	}
+	int set_write_cache_size(uint16_t s)
+	{
+		if (s == 0)
+			return ERR_BAD_ARG;
+		cfg.write_cache_size = s;
+		return ERR_NO_ERROR;
+	}
+	int set_read_cache_size(uint16_t s)
+	{
+		if (s == 0)
+			return ERR_BAD_ARG;
+		cfg.read_cache_size = s;
+		return ERR_NO_ERROR;
+	}
+	void set_tracker_numwant(uint32_t v)
+	{
+		cfg.tracker_numwant = v;
+	}
+	int set_tracker_default_interval(uint64_t v)
+	{
+		if (v == 0)
+			return ERR_BAD_ARG;
+		cfg.tracker_default_interval = v;
+		return ERR_NO_ERROR;
+	}
+	int set_max_active_seeders(uint32_t v)
+	{
+		if (v == 0)
+			return ERR_BAD_ARG;
+		cfg.max_active_seeders = v;
+		return ERR_NO_ERROR;
+	}
+	int set_max_active_leechers(uint32_t v)
+	{
+		if (v == 0)
+			return ERR_BAD_ARG;
+		cfg.max_active_leechers = v;
+		return ERR_NO_ERROR;
+	}
+	void set_send_have(bool v)
+	{
+		cfg.send_have = v;
+	}
+	int set_listen_on(IP_CHAR ip)
+	{
+		if (inet_pton(AF_INET, ip, &cfg.listen_on) <= 0)
+			return ERR_BAD_ARG;
+		return ERR_NO_ERROR;
+	}
+	void set_listen_on(in_addr * addr)
+	{
+		memcpy(&cfg.listen_on, addr, sizeof(in_addr));
+	}
+	int set_max_active_torrents(uint16_t v)
+	{
+		if (v == 0)
+		return ERR_BAD_ARG;
+		cfg.max_active_torrents = v;
+		return ERR_NO_ERROR;
 	}
 	~Glob_cfg(){}
 };

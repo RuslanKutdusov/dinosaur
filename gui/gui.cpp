@@ -19,6 +19,7 @@ GtkLabel* label_length;
 GtkLabel* label_dir;
 GtkLabel* label_piece_number;
 GtkLabel* label_piece_length;
+GtkStatusbar * statusbar;
 dinosaur::DinosaurPtr bt;
 dinosaur::torrent::MetafilePtr metafile;
 
@@ -189,7 +190,12 @@ extern "C" void on_button_check_clicked(GtkWidget *object, gpointer user_data)
 		g_free(g_hash);
 		bt->CheckTorrent(hash);
 	}
+}
 
+extern "C" void on_button_cfg_clicked(GtkWidget *object, gpointer user_data)
+{
+	if (!cfg_opened())
+		show_cfg_dialog();
 }
 
 extern "C" void on_window1_destroy (GtkWidget *object, gpointer user_data)
@@ -587,6 +593,18 @@ gboolean on_timer(gpointer data)
 	return TRUE;
 }
 
+void update_statusbar()
+{
+	//gtk_statusbar_remove_all(statusbar, 0);
+	if (bt->get_socket_status() == dinosaur::SOCKET_STATUS_OK)
+		 gtk_statusbar_push(statusbar, 0, "Socket status: ok");
+	else
+	{
+		char chars[256];
+		sprintf(chars, "Socket status: %s", bt->get_error().c_str());
+		gtk_statusbar_push(statusbar, 0, chars);
+	}
+}
 
 
 /* создание окна в этот раз мы вынесли в отдельную функцию */
@@ -690,9 +708,18 @@ void init_gui()
 			g_critical ("Ошибка при получении виджета диалога");
 	}
 
+	statusbar = GTK_STATUSBAR(gtk_builder_get_object (builder, "statusbar"));
+	if (!statusbar)
+	{
+			/* что-то не так, наверное, ошиблись в имени */
+			g_critical ("Ошибка при получении виджета диалога");
+	}
+
 	g_object_unref (builder);
 
 	g_timeout_add_seconds(1,on_timer,NULL);
+
+	update_statusbar();
 
 	gtk_widget_show_all (window);
 	open_dialog = NULL;
@@ -794,5 +821,4 @@ void show_open_dialog()
 							-1);
 	}
 	gtk_widget_show_all (GTK_WIDGET(open_dialog));
-
 }

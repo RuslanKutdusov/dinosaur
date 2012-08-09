@@ -41,6 +41,12 @@ enum TORRENT_WORK
 	TORRENT_FAILURE
 };
 
+enum SOCKET_STATUS
+{
+	SOCKET_STATUS_OK,
+	SOCKET_STATUS_CLOSED
+};
+
 namespace info
 {
 
