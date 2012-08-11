@@ -60,7 +60,8 @@ private:
 		TRACKER_STATE_NONE,
 		TRACKER_STATE_CONNECT,
 		TRACKER_STATE_WORK,
-		TRACKER_STATE_STOPPING
+		TRACKER_STATE_STOPPING,
+		TRACKER_STATE_FAILURE
 	};
 
 	//события трекера
@@ -84,7 +85,8 @@ private:
 	char 							m_buf[BUFFER_SIZE];//буфер, куда кидаем ответ от сервера
 	ssize_t 						m_buflen;//длина ответа в буфере
 	TRACKER_STATE 					m_state;
-	std::string 					m_status;
+	TRACKER_STATUS 					m_status;
+	std::string						m_tracker_failure;
 	bool 							m_ready2release;
 	time_t 							m_last_update;
 	uint64_t 						m_downloaded;//с момента события started
@@ -157,30 +159,18 @@ private:
 	std::string 						m_ip;
 	uint64_t 							m_downloaded;
 	uint64_t 							m_uploaded;
-	std::set<PIECE_INDEX>	m_available_pieces;
+	std::set<PIECE_INDEX>				m_available_pieces;
 	bool 								m_peer_choking;//пир нас заблокирован
 	bool 								m_peer_interested;//пир в нас заинтересован
 	bool 								m_am_choking;//я блокирую пира
 	bool 								m_am_interested;//я заинтересован в пире
 	int 								m_state;
-	BITFIELD 				m_bitfield;
+	BITFIELD 							m_bitfield;
 	std::set<BLOCK_ID> 					m_requested_blocks;//блоки, которые мы запросили
 	std::set<BLOCK_ID>					m_blocks2request;
 	std::set<BLOCK_ID> 					m_requests_queue;//блоки, которые у нас запросили(очередь запросов)
 	time_t 								m_sleep_time;
 	int process_messages();
-public:
-	Peer();
-	int Init(sockaddr_in * addr, const TorrentInterfaceInternalPtr & torrent);
-	int Init(network::Socket & sock, const TorrentInterfaceInternalPtr & torrent, PEER_ADD peer_add);
-	int event_sock_ready2read(network::Socket sock);
-	int event_sock_closed(network::Socket sock);
-	int event_sock_sended(network::Socket sock);
-	int event_sock_connected(network::Socket sock);
-	int event_sock_accepted(network::Socket sock, network::Socket accepted_sock);
-	int event_sock_timeout(network::Socket sock);
-	int event_sock_unresolved(network::Socket sock);
-	int send_have(PIECE_INDEX piece_index);
 	int send_handshake();
 	int send_bitfield();
 	int send_choke();
@@ -189,6 +179,18 @@ public:
 	int send_not_interested();
 	int send_request(PIECE_INDEX piece, BLOCK_INDEX block, uint32_t block_length);
 	int send_piece(PIECE_INDEX piece, BLOCK_OFFSET offset, uint32_t length,  char * block);
+public:
+	Peer();
+	int Init(sockaddr_in * addr, const TorrentInterfaceInternalPtr & torrent);
+	int Init(network::Socket & sock, const TorrentInterfaceInternalPtr & torrent, PEER_ADD peer_add) throw (Exception);
+	int event_sock_ready2read(network::Socket sock);
+	int event_sock_closed(network::Socket sock);
+	int event_sock_sended(network::Socket sock);
+	int event_sock_connected(network::Socket sock);
+	int event_sock_accepted(network::Socket sock, network::Socket accepted_sock);
+	int event_sock_timeout(network::Socket sock);
+	int event_sock_unresolved(network::Socket sock);
+	int send_have(PIECE_INDEX piece_index);
 	bool have_piece(PIECE_INDEX piece_index);
 	bool is_choking();
 	int clock();
@@ -202,7 +204,7 @@ public:
 	double get_tx_speed();
 	const std::string & get_ip_str();
 	int get_info(info::peer & ref);
-	int prepare2release();
+	void prepare2release();
 	void forced_releasing();
 	~Peer();
 };
@@ -227,16 +229,16 @@ private:
 	struct piece_info
 	{
 		FILE_INDEX 														file_index;//индекс файла, в котором начинается кусок
-		uint32_t 																	length;//его длина
+		uint32_t 														length;//его длина
 		FILE_OFFSET 													offset;//смещение внутри файла до начала куска
-		uint32_t 																	block_count;//кол-во блоков в куске
-		std::vector<std::pair<FILE_INDEX, FILE_OFFSET> >	block_info;
-		std::set<std::string>														taken_from;
+		uint32_t 														block_count;//кол-во блоков в куске
+		std::vector<std::pair<FILE_INDEX, FILE_OFFSET> >				block_info;
+		std::set<std::string>											taken_from;
 		std::set<BLOCK_INDEX>	 										block2download;
 		std::set<BLOCK_INDEX>											downloaded_blocks;
 		SHA1_HASH														hash;
 		DOWNLOAD_PRIORITY												prio;
-		uint32_list_iter															prio_iter;
+		uint32_list_iter												prio_iter;
 	};
 	struct download_queue
 	{
@@ -258,7 +260,7 @@ private:
 	void build_piece_info();
 	int push_piece2download(uint32_t piece_index);
 public:
-	PieceManager(const TorrentInterfaceInternalPtr & torrent, BITFIELD bitfield);
+	PieceManager(const TorrentInterfaceInternalPtr & torrent, BITFIELD bitfield) throw (Exception);
 	void reset();
 	~PieceManager();
 	void get_blocks_count_in_piece(PIECE_INDEX piece_index, uint32_t & blocks_count);
@@ -314,7 +316,12 @@ public:
 	void get_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY  & prio);
 	void ReleaseFiles();
 	~TorrentFile();
-	static void CreateTorrentFile(const TorrentInterfaceInternalPtr & t, const std::string & path, bool files_should_exists, uint32_t & files_exists, TorrentFilePtr & ptr)
+	/*
+	 * Exception::ERR_CODE_UNDEF
+	 * SyscallException
+	 */
+	static void CreateTorrentFile(const TorrentInterfaceInternalPtr & t, const std::string & path,
+								bool files_should_exists, uint32_t & files_exists, TorrentFilePtr & ptr) throw (Exception)
 	{
 		try
 		{
@@ -325,6 +332,11 @@ public:
 		{
 			ptr.reset();
 			throw Exception(e);
+		}
+		catch(SyscallException & e)
+		{
+			ptr.reset();
+			throw SyscallException(e);
 		}
 	}
 };
@@ -370,18 +382,19 @@ protected:
 	double 							m_rx_speed;
 	double 							m_tx_speed;
 	TORRENT_STATE 					m_state;
-	std::string 					m_error;
-	TORRENT_WORK		m_work;
+	TORRENT_WORK					m_work;
+
+	torrent_failure					m_failure_desc;
 
 	virtual void add_seeders(uint32_t count, sockaddr_in * addrs);
-	virtual int add_leecher(network::Socket & sock);
-	virtual std::string get_error();
-	virtual int start();
-	virtual int stop();
-	virtual int pause();
-	virtual int continue_();
-	virtual int check();
-	virtual void set_failure();
+	virtual void add_seeder(sockaddr_in * addr) throw (Exception);
+	virtual void add_leecher(network::Socket & sock) throw (Exception);
+	virtual void start();
+	virtual void stop();
+	virtual void pause();
+	virtual void continue_();
+	virtual void check();
+	virtual void set_failure(const torrent_failure & tf);
 	virtual bool is_downloaded();
 	virtual int event_file_write(const fs::write_event & we);
 	virtual int clock();
@@ -389,13 +402,14 @@ protected:
 	virtual void get_info_dyn(info::torrent_dyn & ref);
 	virtual void get_info_trackers(info::trackers & ref);
 	virtual void get_info_files(info::files & ref);
-	virtual int get_info_file_dyn(FILE_INDEX index, info::file_dyn & ref);
+	virtual void get_info_file_dyn(FILE_INDEX index, info::file_dyn & ref);
 	virtual void get_info_seeders(info::peers & ref);
 	virtual void get_info_leechers(info::peers & ref);
 	virtual int erase_state();
 	virtual void prepare2release();
 	virtual void forced_releasing();
-	virtual int set_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY prio);
+	virtual void set_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY prio);
+	virtual const torrent_failure & get_failure_desc();
 	TorrentBase(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc);
 	void init(const Metafile & metafile, const std::string & work_directory, const std::string & download_directory);
 	static void CreateTorrent(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc,
@@ -428,27 +442,53 @@ public:
 		ptr = boost::static_pointer_cast<TorrentInterfaceBase>(base_ptr);
 	}
 	virtual ~TorrentInterfaceBase() {}
-	virtual void add_seeders(uint32_t count, sockaddr_in * addrs) = 0;
-	virtual int add_leecher(network::Socket & sock) = 0;
-	virtual std::string get_error() = 0;
-	virtual int start() = 0;
-	virtual int stop() = 0;
-	virtual int pause() = 0;
-	virtual int continue_() = 0;
-	virtual int check() = 0;
+	/*
+	 * Exception::ERR_CODE_NULL_REF
+	 * Exception::ERR_CODE_SEED_REJECTED
+	 */
+	virtual void add_seeder(sockaddr_in * addr) throw (Exception) = 0;
+	/*
+	 * Exception::ERR_CODE_NULL_REF
+	 * Exception::ERR_CODE_LEECHER_REJECTED
+	 */
+	virtual void add_leecher(network::Socket & sock) throw (Exception) = 0;
+	/*
+	 * Exception::ERR_CODE_INVALID_OPERATION
+	 */
+	virtual void start() = 0;
+	/*
+	 * Exception::ERR_CODE_INVALID_OPERATION
+	 */
+	virtual void stop() = 0;
+	/*
+	 * Exception::ERR_CODE_INVALID_OPERATION
+	 */
+	virtual void pause() = 0;
+	/*
+	 * Exception::ERR_CODE_INVALID_OPERATION
+	 */
+	virtual void continue_() = 0;
+	/*
+	 * Exception::ERR_CODE_INVALID_OPERATION
+	 */
+	virtual void check() = 0;
 	virtual bool is_downloaded() = 0;
 	virtual int clock() = 0;
 	virtual void get_info_stat(info::torrent_stat & ref) = 0;
 	virtual void get_info_dyn(info::torrent_dyn & ref) = 0;
 	virtual void get_info_trackers(info::trackers & ref) = 0;
 	virtual void get_info_files(info::files & ref) = 0;
-	virtual int get_info_file_dyn(FILE_INDEX index, info::file_dyn & ref) = 0;
+	/*
+	 * Exception::ERR_CODE_INVALID_FILE_INDEX
+	 */
+	virtual void get_info_file_dyn(FILE_INDEX index, info::file_dyn &ref) = 0;
 	virtual void get_info_seeders(info::peers & ref) = 0;
 	virtual void get_info_leechers(info::peers & ref) = 0;
 	virtual int erase_state() = 0;
 	virtual void prepare2release() = 0;
 	virtual void forced_releasing() = 0;
-	virtual int set_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY prio) = 0;
+	virtual void set_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY prio) = 0;
+	virtual const torrent_failure & get_failure_desc() = 0;
 };
 
 class TorrentInterfaceInternal : public TorrentBase
@@ -480,12 +520,11 @@ public:
 	void copy_bitfield(BITFIELD dst);
 	void inc_uploaded(uint32_t bytes_num);
 	void inc_downloaded(uint32_t bytes_num);
-	void set_error(const std::string & err);
 	void copy_piece_hash(SHA1_HASH dst, PIECE_INDEX piece_index);
 	int save_block(PIECE_INDEX piece, BLOCK_OFFSET block_offset, uint32_t block_length, char * block);
 	int read_block(PIECE_INDEX piece, BLOCK_INDEX block_index, char * block, uint32_t & block_length);
 	int read_piece(PIECE_INDEX piece, unsigned char * dst);
-	virtual void set_failure() = 0;
+	virtual void set_failure(const torrent_failure & tf) = 0;
 	virtual int event_file_write(const fs::write_event & we) = 0;
 	virtual void add_seeders(uint32_t count, sockaddr_in * addrs) = 0;
 };

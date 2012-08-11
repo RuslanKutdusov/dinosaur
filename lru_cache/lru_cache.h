@@ -42,11 +42,11 @@ protected:
 public:
 	LRU_Cache();
 	virtual ~LRU_Cache();
-	int Init(uint16_t size);
-	int put(cache_key key, cache_element * value);
-	int get(cache_key key, cache_element * value);
+	void Init(uint16_t size);
+	void put(cache_key key, cache_element * value);
+	void get(cache_key key, cache_element * value);
 	bool empty();
-	int remove(cache_key key);
+	void remove(cache_key key);
 };
 
 template <class cache_key, class cache_element>
@@ -71,8 +71,13 @@ uint64_t LRU_Cache<cache_key, cache_element>::get_time()
 	return ((uint64_t)ts.tv_sec << 32) + ts.tv_nsec;
 }
 
+/*
+ * Exception::ERR_CODE_NO_MEMORY_AVAILABLE
+ * Exception::ERR_CODE_UNDEF
+ */
+
 template <class cache_key, class cache_element>
-int LRU_Cache<cache_key, cache_element>::Init(uint16_t size)//thrown
+void LRU_Cache<cache_key, cache_element>::Init(uint16_t size)//thrown
 {
 	try
 	{
@@ -81,18 +86,25 @@ int LRU_Cache<cache_key, cache_element>::Init(uint16_t size)//thrown
 		for(uint16_t i = 0; i < size; i++)
 			m_free_elements.push_front(&m_elements[i]);//исключение возможно здесь
 	}
+	catch (std::bad_alloc & e) {
+		throw Exception(Exception::ERR_CODE_NO_MEMORY_AVAILABLE);
+	}
 	catch(...)
 	{
-		return ERR_INTERNAL;
+		throw Exception(Exception::ERR_CODE_UNDEF);
 	}
-	return ERR_NO_ERROR;
 }
 
+/*
+ * Exception::ERR_CODE_NULL_REF
+ * Exception::ERR_CODE_UNDEF
+ */
+
 template <class cache_key, class cache_element>
-int LRU_Cache<cache_key, cache_element>::put(cache_key key, cache_element * value)
+void LRU_Cache<cache_key, cache_element>::put(cache_key key, cache_element * value)
 {
 	if (value == NULL || m_elements == NULL)
-		return ERR_NULL_REF;
+		throw Exception(Exception::ERR_CODE_NULL_REF);
 	try
 	{
 		if (m_free_elements.empty())
@@ -103,7 +115,7 @@ int LRU_Cache<cache_key, cache_element>::put(cache_key key, cache_element * valu
 			{
 				memcpy(m_hash_table[key], value, sizeof(cache_element));
 				m_time_queue.right.replace_data(time_queue_iter_to_element, get_time());
-				return ERR_NO_ERROR;
+				return;
 			}
 			//находим самый старый элемент
 			time_queue_left_iterator time_queue_iter_to_old_element = m_time_queue.left.begin();
@@ -140,22 +152,27 @@ int LRU_Cache<cache_key, cache_element>::put(cache_key key, cache_element * valu
 	}
 	catch(...)
 	{
-		return ERR_INTERNAL;
+		throw Exception(Exception::ERR_CODE_UNDEF);
 	}
-	return ERR_NO_ERROR;
 }
 
+/*
+ * Exception::ERR_CODE_NULL_REF
+ * Exception::ERR_CODE_LRU_CACHE_NE
+ * Exception::ERR_CODE_UNDEF
+ */
+
 template <class cache_key, class cache_element>
-int LRU_Cache<cache_key, cache_element>::get(cache_key key, cache_element * value)
+void LRU_Cache<cache_key, cache_element>::get(cache_key key, cache_element * value)
 {
 	if (value == NULL || m_elements == NULL)
-		return ERR_NULL_REF;
+		throw Exception(Exception::ERR_CODE_NULL_REF);
 	try
 	{
 		//cache_key key(torrent, block_id);
 		hash_table_iterator iter = m_hash_table.find(key);
 		if (iter == m_hash_table.end() && m_hash_table.count(key) == 0)
-			return ERR_LRU_CACHE_NE;
+			throw Exception(Exception::ERR_CODE_LRU_CACHE_NE);
 
 		cache_element * element = (*iter).second;
 		memcpy(value, element, sizeof(cache_element));
@@ -171,9 +188,8 @@ int LRU_Cache<cache_key, cache_element>::get(cache_key key, cache_element * valu
 	}
 	catch(...)
 	{
-		return ERR_INTERNAL;
+		throw Exception(Exception::ERR_CODE_UNDEF);
 	}
-	return ERR_NO_ERROR;
 }
 
 template <class cache_key, class cache_element>
@@ -182,15 +198,20 @@ bool LRU_Cache<cache_key, cache_element>::empty()
 	return m_hash_table.empty();
 }
 
+/*
+ * Exception::ERR_CODE_UNDEF
+ * Exception::ERR_CODE_LRU_CACHE_NE
+ */
+
 template <class cache_key, class cache_element>
-int LRU_Cache<cache_key, cache_element>::remove(cache_key key)
+void LRU_Cache<cache_key, cache_element>::remove(cache_key key)
 {
 	try
 	{
 		//cache_key key(torrent, block_id);
 		hash_table_iterator hash_table_iter_to_element = m_hash_table.find(key);
 		if (hash_table_iter_to_element == m_hash_table.end() && m_hash_table.count(key) == 0)
-			return ERR_LRU_CACHE_NE;
+			throw Exception(Exception::ERR_CODE_LRU_CACHE_NE);
 		typename time_queue::right_iterator time_queue_iter_to_element = m_time_queue.right.find(key);
 		m_free_elements.push_back((*hash_table_iter_to_element).second);
 		//удаляем из таблицы и очереди элемент
@@ -199,9 +220,8 @@ int LRU_Cache<cache_key, cache_element>::remove(cache_key key)
 	}
 	catch(...)
 	{
-		return ERR_INTERNAL;
+		throw Exception(Exception::ERR_CODE_UNDEF);
 	}
-	return ERR_NO_ERROR;
 }
 
 }

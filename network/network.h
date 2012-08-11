@@ -65,9 +65,9 @@ class DomainNameResolver
 private:
 	std::string m_domain;
 	struct sockaddr_in * m_addr;
-	int addrinfo();
-	int resolve();
-	int split_domain_and_port();
+	void addrinfo();
+	void resolve();
+	void split_domain_and_port();
 public:
 	DomainNameResolver(std::string & domain, struct sockaddr_in * addr);
 	DomainNameResolver(const char * domain, struct sockaddr_in * addr);
@@ -143,6 +143,10 @@ public:
 		printf("%s\n", inet_ntoa(m_peer.sin_addr));
 	}
 #endif
+	int get_errno()
+	{
+		return m_errno;
+	}
 	friend class NetworkManager;
 };
 
@@ -158,49 +162,46 @@ private:
 	socket_set m_listening_sockets;
 	socket_set m_sockets;
 	int m_epoll_fd;
-	int handle_event(socket_ * sock, uint32_t events);
-	int handler_connection(socket_ * sock);
-	int handler_transmission(socket_ * sock, int transmission_type);
-	int _send(socket_ * sock, const void * data,size_t len, bool full);
-	int _recv(socket_ * sock, void * data, size_t len);
-	int _close(socket_ * sock);
-	int epoll_mod(socket_ * sock);
-	int epoll_mod(socket_ * sock, uint32_t events);
-	int epollin(socket_ * sock, bool on_off);
-	int epollout(socket_ * sock, bool on_off);
+	void handle_event(socket_ * sock, uint32_t events) throw (SyscallException);
+	void handler_connection(socket_ * sock) throw (SyscallException);
+	void handler_transmission(socket_ * sock, int transmission_type) throw (SyscallException);
+	void epoll_mod(socket_ * sock) throw (SyscallException);
+	void epoll_mod(socket_ * sock, uint32_t events) throw (SyscallException);
+	void epollin(socket_ * sock, bool on_off) throw (SyscallException);
+	void epollout(socket_ * sock, bool on_off) throw (SyscallException);
 private:
 	pthread_t m_thread;
 	pthread_mutex_t m_mutex_sockets;
 	bool m_thread_stop;
 	static void * timeout_thread(void * arg);
-	int ConnectResolvedSocket(Socket & sock);
+	void ConnectResolvedSocket(Socket & sock) throw (SyscallException);
 public:
 	NetworkManager();
-	int Init();
+	void Init() throw (SyscallException);
 	~NetworkManager();
-	int Socket_add(std::string & ip, uint16_t port, const SocketAssociation::ptr & assoc, Socket & socket);
-	int Socket_add(const char * ip, uint16_t port, const SocketAssociation::ptr & assoc, Socket & socket);
-	int Socket_add(sockaddr_in *addr, const SocketAssociation::ptr & assoc, Socket & socket);
-	int Socket_add(int sock_fd, struct sockaddr_in * addr, const SocketAssociation::ptr & assoc, Socket & sock);
-	int Socket_add_domain(const char *domain_name, uint16_t port, const SocketAssociation::ptr & assoc, Socket & socket);
-	int Socket_add_domain(std::string & domain_name, uint16_t port, const SocketAssociation::ptr & assoc, Socket & socket);
-	int ListenSocket_add(sockaddr_in * addr, const SocketAssociation::ptr & assoc, Socket & sock);
-	int ListenSocket_add(uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock);
-	int ListenSocket_add(uint16_t port, in_addr * addr, const SocketAssociation::ptr & assoc, Socket & sock);
-	int ListenSocket_add(uint16_t port, const char * ip, const SocketAssociation::ptr & assoc, Socket & sock);
-	int ListenSocket_add(uint16_t port, const std::string & ip, const SocketAssociation::ptr & assoc, Socket & sock);
-	int Socket_send(Socket & sock, const void * data, size_t len, bool full = true);//full == 1 => надо отправить все сразу
-	int Socket_recv(Socket & sock, void * data, size_t len);
-	ssize_t Socket_datalen(Socket & sock);
-	int Socket_closed(Socket & sock, bool * closed);
-	int Socket_close(Socket & sock);
-	int Socket_delete(Socket & sock);
-	int Socket_set_assoc(Socket & sock, const SocketAssociation::ptr & assoc);
-	int Socket_get_assoc(Socket & sock, SocketAssociation::ptr & assoc);
-	double Socket_get_rx_speed(Socket & sock);
-	double Socket_get_tx_speed(Socket & sock);
-	int Socket_get_addr(Socket & sock, sockaddr_in * addr);
-	int get_sock_errno(Socket & sock)
+	void Socket_add(std::string & ip, uint16_t port, const SocketAssociation::ptr & assoc, Socket & socket) throw (Exception, SyscallException);
+	void Socket_add(const char * ip, uint16_t port, const SocketAssociation::ptr & assoc, Socket & socket) throw (Exception, SyscallException);
+	void Socket_add(sockaddr_in *addr, const SocketAssociation::ptr & assoc, Socket & socket) throw (Exception, SyscallException);
+	void Socket_add(int sock_fd, struct sockaddr_in * addr, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException);
+	void Socket_add_domain(const char *domain_name, uint16_t port, const SocketAssociation::ptr & assoc, Socket & socket) throw (Exception);
+	void Socket_add_domain(std::string & domain_name, uint16_t port, const SocketAssociation::ptr & assoc, Socket & socket) throw (Exception);
+	void ListenSocket_add(sockaddr_in * addr, const SocketAssociation::ptr & assoc, Socket & sock)  throw (Exception, SyscallException);
+	void ListenSocket_add(uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock)  throw (Exception, SyscallException);
+	void ListenSocket_add(uint16_t port, in_addr * addr, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException);
+	void ListenSocket_add(uint16_t port, const char * ip, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException);
+	void ListenSocket_add(uint16_t port, const std::string & ip, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException);
+	size_t Socket_send(Socket & sock, const void * data, size_t len, bool full = true) throw (Exception);//full == 1 => надо отправить все сразу
+	size_t Socket_recv(Socket & sock, void * data, size_t len) throw (Exception);
+	ssize_t Socket_datalen(Socket & sock) throw (Exception);
+	void Socket_closed(Socket & sock, bool * closed) throw (Exception);
+	void Socket_close(Socket & sock) throw (Exception);
+	void Socket_delete(Socket & sock);
+	void Socket_set_assoc(Socket & sock, const SocketAssociation::ptr & assoc) throw (Exception);
+	void Socket_get_assoc(Socket & sock, SocketAssociation::ptr & assoc) throw (Exception);
+	double Socket_get_rx_speed(Socket & sock) throw (Exception);
+	double Socket_get_tx_speed(Socket & sock) throw (Exception);
+	void Socket_get_addr(Socket & sock, sockaddr_in * addr) throw (Exception);
+	/*int get_sock_errno(Socket & sock)
 	{
 		if (sock == NULL)
 			return ERR_BAD_ARG;
@@ -211,11 +212,11 @@ public:
 		if (sock == NULL)
 			return NULL;
 		return sys_errlist[sock->m_errno];
-	}
+	}*/
 	ssize_t Socket_sendbuf_remain(Socket & sock)
 	{
 		if (sock == NULL)
-			return -1;
+			return 0;
 		return sock->m_send_buffer.length - sock->m_send_buffer.pos;
 	}
 #ifdef BITTORRENT_DEBUG
@@ -227,7 +228,7 @@ public:
 			std::cout<<"Socket fd = "<<sock->m_socket<<std::endl;
 			std::cout<<"       cl = "<<sock->m_closed<<std::endl;
 			std::cout<<"       cn = "<<sock->m_connected<<std::endl;
-			std::cout<<"       er = "<<sock->m_errno<<" "<<get_sock_errno_str(sock)<<std::endl;
+			//std::cout<<"       er = "<<sock->m_errno<<" "<<get_sock_errno_str(sock)<<std::endl;
 			char * ip = inet_ntoa (sock->m_peer.sin_addr ) ;
 			std::cout<<"       IP:port ="<<ip<<":"<<ntohs(sock->m_peer.sin_port)<<std::endl;
 			std::cout<<"       Recvbuffer"<<std::endl;
@@ -246,7 +247,7 @@ public:
 		return 0;
 	}
 #endif
-	int clock();
+	int clock()  throw (SyscallException);
 	void notify();
 };
 

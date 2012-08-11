@@ -95,6 +95,11 @@ void messagebox(const char * message)
 	gtk_widget_destroy (dialog);
 }
 
+void messagebox(const std::string & message)
+{
+	messagebox(message.c_str());
+}
+
 extern "C" void on_button_open_clicked (GtkWidget *object, gpointer user_data)
 {
 	if (open_dialog != NULL)
@@ -119,7 +124,7 @@ extern "C" void on_button_open_clicked (GtkWidget *object, gpointer user_data)
 		catch(dinosaur::Exception & e)
 		{
 			gtk_widget_destroy (dialog);
-			messagebox(e.get_error().c_str());
+			messagebox(exception_errcode2str(e));
 		}
 		g_free (filename);
 	}
@@ -139,7 +144,13 @@ extern "C" void on_button_start_clicked (GtkWidget *object, gpointer user_data)
 		gtk_tree_model_get (model, &selected_iter, TORRENT_LIST_COL_HASH, &g_hash, -1);
 		std::string hash = g_hash;
 		g_free(g_hash);
-		bt->ContinueTorrent(hash);
+		try
+		{
+			bt->ContinueTorrent(hash);
+		}
+		catch (dinosaur::Exception & e) {
+			messagebox(dinosaur::exception_errcode2str(e));
+		}
 	}
 }
 
@@ -155,7 +166,13 @@ extern "C" void on_button_stop_clicked (GtkWidget *object, gpointer user_data)
 		gtk_tree_model_get (model, &selected_iter, TORRENT_LIST_COL_HASH, &g_hash, -1);
 		std::string hash = g_hash;
 		g_free(g_hash);
-		bt->PauseTorrent(hash);
+		try
+		{
+			bt->PauseTorrent(hash);
+		}
+		catch (dinosaur::Exception & e) {
+			messagebox(dinosaur::exception_errcode2str(e));
+		}
 	}
 }
 
@@ -171,7 +188,13 @@ extern "C" void on_button_delete_clicked (GtkWidget *object, gpointer user_data)
 		gtk_tree_model_get (model, &selected_iter, TORRENT_LIST_COL_HASH, &g_hash, -1);
 		std::string hash = g_hash;
 		g_free(g_hash);
-		bt->DeleteTorrent(hash);
+		try
+		{
+			bt->DeleteTorrent(hash);
+		}
+		catch (dinosaur::Exception & e) {
+			messagebox(dinosaur::exception_errcode2str(e));
+		}
 		on_window1_show(NULL,NULL);
 	}
 }
@@ -188,7 +211,13 @@ extern "C" void on_button_check_clicked(GtkWidget *object, gpointer user_data)
 		gtk_tree_model_get (model, &selected_iter, TORRENT_LIST_COL_HASH, &g_hash, -1);
 		std::string hash = g_hash;
 		g_free(g_hash);
-		bt->CheckTorrent(hash);
+		try
+		{
+			bt->CheckTorrent(hash);
+		}
+		catch (dinosaur::Exception & e) {
+			messagebox(dinosaur::exception_errcode2str(e));
+		}
 	}
 }
 
@@ -220,28 +249,29 @@ extern "C" void on_open_dialog_button_ok_clicked (GtkWidget *object, gpointer us
 	}
 	std::string dir_str = dir;
 	std::string hash;
-	if (bt->AddTorrent(*metafile, dir_str, hash) != ERR_NO_ERROR)
+	try
 	{
+		bt->AddTorrent(*metafile, dir_str, hash);
+		bt->StartTorrent(hash);
+		g_free(dir);
 		gtk_object_destroy(GTK_OBJECT(open_dialog));
-		messagebox(bt->get_error().c_str());
 		open_dialog = NULL;
 		metafile.reset();
+		on_window1_show(NULL,NULL);
 		return;
 	}
-	if (bt->StartTorrent(hash) != ERR_NO_ERROR)
+	catch (dinosaur::Exception & e)
 	{
-		gtk_object_destroy(GTK_OBJECT(open_dialog));
-		messagebox(bt->get_error().c_str());
-		open_dialog = NULL;
-		metafile.reset();
-		return;
+		messagebox(dinosaur::exception_errcode2str(e));
 	}
-	g_free(dir);
-	//commit
+	catch (dinosaur::SyscallException & e)
+	{
+		messagebox(e.get_errno_str());
+	}
 	gtk_object_destroy(GTK_OBJECT(open_dialog));
 	open_dialog = NULL;
 	metafile.reset();
-	on_window1_show(NULL,NULL);
+	return;
 }
 
 extern "C" void on_open_dialog_button_cancel_clicked (GtkWidget *object, gpointer user_data)
@@ -285,19 +315,19 @@ extern "C" void on_window1_show (GtkWidget *object, gpointer user_data)
 		std::string work;
 		switch(dyn.work)
 		{
-		case(dinosaur::TORRENT_DOWNLOADING):
+		case(dinosaur::TORRENT_WORK_DOWNLOADING):
 				work = "Downloading";
 				break;
-		case(dinosaur::TORRENT_UPLOADING):
+		case(dinosaur::TORRENT_WORK_UPLOADING):
 				work = "Uploading";
 				break;
-		case(dinosaur::TORRENT_CHECKING):
+		case(dinosaur::TORRENT_WORK_CHECKING):
 				work = "Checking";
 				break;
-		case(dinosaur::TORRENT_PAUSED):
+		case(dinosaur::TORRENT_WORK_PAUSED):
 				work = "Paused";
 				break;
-		case(dinosaur::TORRENT_FAILURE):
+		case(dinosaur::TORRENT_WORK_FAILURE):
 				work = "Failure";
 				break;
 		}
@@ -363,7 +393,7 @@ extern "C" void  on_torrent_view_cursor_changed(GtkWidget *object, gpointer user
 			gtk_list_store_append(tracker_list, &iter);
 			gtk_list_store_set (tracker_list, &iter,
 					TRACKER_LIST_COL_ANNOUNCE, (*i).announce.c_str(),
-					TRACKER_LIST_COL_STATUS, (*i).status.c_str(),
+					//TRACKER_LIST_COL_STATUS, (*i).status.c_str(),
 					TRACKER_LIST_COL_UPDATE_IN, (gint)(*i).update_in,
 					TRACKER_LIST_COL_LEECHERS,(gint)(*i).leechers,
 					TRACKER_LIST_COL_SEEDERS,(gint)(*i).seeders,
@@ -435,19 +465,19 @@ gboolean foreach_torrent_list (GtkTreeModel *model,
 	std::string work;
 	switch(dyn.work)
 	{
-	case(dinosaur::TORRENT_DOWNLOADING):
+	case(dinosaur::TORRENT_WORK_DOWNLOADING):
 			work = "Downloading";
 			break;
-	case(dinosaur::TORRENT_UPLOADING):
+	case(dinosaur::TORRENT_WORK_UPLOADING):
 			work = "Uploading";
 			break;
-	case(dinosaur::TORRENT_CHECKING):
+	case(dinosaur::TORRENT_WORK_CHECKING):
 			work = "Checking";
 			break;
-	case(dinosaur::TORRENT_PAUSED):
+	case(dinosaur::TORRENT_WORK_PAUSED):
 			work = "Paused";
 			break;
-	case(dinosaur::TORRENT_FAILURE):
+	case(dinosaur::TORRENT_WORK_FAILURE):
 			work = "Failure";
 			break;
 	}
@@ -491,7 +521,7 @@ gboolean foreach_tracker_list (GtkTreeModel *model,
 		if (announce == (*i).announce)
 		{
 			gtk_list_store_set (tracker_list, iter,
-					TRACKER_LIST_COL_STATUS, (*i).status.c_str(),
+					//TRACKER_LIST_COL_STATUS, (*i).status.c_str(),
 					TRACKER_LIST_COL_UPDATE_IN, (gint)(*i).update_in,
 					TRACKER_LIST_COL_LEECHERS,(gint)(*i).leechers,
 					TRACKER_LIST_COL_SEEDERS,(gint)(*i).seeders,
@@ -596,12 +626,14 @@ gboolean on_timer(gpointer data)
 void update_statusbar()
 {
 	//gtk_statusbar_remove_all(statusbar, 0);
-	if (bt->get_socket_status() == dinosaur::SOCKET_STATUS_OK)
+	dinosaur::socket_status s= bt->get_socket_status();
+	if (s.listen)
 		 gtk_statusbar_push(statusbar, 0, "Socket status: ok");
 	else
 	{
 		char chars[256];
-		sprintf(chars, "Socket status: %s", bt->get_error().c_str());
+		std::string error_mes = s.exception_errcode == dinosaur::Exception::NO_ERROR ? sys_errlist[s.errno_] : dinosaur::exception_errcode2str(s.exception_errcode);
+		sprintf(chars, "Socket status: %s", error_mes.c_str());
 		gtk_statusbar_push(statusbar, 0, chars);
 	}
 }
@@ -614,10 +646,9 @@ void init_gui()
 	{
 		dinosaur::Dinosaur::CreateDinosaur(bt);
 	}
-	catch(dinosaur::Exception e)
+	catch(dinosaur::Exception & e)
 	{
-		e.print();
-		return;
+		std::cout<<dinosaur::exception_errcode2str(e);
 	}
 	catch(...)
 	{

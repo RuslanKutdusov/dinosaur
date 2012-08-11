@@ -144,11 +144,6 @@ void TorrentInterfaceInternal::inc_downloaded(uint32_t bytes_num)
 	m_downloaded += bytes_num;
 }
 
-void TorrentInterfaceInternal::set_error(const std::string & err)
-{
-	m_error = err;
-}
-
 void TorrentInterfaceInternal::copy_piece_hash(SHA1_HASH dst, uint32_t piece_index)
 {
 	memcpy(dst, &m_metafile.pieces[piece_index * SHA1_LENGTH], SHA1_LENGTH);

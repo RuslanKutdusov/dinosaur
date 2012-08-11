@@ -11,17 +11,15 @@ namespace dinosaur {
 namespace torrent
 {
 
-PieceManager::PieceManager(const TorrentInterfaceInternalPtr & torrent, unsigned char * bitfield)
+PieceManager::PieceManager(const TorrentInterfaceInternalPtr & torrent, unsigned char * bitfield) throw (Exception)
 {
-	if (torrent == NULL)
-		throw Exception(GENERAL_ERROR_UNDEF_ERROR);
 	m_torrent = torrent;
 	uint32_t piece_count = m_torrent->get_piece_count();
 
 	m_bitfield_len = ceil(piece_count / 8.0f);
 	m_bitfield = new(std::nothrow) unsigned char[m_bitfield_len];
 	if (m_bitfield == NULL)
-		throw Exception(GENERAL_ERROR_NO_MEMORY_AVAILABLE);
+		throw Exception(Exception::ERR_CODE_NO_MEMORY_AVAILABLE);
 
 	if (bitfield == NULL)
 		memset(m_bitfield, 0, m_bitfield_len);
@@ -32,7 +30,7 @@ PieceManager::PieceManager(const TorrentInterfaceInternalPtr & torrent, unsigned
 	if (m_piece_for_check_hash == NULL)
 	{
 		delete[] bitfield;
-		throw Exception(GENERAL_ERROR_NO_MEMORY_AVAILABLE);
+		throw Exception(Exception::ERR_CODE_NO_MEMORY_AVAILABLE);
 	}
 
 
@@ -73,7 +71,6 @@ void PieceManager::reset()
 
 		m_piece_info[i].taken_from.clear();
 	}
-
 }
 
 void PieceManager::build_piece_info()

@@ -15,6 +15,7 @@
 #include <sys/types.h>
 #include <errno.h>
 #include "../err/err_code.h"
+#include "../exceptions/exceptions.h"
 
 namespace dinosaur {
 namespace dir_tree {
@@ -35,7 +36,7 @@ public:
 	std::string get_name();
 	Dir * add_child(const std::string  & name);
 	Dir * add_child(const char * name);
-	int make(std::string current_dir);
+	void make(std::string current_dir) throw (SyscallException);
 	~Dir();
 };
 
@@ -48,10 +49,10 @@ public:
 	DirTree(const DirTree & dirtree);
 	DirTree(const std::string & root);
 	DirTree & operator = (const DirTree & dirtree);
-	int reset();
-	int put(const std::string & dir);
-	int put(const char * dir);
-	int make_dir_tree(std::string current_dir);
+	void reset();
+	void put(const std::string & dir) throw (Exception);
+	void put(const char * dir) throw (Exception);
+	void make_dir_tree(std::string current_dir) throw (Exception, SyscallException);
 	~DirTree();
 };
 

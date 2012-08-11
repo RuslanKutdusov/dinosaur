@@ -231,13 +231,14 @@ int main(int argc,char* argv[])
 {
 	signal(SIGSEGV, catchCrash);
 	signal(SIGABRT, catchCrash);
+	dinosaur::ERR_CODES_STR::save_defaults();
 	try
 	{
 		init_gui();
 	}
 	catch(dinosaur::Exception  &e)
 	{
-		e.print();
+
 	}
 	//network_test2();
 	return 0;

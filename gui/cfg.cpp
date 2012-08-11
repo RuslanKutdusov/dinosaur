@@ -173,73 +173,67 @@ extern "C" void on_cfg_cancel_clicked (GtkWidget *object, gpointer user_data)
 
 extern "C" void on_cfg_ok_clicked (GtkWidget *object, gpointer user_data)
 {
-	int ret = bt->Config.set_download_directory((const char *)gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(download_dir)));
-	if (ret == ERR_DIR_NOT_EXISTS)
-		messagebox("Directory not exists");
-	if (ret == ERR_SYSCALL_ERROR)
+	try
 	{
-		std::string err = GENERAL_ERROR_SYSCALL;
-		err += sys_errlist[errno];
-		messagebox(err.c_str());
-	}
+		bt->Config.set_download_directory((const char *)gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(download_dir)));
+		uint16_t uint16;
+		uint32_t uint32;
+		uint64_t uint64;
 
-	uint16_t uint16;
-	uint32_t uint32;
-	uint64_t uint64;
+		if (sscanf((const char *)gtk_entry_get_text(listen_port), "%hu", &uint16) == 0)
+			messagebox("Invalid port");
+		else
+			bt->Config.set_port(uint16);
 
-	if (sscanf((const char *)gtk_entry_get_text(listen_port), "%hu", &uint16) == 0)
-		messagebox("Invalid port");
-	else
-		bt->Config.set_port(uint16);
-
-	if (sscanf((const char *)gtk_entry_get_text(w_cache_size), "%hu", &uint16) == 0)
-		messagebox("Invalid write cache size");
-	else
-		if (bt->Config.set_write_cache_size(uint16) != ERR_NO_ERROR)
+		if (sscanf((const char *)gtk_entry_get_text(w_cache_size), "%hu", &uint16) == 0)
 			messagebox("Invalid write cache size");
+		else
+			bt->Config.set_write_cache_size(uint16);
 
-	if (sscanf((const char *)gtk_entry_get_text(r_cache_size), "%hu", &uint16) == 0)
-		messagebox("Invalid read cache size");
-	else
-		if (bt->Config.set_read_cache_size(uint16) != ERR_NO_ERROR)
+		if (sscanf((const char *)gtk_entry_get_text(r_cache_size), "%hu", &uint16) == 0)
 			messagebox("Invalid read cache size");
+		else
+			bt->Config.set_read_cache_size(uint16);
 
-	if (sscanf((const char *)gtk_entry_get_text(def_interval), "%llu", &uint64) == 0)
-		messagebox("Invalid tracker default interval");
-	else
-		if (bt->Config.set_tracker_default_interval(uint64) != ERR_NO_ERROR)
+		if (sscanf((const char *)gtk_entry_get_text(def_interval), "%llu", &uint64) == 0)
 			messagebox("Invalid tracker default interval");
+		else
+			bt->Config.set_tracker_default_interval(uint64);
 
-	if (sscanf((const char *)gtk_entry_get_text(num_want), "%u", &uint32) == 0)
-		messagebox("Invalid tracker numwant");
-	else
-		bt->Config.set_tracker_numwant(uint32);
+		if (sscanf((const char *)gtk_entry_get_text(num_want), "%u", &uint32) == 0)
+			messagebox("Invalid tracker numwant");
+		else
+			bt->Config.set_tracker_numwant(uint32);
 
-	if (sscanf((const char *)gtk_entry_get_text(max_seeds), "%u", &uint32) == 0)
-		messagebox("Invalid max active seeds");
-	else
-		if (bt->Config.set_max_active_seeders(uint32) != ERR_NO_ERROR)
+		if (sscanf((const char *)gtk_entry_get_text(max_seeds), "%u", &uint32) == 0)
 			messagebox("Invalid max active seeds");
+		else
+			bt->Config.set_max_active_seeders(uint32);
 
-	if (sscanf((const char *)gtk_entry_get_text(max_leechs), "%u", &uint32) == 0)
-		messagebox("Invalid max active leechs");
-	else
-		if (bt->Config.set_max_active_leechers(uint32) != ERR_NO_ERROR)
+		if (sscanf((const char *)gtk_entry_get_text(max_leechs), "%u", &uint32) == 0)
 			messagebox("Invalid max active leechs");
+		else
+			bt->Config.set_max_active_leechers(uint32);
 
-	bt->Config.set_send_have((bool)gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(send_have)));
+		bt->Config.set_send_have((bool)gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(send_have)));
 
-	if (bt->Config.set_listen_on((char *)gtk_entry_get_text(listen_on)) != ERR_NO_ERROR)
-		messagebox("Invalid listen on");
+		bt->Config.set_listen_on((char *)gtk_entry_get_text(listen_on));
 
-	if (sscanf((const char *)gtk_entry_get_text(max_torrents), "%hu", &uint16) == 0)
-		messagebox("Invalid max active torrents");
-	else
-		if (bt->Config.set_max_active_torrents(uint16) != ERR_NO_ERROR)
+		if (sscanf((const char *)gtk_entry_get_text(max_torrents), "%hu", &uint16) == 0)
 			messagebox("Invalid max active torrents");
+		else
+			bt->Config.set_max_active_torrents(uint16);
 
-	if (bt->UpdateConfigs() == ERR_SEE_ERROR)
-		messagebox(bt->get_error().c_str());
+			bt->UpdateConfigs();
+	}
+	catch(dinosaur::Exception & e)
+	{
+		messagebox(dinosaur::exception_errcode2str(e));
+	}
+	catch(dinosaur::SyscallException & e)
+	{
+		messagebox(e.get_errno_str());
+	}
 
 	gtk_object_destroy(GTK_OBJECT(cfg_window));
 	cfg_window = NULL;

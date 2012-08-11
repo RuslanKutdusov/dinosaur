@@ -25,6 +25,10 @@ Metafile::Metafile()
 	info_hash_hex[SHA1_HEX_LENGTH - 1] = '\0';
 }
 
+/*
+ * Exception::ERR_CODE_INVALID_METAFILE
+ */
+
 Metafile::Metafile(const Metafile & metafile)
 : m_metafile(bencode::copy(metafile.m_metafile)),
   m_metafile_len(metafile.m_metafile_len),
@@ -46,15 +50,25 @@ Metafile::Metafile(const Metafile & metafile)
 		bencode::be_node * info;// = bencode::get_info_dict(m_metafile);
 		bencode::be_str * str;
 		if (bencode::get_node(m_metafile, "info", &info) == -1)
-			throw Exception("Invalid metafile, can not get info dictionary");
+		{
+			bencode::_free(m_metafile);
+			throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
+		}
 
 		if (bencode::get_str(info,"pieces",&str) == -1 || str->len % 20 != 0)
-			throw Exception("Invalid metafile");
+		{
+			bencode::_free(m_metafile);
+			throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
+		}
 		pieces	 = str->ptr;
 	}
 	memcpy(info_hash_bin, metafile.info_hash_bin, SHA1_LENGTH);
 	memcpy(info_hash_hex, metafile.info_hash_hex, SHA1_HEX_LENGTH);
 }
+
+/*
+ * Exception::ERR_CODE_INVALID_METAFILE
+ */
 
 Metafile & Metafile::operator = (const Metafile & metafile)
 {
@@ -78,13 +92,19 @@ Metafile & Metafile::operator = (const Metafile & metafile)
 		pieces = 			NULL;
 		if (m_metafile != NULL)
 		{
-			bencode::be_node * info;// = bencode::get_info_dict(m_metafile);
+			bencode::be_node * info;
 			bencode::be_str * str;
 			if (bencode::get_node(m_metafile, "info", &info) == -1)
-				throw Exception("Invalid metafile, can not get info dictionary");
+			{
+				bencode::_free(m_metafile);
+				throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
+			}
 
 			if (bencode::get_str(info,"pieces",&str) == -1 || str->len % 20 != 0)
-				throw Exception("Invalid metafile");
+			{
+				bencode::_free(m_metafile);
+				throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
+			}
 			pieces	 = str->ptr;
 		}
 		memcpy(info_hash_bin, metafile.info_hash_bin, SHA1_LENGTH);
@@ -93,15 +113,41 @@ Metafile & Metafile::operator = (const Metafile & metafile)
 	return *this;
 }
 
+/*
+ * Exception::ERR_CODE_INVALID_METAFILE
+ */
+
 
 Metafile::Metafile(const std::string & metafile_path)
 {
-	init(metafile_path.c_str());
+	try
+	{
+		init(metafile_path.c_str());
+	}
+	catch(Exception & e)
+	{
+		if (m_metafile != NULL)
+			bencode::_free(m_metafile);
+		throw Exception(e);
+	}
 }
+
+/*
+ * Exception::ERR_CODE_INVALID_METAFILE
+ */
 
 Metafile::Metafile(const char * metafile_path)
 {
-	init(metafile_path);
+	try
+	{
+		init(metafile_path);
+	}
+	catch(Exception & e)
+	{
+		if (m_metafile != NULL)
+			bencode::_free(m_metafile);
+		throw Exception(e);
+	}
 }
 
 Metafile::~Metafile() {
@@ -111,32 +157,36 @@ Metafile::~Metafile() {
 		bencode::_free(m_metafile);
 }
 
+/*
+ * Exception::ERR_CODE_INVALID_METAFILE
+ */
+
 void Metafile::init(const char * metafile_path)
 {
 	char * buf = read_file(metafile_path, &m_metafile_len, MAX_TORRENT_FILE_LENGTH);
 	if (buf == NULL)
-		throw FileException(errno);
+		throw SyscallException();
 	m_metafile = bencode::decode(buf, m_metafile_len, false);
 #ifdef BITTORRENT_DEBUG
 	bencode::dump(m_metafile);
 #endif
 	free(buf);
 	if (!m_metafile)
-		throw Exception("Invalid metafile, parse error");
+		throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
 
-	if (get_announces() != ERR_NO_ERROR)
-		throw Exception("Invalid metafile, parse error");
+	get_announces();
 
 	get_additional_info();
 
-	if (get_main_info(m_metafile_len) != ERR_NO_ERROR)
-		throw Exception("Invalid metafile, parse error");
+	get_main_info(m_metafile_len);
 }
 
-int Metafile::get_announces()
+/*
+ * Exception::ERR_CODE_INVALID_METAFILE
+ */
+
+void Metafile::get_announces()
 {
-	if (m_metafile == NULL)
-		return ERR_NULL_REF;
 	bencode::be_node * node;
 
 	if (bencode::get_node(m_metafile,"announce-list",&node) == 0 && bencode::is_list(node))
@@ -145,7 +195,7 @@ int Metafile::get_announces()
 		for(int i = 0; bencode::get_node(node, i, &l) == 0; i++)
 		{
 			if (!bencode::is_list(l))
-				return ERR_INTERNAL;
+				throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
 			bencode::be_str * str;
 			for(int j = 0; bencode::get_str(l, j, &str) == 0; j++)
 			{
@@ -166,8 +216,11 @@ int Metafile::get_announces()
 			delete[] c_str;
 		}
 	}
-	return ERR_NO_ERROR;
 }
+
+/*
+ * Exception::ERR_CODE_INVALID_METAFILE
+ */
 
 void Metafile::get_additional_info()
 {
@@ -192,16 +245,18 @@ void Metafile::get_additional_info()
 	bencode::get_int(m_metafile,"creation date",&creation_date);
 }
 
-int Metafile::get_files_info(bencode::be_node * info)
+/*
+ * Exception::ERR_CODE_INVALID_METAFILE
+ */
+
+void Metafile::get_files_info(bencode::be_node * info)
 {
-	if (m_metafile == NULL || info == NULL)
-		return ERR_NULL_REF;
 	dir_tree = dir_tree::DirTree(name);
 	bencode::be_node * files_node;
 	if (bencode::get_node(info,"files",&files_node) == -1 || !bencode::is_list(files_node))
 	{
 		if (bencode::get_int(info,"length",&length) == -1 || length <= 0)
-			return ERR_INTERNAL; //throw Exception("Invalid metafile, can not get key length");
+			throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
 		files.resize(1);
 		files[0].length = length;
 		files[0].name = name;
@@ -209,66 +264,65 @@ int Metafile::get_files_info(bencode::be_node * info)
 	else
 	{//определяем кол-во файлов
 		int files_count = get_list_size(files_node);
-		//std::cout<<m_files_count<<std::endl;
 		if (files_count <= 0)
-			return ERR_INTERNAL;
+			throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
 		files.resize(files_count);
 		length = 0;
 		for(int i = 0; i < files_count; i++)
 		{
 			bencode::be_node * file_node;// = temp.val.l[i];
 			if ( bencode::get_node(files_node, i, &file_node) == -1 || !bencode::is_dict(file_node))
-				return ERR_INTERNAL;
+				throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
 
 			bencode::be_node * path_node;
 			if (bencode::get_node(file_node, "path", &path_node) == -1 || !bencode::is_list(path_node))
-				return ERR_INTERNAL;
+				throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
 			if (bencode::get_int(file_node, "length", &files[i].length) == -1)
-				return ERR_INTERNAL;
+				throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
 
 			dir_tree.reset();
 			int path_list_size = bencode::get_list_size(path_node);
-			//int substring_offset = 0;
 			for(int j = 0; j < path_list_size; j++)
 			{
 				bencode::be_str * str;
 				if (bencode::get_str(path_node, j, &str) == -1)
-					return ERR_INTERNAL;
-				//m_files[i].name.resize(m_files[i].name.size() + str->len + 1);
-				//strncpy(&m_files[i].name[substring_offset], str->ptr, str->len);
+					throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
 				char * name = bencode::str2c_str(str);
 				files[i].name += name;
 				if (j < path_list_size - 1)
 				{
-					//m_files[i].name[substring_offset + str->len] = '\0';
-					if (dir_tree.put(name) != ERR_NO_ERROR)
-						return ERR_INTERNAL;
+					try
+					{
+						dir_tree.put(name);
+					}
+					catch(Exception & e)
+					{
+						throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
+					}
 					files[i].name += '/';
 				}
 				delete[] name;
 
-				//substring_offset += str->len;
-				//m_files[i].name[substring_offset++] = '/';
 			}
-			//m_files[i].name[m_files[i].name.size() - 1] = '\0';
 			length += files[i].length;
 		}
 	}
-	return ERR_NO_ERROR;
 }
 
-int Metafile::get_main_info( uint64_t metafile_len)
-{
-	if (m_metafile == NULL)
-		return ERR_NULL_REF;
+/*
+ * Exception::ERR_CODE_INVALID_METAFILE
+ */
 
+void Metafile::get_main_info( uint64_t metafile_len)
+{
 	bencode::be_node * info;// = bencode::get_info_dict(m_metafile);
 	bencode::be_str * str;
 	if (bencode::get_node(m_metafile, "info", &info) == -1)
-		return ERR_INTERNAL;
+		throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
 
 	if (bencode::get_str(info,"name",&str) == -1)
-		return ERR_INTERNAL;
+		throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
+
 	char * c_str = bencode::str2c_str(str);
 	name        = c_str;
 	delete[] c_str;
@@ -276,23 +330,26 @@ int Metafile::get_main_info( uint64_t metafile_len)
 	get_files_info(info);
 
 	if (bencode::get_int(info,"piece length",&piece_length) == -1 || piece_length == 0)
-		return ERR_INTERNAL;
+		throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
 
 	if (bencode::get_str(info,"pieces",&str) == -1 || str->len % 20 != 0)
-		return ERR_INTERNAL;
+		throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
+
 	pieces	 = str->ptr;
 	piece_count = str->len / 20;
 
 	if (bencode::get_int(m_metafile,"private",&private_) == -1)
 		bencode::get_int(info,"private",&private_);
 
-	return calculate_info_hash(info, metafile_len);
+	calculate_info_hash(info, metafile_len);
 }
 
-int Metafile::calculate_info_hash(bencode::be_node * info, uint64_t metafile_len)
+/*
+ * Exception::ERR_CODE_INVALID_METAFILE
+ */
+
+void Metafile::calculate_info_hash(bencode::be_node * info, uint64_t metafile_len)
 {
-	if (info == NULL || metafile_len == 0)
-		return ERR_BAD_ARG;
 	memset(info_hash_bin,0,20);
 	memset(info_hash_hex,0,41);
 	char * bencoded_info = new char[metafile_len];
@@ -300,7 +357,7 @@ int Metafile::calculate_info_hash(bencode::be_node * info, uint64_t metafile_len
 	if (bencode::encode(info, &bencoded_info, metafile_len, &bencoded_info_len) != ERR_NO_ERROR)
 	{
 		delete[] bencoded_info;
-		return ERR_INTERNAL;
+		throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
 	}
 	CSHA1 csha1;
 	csha1.Update((unsigned char*)bencoded_info,bencoded_info_len);
@@ -308,48 +365,60 @@ int Metafile::calculate_info_hash(bencode::be_node * info, uint64_t metafile_len
 	csha1.ReportHash(info_hash_hex,CSHA1::REPORT_HEX);
 	csha1.GetHash(info_hash_bin);
 	delete[] bencoded_info;
-	return ERR_NO_ERROR;
 }
 
-int Metafile::save2file(const std::string & filepath)
+/*
+ * Exception::ERR_CODE_NULL_REF
+ * Exception::ERR_CODE_UNDEF
+ * Exception::ERR_CODE_BENCODE_PARSE_ERROR
+ * SyscallException
+ */
+
+void Metafile::save2file(const std::string & filepath)
 {
 	return save2file(filepath.c_str());
 }
 
-int Metafile::save2file(const char * filepath)
+/*
+ * Exception::ERR_CODE_NULL_REF
+ * Exception::ERR_CODE_UNDEF
+ * Exception::ERR_CODE_BENCODE_PARSE_ERROR
+ * SyscallException
+ */
+
+void Metafile::save2file(const char * filepath)
 {
 	if (filepath == NULL)
-		return ERR_BAD_ARG;
+		throw Exception(Exception::ERR_CODE_NULL_REF);
 
 	if (m_metafile == NULL)
-		return ERR_NULL_REF;
+		throw Exception(Exception::ERR_CODE_UNDEF);
 
 	char * bencoded_metafile = new(std::nothrow) char[m_metafile_len];
 	if (bencoded_metafile == NULL)
-		return ERR_INTERNAL;
+		throw Exception(Exception::ERR_CODE_NO_MEMORY_AVAILABLE);
 	uint32_t bencoded_metafile_len = 0;
 	if (bencode::encode(m_metafile, &bencoded_metafile, m_metafile_len, &bencoded_metafile_len) != ERR_NO_ERROR)
 	{
 		delete[] bencoded_metafile;
-		return ERR_INTERNAL;
+		throw Exception(Exception::ERR_CODE_BENCODE_PARSE_ERROR);
 	}
 	int fd = open(filepath, O_RDWR | O_CREAT, S_IRWXU);
 	if (fd == -1)
 	{
 		delete[] bencoded_metafile;
-		return ERR_SYSCALL_ERROR;
+		throw SyscallException();
 	}
 	ssize_t ret = write(fd, bencoded_metafile, bencoded_metafile_len);
 	if (ret == -1)
 	{
+		int err = errno;
 		delete[] bencoded_metafile;
-		return ERR_SYSCALL_ERROR;
 		close(fd);
-		return ERR_SYSCALL_ERROR;
+		throw SyscallException(err);
 	}
 	close(fd);
 	delete[] bencoded_metafile;
-	return ERR_NO_ERROR;
 }
 
 void Metafile::dump()

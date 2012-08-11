@@ -31,11 +31,15 @@ NetworkManager::NetworkManager()
 	m_thread_stop = false;
 }
 
-int NetworkManager::Init()
+/*
+ * SyscallException
+ */
+
+void NetworkManager::Init() throw (SyscallException)
 {
 	m_epoll_fd = epoll_create(10);
 	if (m_epoll_fd == -1)
-		return ERR_SYSCALL_ERROR;
+		throw SyscallException();
 	m_thread_stop = false;
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
@@ -46,16 +50,14 @@ int NetworkManager::Init()
 	pthread_mutexattr_settype(&mta, PTHREAD_MUTEX_RECURSIVE);
 	pthread_mutex_init(&m_mutex_sockets, &mta);
 	pthread_mutex_unlock(&m_mutex_sockets);
-	//pthread_mutex_init(&m_mutex_timeout_sockets, NULL);
-	if (pthread_create(&m_thread, &attr, NetworkManager::timeout_thread, (void *)this))
-		return ERR_SYSCALL_ERROR;
+	int ret = pthread_create(&m_thread, &attr, NetworkManager::timeout_thread, (void *)this);
+	if (ret)
+		throw Exception(Exception::ERR_CODE_CAN_NOT_CREATE_THREAD);
 	pthread_attr_destroy(&attr);
-	return ERR_NO_ERROR;
 }
 
 NetworkManager::~NetworkManager()
 {
-	//pthread_mutex_destroy(&m_mutex_sockets);
 #ifdef BITTORRENT_DEBUG
 	printf("NetworkManager destructor\n");
 #endif
@@ -70,7 +72,6 @@ NetworkManager::~NetworkManager()
 	for(socket_set_iter iter = temp_sockets.begin(); iter != temp_sockets.end(); ++iter)
 	{
 		(*iter)->m_assoc.reset();
-		//std::cout<<"a"<<std::endl;
 	}
 	m_sockets.clear();
 	temp_sockets.clear();
@@ -86,29 +87,54 @@ NetworkManager::~NetworkManager()
 #endif
 }
 
-int NetworkManager::Socket_add(std::string & ip, uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock)
+/*
+ * SyscallException
+ * Exception::ERR_CODE_INVALID_FORMAT
+ * Exception::ERR_CODE_UNDEF
+ * Exception::ERR_CODE_NULL_REF
+ */
+
+void NetworkManager::Socket_add(std::string & ip, uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException)
 {
-	return Socket_add(ip.c_str(), port, assoc, sock);
+	Socket_add(ip.c_str(), port, assoc, sock);
 }
 
-int NetworkManager::Socket_add(const char * ip, uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock)
+/*
+ * SyscallException
+ * Exception::ERR_CODE_INVALID_FORMAT
+ * Exception::ERR_CODE_UNDEF
+ * Exception::ERR_CODE_NULL_REF
+ */
+
+void NetworkManager::Socket_add(const char * ip, uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException)
 {
+	if(ip == NULL)
+		throw Exception(Exception::ERR_CODE_NULL_REF);
 	struct sockaddr_in sockaddr;
 	sockaddr.sin_family = AF_INET;
 	sockaddr.sin_port = htons (port);
-	if (inet_pton(AF_INET, ip, &sockaddr.sin_addr) == 0)
-		return ERR_BAD_ARG;
-	return Socket_add(&sockaddr, assoc, sock);
+	int ret = inet_pton(AF_INET, ip, &sockaddr.sin_addr);
+	if (ret == 0)
+		throw Exception(Exception::ERR_CODE_INVALID_FORMAT);
+	if (ret == -1)
+		throw Exception(Exception::ERR_CODE_UNDEF);
+	Socket_add(&sockaddr, assoc, sock);
 }
 
-int NetworkManager::Socket_add_domain(const char *domain_name, uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock)
+/*
+ * Exception::ERR_CODE_NULL_REF
+ */
+
+void NetworkManager::Socket_add_domain(const char *domain_name, uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception)
 {
 #ifdef BITTORRENT_DEBUG
 	printf("Adding socket %s\n", domain_name);
 #endif
 	sock.reset(new socket_());
-	if (sock == NULL || domain_name == NULL)
-		return ERR_INTERNAL;;
+	if (sock == NULL)
+		throw Exception(Exception::ERR_CODE_UNDEF);
+	if(domain_name == NULL)
+		throw Exception(Exception::ERR_CODE_NULL_REF);
 	sock->m_closed = false;
 	sock->m_assoc = assoc;
 	sock->m_connected = false;
@@ -118,30 +144,39 @@ int NetworkManager::Socket_add_domain(const char *domain_name, uint16_t port, co
 	sock->m_need2resolved = true;
 	sock->m_domain = domain_name;
 	sock->m_timer = 0;
-	//if (lock_mutex)
 	pthread_mutex_lock(&m_mutex_sockets);
 	m_sockets.insert(sock);
-	//if (lock_mutex)
 	pthread_mutex_unlock(&m_mutex_sockets);
 #ifdef BITTORRENT_DEBUG
 	printf("Socket is added %s\n", domain_name);
 #endif
-	return ERR_NO_ERROR;
 }
 
-int NetworkManager::Socket_add_domain(std::string & domain_name, uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock)
+/*
+ * Exception::ERR_CODE_NULL_REF
+ */
+
+void NetworkManager::Socket_add_domain(std::string & domain_name, uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception)
 {
-	return Socket_add_domain(domain_name.c_str(), port, assoc, sock);
+	Socket_add_domain(domain_name.c_str(), port, assoc, sock);
 }
 
-int NetworkManager::Socket_add(struct sockaddr_in * addr, const SocketAssociation::ptr & assoc, Socket & sock)
+/*
+ * Exception::ERR_CODE_UNDEF
+ * Exception::ERR_CODE_NULL_REF
+ * SyscallException
+ */
+
+void NetworkManager::Socket_add(struct sockaddr_in * addr, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException)
 {
 #ifdef BITTORRENT_DEBUG
 	printf("Adding socket %s\n",  inet_ntoa(addr->sin_addr));
 #endif
 	sock.reset(new socket_());
 	if (sock == NULL)
-		return ERR_UNDEF;
+		throw Exception(Exception::ERR_CODE_UNDEF);
+	if (addr == NULL)
+		throw Exception(Exception::ERR_CODE_NULL_REF);
 	struct epoll_event event;
 	sock->m_closed = false;
 	sock->m_assoc = assoc;
@@ -151,16 +186,17 @@ int NetworkManager::Socket_add(struct sockaddr_in * addr, const SocketAssociatio
 	if ((sock->m_socket = socket (AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0)) == -1)
 	{
 		sock.reset();
-		return ERR_SYSCALL_ERROR;
+		throw SyscallException();
 	}
 	event.data.ptr=(void*)sock.get();
 	event.events = EPOLLOUT;
 	sock->m_epoll_events = event.events;
 	if (epoll_ctl(m_epoll_fd, EPOLL_CTL_ADD, sock->m_socket, &event) == -1)
 	{
+		int err = errno;
 		close(sock->m_socket);
 		sock.reset();
-		return ERR_SYSCALL_ERROR;
+		throw SyscallException(err);
 	}
 	memcpy((void *)&sock->m_peer, (void *)addr, sizeof(struct sockaddr_in));
 	if (connect(sock->m_socket, (const struct sockaddr *)addr, sizeof(struct sockaddr_in)) == -1)
@@ -170,9 +206,10 @@ int NetworkManager::Socket_add(struct sockaddr_in * addr, const SocketAssociatio
 			sock->m_state = STATE_CONNECTION;
 			goto end;
 		}
+		int err = errno;
 		close(sock->m_socket);
 		sock.reset();
-		return ERR_SYSCALL_ERROR;
+		throw SyscallException(err);
 	}
 	sock->m_state = STATE_TRANSMISSION;
 	m_connected_sockets.insert(sock);
@@ -185,14 +222,21 @@ end:
 #ifdef BITTORRENT_DEBUG
 	printf("Socket is added %d %s\n", sock->m_socket, inet_ntoa(sock->m_peer.sin_addr));
 #endif
-	return ERR_NO_ERROR;
 }
 
-int NetworkManager::Socket_add(int sock_fd, struct sockaddr_in * addr, const SocketAssociation::ptr & assoc, Socket & sock)
+/*
+ * Exception::ERR_CODE_UNDEF
+ * Exception::ERR_CODE_NULL_REF
+ * SyscallException
+ */
+
+void NetworkManager::Socket_add(int sock_fd, struct sockaddr_in * addr, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException)
 {
 	sock.reset(new socket_());
 	if (sock == NULL)
-		return ERR_UNDEF;
+		throw Exception(Exception::ERR_CODE_UNDEF);
+	if (addr == NULL)
+		throw Exception(Exception::ERR_CODE_NULL_REF);
 	struct epoll_event event;
 	sock->m_closed = false;
 	sock->m_assoc = assoc;
@@ -207,29 +251,34 @@ int NetworkManager::Socket_add(int sock_fd, struct sockaddr_in * addr, const Soc
 	sock->m_epoll_events = event.events;
 	if (epoll_ctl(m_epoll_fd, EPOLL_CTL_ADD, sock->m_socket, &event) == -1)
 	{
+		int err = errno;
 		close(sock->m_socket);
 		sock.reset();
-		return ERR_SYSCALL_ERROR;
+		throw SyscallException(err);
 	}
 	sock->m_state = STATE_TRANSMISSION;
 
 	sock->m_timer = time(NULL);
-	//if (lock_mutex)
 	pthread_mutex_lock(&m_mutex_sockets);
 	m_sockets.insert(sock);
-	//if (lock_mutex)
 	pthread_mutex_unlock(&m_mutex_sockets);
-	return ERR_NO_ERROR;
 }
 
-int NetworkManager::ListenSocket_add(sockaddr_in * addr, const SocketAssociation::ptr & assoc, Socket & sock)
+/*
+ * SyscallException
+ * Exception::ERR_CODE_UNDEF
+ * Exception::ERR_CODE_NULL_REF
+ */
+
+void NetworkManager::ListenSocket_add(sockaddr_in * addr, const SocketAssociation::ptr & assoc, Socket & sock)  throw (Exception, SyscallException)
 {
 	struct epoll_event event;
 	const unsigned int yes = 1;
-	//struct socket_ * sock = (struct socket_ *)malloc(sizeof(struct socket_));
 	sock.reset(new socket_());
 	if (sock == NULL)
-		return ERR_UNDEF;
+		throw Exception(Exception::ERR_CODE_UNDEF);
+	if (addr == NULL)
+		throw Exception(Exception::ERR_CODE_NULL_REF);
 
 	sock->m_closed = false;
 	sock->m_assoc = assoc;
@@ -239,32 +288,32 @@ int NetworkManager::ListenSocket_add(sockaddr_in * addr, const SocketAssociation
 	if ((sock->m_socket = socket (AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0)) == -1)
 	{
 		sock.reset();
-		return ERR_SYSCALL_ERROR;
+		throw SyscallException();
 	}
 
 	if (setsockopt (sock->m_socket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof (yes)) == -1)
 	{
+		int err = errno;
 		close(sock->m_socket);
 		sock.reset();
-		return ERR_SYSCALL_ERROR;
+		throw SyscallException(err);
 	}
 
-	//addr.sin_family = AF_INET;
-	//addr.sin_port = htons (port);
-	//inet_pton(AF_INET,"0.0.0.0",&addr.sin_addr);
 	memcpy((void *)&sock->m_peer, (void *)addr, sizeof(struct sockaddr_in));
 	if (bind (sock->m_socket, (const struct sockaddr *) addr, sizeof (struct sockaddr)))
 	{
+		int err = errno;
 		close(sock->m_socket);
 		sock.reset();
-		return ERR_SYSCALL_ERROR;
+		throw SyscallException(err);
 	}
 
 	if (listen (sock->m_socket, SOMAXCONN) == -1)
 	{
+		int err = errno;
 		close(sock->m_socket);
 		sock.reset();
-		return ERR_SYSCALL_ERROR;
+		throw SyscallException(err);
 	}
 
 	event.data.ptr = (void*)sock.get();
@@ -272,61 +321,98 @@ int NetworkManager::ListenSocket_add(sockaddr_in * addr, const SocketAssociation
 	sock->m_epoll_events = event.events;
 	if (epoll_ctl(m_epoll_fd, EPOLL_CTL_ADD, sock->m_socket, &event) == -1)
 	{
+		int err = errno;
 		close(sock->m_socket);
 		sock.reset();
-		return ERR_SYSCALL_ERROR;
+		throw SyscallException(err);
 	}
 
 	sock->m_state = STATE_LISTEN;
 	sock->m_timer = time(NULL);
-	//if (lock_mutex)
 	pthread_mutex_lock(&m_mutex_sockets);
 	m_sockets.insert(sock);
 	m_listening_sockets.insert(sock);
-	//if (lock_mutex)
 	pthread_mutex_unlock(&m_mutex_sockets);
-	return ERR_NO_ERROR;
 }
 
-int NetworkManager::ListenSocket_add(uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock)
+/*
+ * SyscallException
+ * Exception::ERR_CODE_UNDEF
+ * Exception::ERR_CODE_NULL_REF
+ */
+
+void NetworkManager::ListenSocket_add(uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock)  throw (Exception, SyscallException)
 {
 	sockaddr_in addr;
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons (port);
-	inet_pton(AF_INET, "0.0.0.0", &addr.sin_addr);
-	return ListenSocket_add(&addr, assoc, sock);
+	if (inet_pton(AF_INET, "0.0.0.0", &addr.sin_addr) == -1)
+		throw Exception(Exception::ERR_CODE_UNDEF);
+	ListenSocket_add(&addr, assoc, sock);
 }
 
-int NetworkManager::ListenSocket_add(uint16_t port, in_addr * addr, const SocketAssociation::ptr & assoc, Socket & sock)
+/*
+ * SyscallException
+ * Exception::ERR_CODE_UNDEF
+ * Exception::ERR_CODE_NULL_REF
+ */
+
+void NetworkManager::ListenSocket_add(uint16_t port, in_addr * addr, const SocketAssociation::ptr & assoc, Socket & sock)  throw (Exception, SyscallException)
 {
+	if (addr == NULL)
+		throw Exception(Exception::ERR_CODE_NULL_REF);
 	sockaddr_in sockaddr;
 	sockaddr.sin_family = AF_INET;
 	sockaddr.sin_port = htons (port);
 	memcpy(&sockaddr.sin_addr, addr, sizeof(in_addr));
-	return ListenSocket_add(&sockaddr, assoc, sock);
+	ListenSocket_add(&sockaddr, assoc, sock);
 }
 
-int NetworkManager::ListenSocket_add(uint16_t port, const char * ip, const SocketAssociation::ptr & assoc, Socket & sock)
+/*
+ * SyscallException
+ * Exception::ERR_CODE_UNDEF
+ * Exception::ERR_CODE_INVALID_FORMAT
+ * Exception::ERR_CODE_NULL_REF
+ */
+
+void NetworkManager::ListenSocket_add(uint16_t port, const char * ip, const SocketAssociation::ptr & assoc, Socket & sock)  throw (Exception, SyscallException)
 {
+	if (ip == NULL)
+		throw Exception(Exception::ERR_CODE_NULL_REF);
 	sockaddr_in addr;
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons (port);
-	inet_pton(AF_INET, ip, &addr.sin_addr);
-	return ListenSocket_add(&addr, assoc, sock);
+	int ret = inet_pton(AF_INET, ip, &addr.sin_addr);
+	if (ret == 0)
+		throw Exception(Exception::ERR_CODE_INVALID_FORMAT);
+	if (ret == -1)
+		throw Exception(Exception::ERR_CODE_UNDEF);
+	ListenSocket_add(&addr, assoc, sock);
 }
 
-int NetworkManager::ListenSocket_add(uint16_t port, const std::string & ip, const SocketAssociation::ptr & assoc, Socket & sock)
+/*
+ * SyscallException
+ * Exception::ERR_CODE_UNDEF
+ * Exception::ERR_CODE_INVALID_FORMAT
+ * Exception::ERR_CODE_NULL_REF
+ */
+
+void NetworkManager::ListenSocket_add(uint16_t port, const std::string & ip, const SocketAssociation::ptr & assoc, Socket & sock)  throw (Exception, SyscallException)
 {
-	return ListenSocket_add(port, ip.c_str(), assoc, sock);
+	ListenSocket_add(port, ip.c_str(), assoc, sock);
 }
 
-int NetworkManager::clock()
+/*
+ * SyscallException
+ */
+
+int NetworkManager::clock()  throw (SyscallException)
 {
 	struct epoll_event events[MAX_EPOLL_EVENT];
 	int nfds = epoll_wait(m_epoll_fd, events, MAX_EPOLL_EVENT, 80);
 	if (nfds == -1)
 	{
-		return ERR_SYSCALL_ERROR;
+		throw SyscallException();
 	}
 	pthread_mutex_lock(&m_mutex_sockets);
 	for(int i = 0; i < nfds; i++)
@@ -336,8 +422,14 @@ int NetworkManager::clock()
 		bool need2send = buffer_remain(&sock->m_send_buffer) > 0;
 		bool connected = sock->m_connected;
 
-		if (handle_event(sock.get(), events[i].events) == ERR_SYSCALL_ERROR)
-			sock->m_errno = errno;
+		try
+		{
+			handle_event(sock.get(), events[i].events);
+		}
+		catch(SyscallException & e)
+		{
+			sock->m_errno = e.get_errno();
+		}
 
 		if (buffer_remain(&sock->m_recv_buffer) > 0)
 			m_ready2read_sockets.insert(sock);
@@ -429,27 +521,53 @@ void NetworkManager::notify()
 	pthread_mutex_unlock(&m_mutex_sockets);
 }
 
-int NetworkManager::Socket_send(Socket & sock, const void * data, size_t len, bool full)
+/*
+ * Exception::ERR_CODE_NULL_REF
+ * Exception::ERR_CODE_SOCKET_CLOSED
+ * Exception::ERR_CODE_SOCKET_CAN_NOT_SEND
+ */
+
+size_t NetworkManager::Socket_send(Socket & sock, const void * data, size_t len, bool full)  throw (Exception)
 {
-	if (sock == NULL)
-		return ERR_BAD_ARG;
+	if (sock == NULL  || data == NULL)
+		throw Exception(Exception::ERR_CODE_NULL_REF);
 	if (sock->m_closed)
 	{
 		m_closed_sockets.insert(sock);
-		return ERR_BAD_ARG;
+		throw Exception(Exception::ERR_CODE_SOCKET_CLOSED);
 	}
-	return _send(sock.get(), data,len, full);
+	if (len == 0)
+		return 0;
+	size_t can_send = BUFFER_SIZE - sock->m_send_buffer.length;
+	if (full && can_send < len)
+		throw Exception(Exception::ERR_CODE_SOCKET_CAN_NOT_SEND);
+	can_send = can_send < len ? can_send : len;
+	memcpy(sock->m_send_buffer.data + sock->m_send_buffer.length, data, can_send);
+	sock->m_send_buffer.length += can_send;
+	epollout(sock.get(), true);
+	return can_send;
 }
 
-int NetworkManager::Socket_recv(Socket & sock, void * data, size_t len)
+/*
+ * Exception::ERR_CODE_NULL_REF
+ */
+
+size_t NetworkManager::Socket_recv(Socket & sock, void * data, size_t len) throw (Exception)
 {
 	if (sock == NULL || data == NULL)
-		return ERR_BAD_ARG;
-	int ret =_recv(sock.get(), data, len);
-	if (ret < ERR_NO_ERROR)
+		throw Exception(Exception::ERR_CODE_NULL_REF);
+
+	if (len == 0)
+		return 0;
+	size_t l = sock->m_recv_buffer.length - sock->m_recv_buffer.pos;
+	if (l > len)
+		l = len;
+	memcpy(data, sock->m_recv_buffer.data + sock->m_recv_buffer.pos, l);
+	sock->m_recv_buffer.pos += l;
+	if (buffer_remain(&sock->m_recv_buffer) == 0)
 	{
-		//m_ready2read_sockets.erase(id);
-		return ERR_INTERNAL;
+		sock->m_recv_buffer.length = 0;
+		sock->m_recv_buffer.pos = 0;
 	}
 	if (buffer_remain(&sock->m_recv_buffer) > 0)
 		m_ready2read_sockets.insert(sock);
@@ -457,13 +575,17 @@ int NetworkManager::Socket_recv(Socket & sock, void * data, size_t len)
 		m_ready2read_sockets.erase(sock);
 	if (sock->m_closed)
 		m_closed_sockets.insert(sock);
-	return ret;
+	return l;
 }
 
-ssize_t NetworkManager::Socket_datalen(Socket & sock)
+/*
+ * Exception::ERR_CODE_NULL_REF
+ */
+
+ssize_t NetworkManager::Socket_datalen(Socket & sock) throw (Exception)
 {
 	if (sock == NULL)
-		return ERR_BAD_ARG;
+		throw Exception(Exception::ERR_CODE_NULL_REF);
 	int len = buffer_remain(&sock->m_recv_buffer);
 	if (len > 0)
 		m_ready2read_sockets.insert(sock);
@@ -474,31 +596,35 @@ ssize_t NetworkManager::Socket_datalen(Socket & sock)
 	return len;
 }
 
-int NetworkManager::Socket_closed(Socket & sock, bool * closed)
+/*
+ * Exception::ERR_CODE_NULL_REF
+ */
+
+void NetworkManager::Socket_closed(Socket & sock, bool * closed) throw (Exception)
 {
 	if (sock == NULL)
-	{
-		*closed = true;
-		return ERR_BAD_ARG;
-	}
+		throw Exception(Exception::ERR_CODE_NULL_REF);
 	*closed = sock->m_closed;
-	return ERR_NO_ERROR;
 }
 
-int NetworkManager::Socket_close(Socket & sock)
+/*
+ * Exception::ERR_CODE_NULL_REF
+ */
+
+void NetworkManager::Socket_close(Socket & sock) throw (Exception)
 {
 	if (sock == NULL)
-		return ERR_BAD_ARG;
-	_close(sock.get());
-	if (sock->m_closed)
-		m_closed_sockets.insert(sock);
-	return ERR_NO_ERROR;
+		throw Exception(Exception::ERR_CODE_NULL_REF);
+	close(sock->m_socket);
+	sock->m_closed = true;
+	sock->m_connected = false;
+	m_closed_sockets.insert(sock);
 }
 
-int NetworkManager::Socket_delete(Socket & sock)
+void NetworkManager::Socket_delete(Socket & sock)
 {
 	if (sock == NULL)
-		return ERR_BAD_ARG;
+		return;
 	pthread_mutex_lock(&m_mutex_sockets);
 	m_sockets.erase(sock);
 	m_ready2read_sockets.erase(sock);
@@ -508,92 +634,111 @@ int NetworkManager::Socket_delete(Socket & sock)
 	m_timeout_sockets.erase(sock);
 	m_unresolved_sockets.erase(sock);
 	m_listening_sockets.erase(sock);
-	_close(sock.get());
+	close(sock->m_socket);
 	sock->m_need2delete = true;
 	sock.reset();
 	pthread_mutex_unlock(&m_mutex_sockets);
-	return ERR_NO_ERROR;
+	return;
 }
 
-int NetworkManager::Socket_set_assoc(Socket & sock, const SocketAssociation::ptr & assoc)
+/*
+ * Exception::ERR_CODE_NULL_REF
+ */
+
+void NetworkManager::Socket_set_assoc(Socket & sock, const SocketAssociation::ptr & assoc) throw (Exception)
 {
 	if (sock == NULL)
-		return ERR_BAD_ARG;
+		throw Exception(Exception::ERR_CODE_NULL_REF);
 	sock->m_assoc = assoc;
-	return ERR_NO_ERROR;
 }
 
-int NetworkManager::Socket_get_assoc(Socket & sock, SocketAssociation::ptr & assoc)
+/*
+ * Exception::ERR_CODE_NULL_REF
+ */
+
+void NetworkManager::Socket_get_assoc(Socket & sock, SocketAssociation::ptr & assoc) throw (Exception)
 {
 	if (sock == NULL)
-		return ERR_BAD_ARG;
+		throw Exception(Exception::ERR_CODE_NULL_REF);
 	assoc =  sock->m_assoc;
-	return ERR_NO_ERROR;
 }
 
-double NetworkManager::Socket_get_rx_speed(Socket & sock)
+/*
+ * Exception::ERR_CODE_NULL_REF
+ */
+
+double NetworkManager::Socket_get_rx_speed(Socket & sock) throw (Exception)
 {
 	if (sock == NULL)
-		return 0.0f;
+		throw Exception(Exception::ERR_CODE_NULL_REF);
 	double time = get_time();
 	double speed = (double)sock->m_rx / (time - sock->m_rx_last_time);
 	return speed;
 }
 
-double NetworkManager::Socket_get_tx_speed(Socket & sock)
+/*
+ * Exception::ERR_CODE_NULL_REF
+ */
+
+double NetworkManager::Socket_get_tx_speed(Socket & sock) throw (Exception)
 {
 	if (sock == NULL)
-		return 0.0f;
+		throw Exception(Exception::ERR_CODE_NULL_REF);
 	double time = get_time();
 	double speed = (double)sock->m_tx / (time - sock->m_tx_last_time);
 	return speed;
 }
 
-int NetworkManager::Socket_get_addr(Socket & sock, sockaddr_in * addr)
+/*
+ * Exception::ERR_CODE_NULL_REF
+ */
+
+void NetworkManager::Socket_get_addr(Socket & sock, sockaddr_in * addr)  throw (Exception)
 {
 	if (addr == NULL || sock == NULL)
-		return ERR_BAD_ARG;
+		throw Exception(Exception::ERR_CODE_NULL_REF);
 	memcpy(addr, &sock->m_peer, sizeof(sockaddr_in));
-	return ERR_NO_ERROR;
 }
 
-int NetworkManager::handle_event(socket_ * sock, uint32_t events)
+/*
+ * SyscallException
+ */
+
+void NetworkManager::handle_event(socket_ * sock, uint32_t events) throw (SyscallException)
 {
-	int ret;
 	if ((events & EPOLLOUT) != 0)
 	{
 		if (sock->m_state == STATE_CONNECTION)
 		{
-			ret = handler_connection(sock);
-			if (ret != ERR_NO_ERROR)
+			try
+			{
+				handler_connection(sock);
+
+				uint32_t new_events = EPOLLIN;
+				if (buffer_remain(&sock->m_send_buffer) != 0)
+					new_events |= EPOLLOUT;
+				epoll_mod(sock, new_events);
+			}
+			catch(SyscallException & e)
 			{
 				close(sock->m_socket);
 				sock->m_closed = true;
 				sock->m_connected = false;
-				return ret;
+				throw SyscallException(e);
 			}
-			uint32_t new_events = EPOLLIN;
-			if (buffer_remain(&sock->m_send_buffer) != 0)
-				new_events |= EPOLLOUT;
-			ret = epoll_mod(sock, new_events);
-			if (ret != ERR_NO_ERROR)
-			{
-				close(sock->m_socket);
-				sock->m_closed = true;
-				sock->m_connected = false;
-				return ret;
-			}
-			//return ERR_NO_ERROR;//?????????????????????????????????///
 		}
 		if (sock->m_state == STATE_TRANSMISSION)
 		{
-			ret = handler_transmission(sock, TRANSMISSION_OUT);
-			if (ret != ERR_NO_ERROR)
+			try
+			{
+				handler_transmission(sock, TRANSMISSION_OUT);
+			}
+			catch(SyscallException & e)
 			{
 				close(sock->m_socket);
 				sock->m_closed = true;
 				sock->m_connected = false;
-				return ret;
+				throw SyscallException(e);
 			}
 		}
 	}
@@ -601,13 +746,16 @@ int NetworkManager::handle_event(socket_ * sock, uint32_t events)
 	{
 		if (sock->m_state == STATE_TRANSMISSION)
 		{
-			ret = handler_transmission(sock, TRANSMISSION_IN);
-			if (ret != ERR_NO_ERROR)
+			try
+			{
+				handler_transmission(sock, TRANSMISSION_IN);
+			}
+			catch(SyscallException & e)
 			{
 				close(sock->m_socket);
 				sock->m_closed = true;
 				sock->m_connected = false;
-				return ret;
+				throw SyscallException(e);
 			}
 		}
 		if (sock->m_state == STATE_LISTEN)
@@ -616,45 +764,46 @@ int NetworkManager::handle_event(socket_ * sock, uint32_t events)
 			struct sockaddr_in client_addr;
 			socklen_t client_addr_len = sizeof(client_addr);
 
-			memset(&client_addr,'\0',sizeof(client_addr));
+			memset(&client_addr, '\0', sizeof(client_addr));
 			client_sock = accept4(sock->m_socket, (struct sockaddr *)&client_addr, &client_addr_len, SOCK_NONBLOCK);
 			if (client_sock == -1)
 			{
 				if (errno != EAGAIN && errno != EWOULDBLOCK)
-					return ERR_NO_ERROR;
-				return ERR_SYSCALL_ERROR;
+					return;
+				throw SyscallException();
 			}
 			SocketAssociation::ptr assoc;
 			Socket new_sock;
 			Socket_add(client_sock, &client_addr, assoc, new_sock);
-			if (new_sock == NULL)
-				return ERR_INTERNAL;
 			sock->m_accepted_sockets.insert(new_sock);
-			return ERR_NO_ERROR;
 		}
 	}
-	return ERR_NO_ERROR;
 }
 
-int NetworkManager::handler_connection(socket_ * sock)
+/*
+ * SyscallException
+ */
+
+void NetworkManager::handler_connection(socket_ * sock) throw (SyscallException)
 {
 	int connect_result;
 	socklen_t opt_len = sizeof(int);
 	//ошибка в errno
 	if (getsockopt (sock->m_socket, SOL_SOCKET, SO_ERROR, &connect_result, &opt_len) == -1)
-		return ERR_SYSCALL_ERROR;
+		throw SyscallException();
 
 	if (connect_result != 0)
-	{
-		errno = connect_result;
-		return ERR_SYSCALL_ERROR;
-	}
+		throw SyscallException(connect_result);
+
 	sock->m_connected = true;
 	sock->m_state = STATE_TRANSMISSION;
-	return ERR_NO_ERROR;
 }
 
-int NetworkManager::handler_transmission(socket_ * sock, int transmission_type)
+/*
+ * SyscallException
+ */
+
+void NetworkManager::handler_transmission(socket_ * sock, int transmission_type) throw (SyscallException)
 {
 	if (transmission_type == TRANSMISSION_OUT)
 	{
@@ -665,13 +814,13 @@ int NetworkManager::handler_transmission(socket_ * sock, int transmission_type)
 			{
 				sock->m_send_buffer.length = 0;
 				sock->m_send_buffer.pos = 0;
-				return epollout(sock, false);
+				epollout(sock, false);
 			}
 			ssize_t sended = send(sock->m_socket, sock->m_send_buffer.data + sock->m_send_buffer.pos, ret, MSG_NOSIGNAL);
 			if (sended == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
 				break;
 			if (sended == -1 && !(errno == EAGAIN || errno == EWOULDBLOCK))
-				return ERR_SYSCALL_ERROR;
+				throw SyscallException();
 			if (sended != -1)
 			{
 				sock->m_send_buffer.pos += sended;
@@ -686,18 +835,18 @@ int NetworkManager::handler_transmission(socket_ * sock, int transmission_type)
 			char temp_buffer[BUFFER_SIZE];
 			ssize_t free_in_buffer = BUFFER_SIZE - sock->m_recv_buffer.length;
 			if (free_in_buffer == 0)
-				return ERR_NO_ERROR;
+				return;
 			ssize_t received = recv(sock->m_socket, temp_buffer, free_in_buffer, 0);
 			if (received == -1 && !(errno == EAGAIN || errno==EWOULDBLOCK))
-				return ERR_SYSCALL_ERROR;
+				throw SyscallException();
 			if (received == -1 && (errno == EAGAIN || errno==EWOULDBLOCK))
-				return ERR_NO_ERROR;
+				return;
 			if (received == 0)
 			{
 				close(sock->m_socket);
 				sock->m_closed = true;
 				sock->m_connected = false;
-				return ERR_NO_ERROR;
+				return;
 			}
 			memcpy(sock->m_recv_buffer.data + sock->m_recv_buffer.length, temp_buffer, received);
 			sock->m_recv_buffer.length += received;
@@ -705,130 +854,100 @@ int NetworkManager::handler_transmission(socket_ * sock, int transmission_type)
 			sock->m_rx += received;
 		}
 	}
-	return ERR_NO_ERROR;
 }
 
-int NetworkManager::_send(socket_ * sock, const void * data,size_t len, bool full)
-{
-	if (sock == NULL || data == NULL || len <= 0 || sock->m_closed)
-		return ERR_BAD_ARG;
-	size_t can_send = BUFFER_SIZE - sock->m_send_buffer.length;
-	if (full && can_send < len)
-		return ERR_INTERNAL;
-	can_send = can_send < len ? can_send : len;
-	memcpy(sock->m_send_buffer.data + sock->m_send_buffer.length, data, can_send);
-	sock->m_send_buffer.length += can_send;
-	if (epollout(sock, true) != ERR_NO_ERROR)
-		return ERR_INTERNAL;
-	return can_send;
-}
+/*
+ * SyscallException
+ */
 
-int NetworkManager::_recv(socket_ * sock, void * data, size_t len)
-{
-	if (sock == NULL || len <= 0 || data == NULL)
-		return ERR_BAD_ARG;
-	size_t l = sock->m_recv_buffer.length - sock->m_recv_buffer.pos;
-	if (l > len)
-		l = len;
-	//if (sock->m_recv_buffer.length - sock->m_recv_buffer.pos < len)
-		//return ERR_INTERNAL;
-	memcpy(data, sock->m_recv_buffer.data + sock->m_recv_buffer.pos, l);
-	sock->m_recv_buffer.pos += l;
-	if (buffer_remain(&sock->m_recv_buffer) == 0)
-	{
-		sock->m_recv_buffer.length = 0;
-		sock->m_recv_buffer.pos = 0;
-	}
-	return l;
-}
-
-int NetworkManager::_close(socket_ * sock)
-{
-	close(sock->m_socket);
-	sock->m_closed = true;
-	sock->m_connected = false;
-	return ERR_NO_ERROR;
-}
-
-int NetworkManager::epoll_mod(socket_ * sock)
+void NetworkManager::epoll_mod(socket_ * sock) throw (SyscallException)
 {
 	struct epoll_event event;
 	event.data.ptr = (void*)sock;
 	event.events = sock->m_epoll_events;
 	if (epoll_ctl(m_epoll_fd, EPOLL_CTL_MOD, sock->m_socket, &event) == -1)
-		return ERR_SYSCALL_ERROR;
-	return ERR_NO_ERROR;
+		throw SyscallException();
 }
 
-int NetworkManager::epoll_mod(socket_ * sock, uint32_t events)
+/*
+ * SyscallException
+ */
+
+void NetworkManager::epoll_mod(socket_ * sock, uint32_t events) throw (SyscallException)
 {
 	struct epoll_event event;
 	event.data.ptr = (void*)sock;
 	event.events = events;
 	sock->m_epoll_events = events;
 	if (epoll_ctl(m_epoll_fd, EPOLL_CTL_MOD, sock->m_socket, &event) == -1)
-	{
-		return ERR_SYSCALL_ERROR;
-	}
-	return ERR_NO_ERROR;
+		throw SyscallException();
 }
 
-int NetworkManager::epollin(socket_ * sock, bool on_off)
+/*
+ * SyscallException
+ */
+
+void NetworkManager::epollin(socket_ * sock, bool on_off) throw (SyscallException)
 {
 	if (on_off == true)
 	{
 		if ((sock->m_epoll_events & EPOLLIN) != 0)
-			return ERR_NO_ERROR;
+			return;
 		sock->m_epoll_events |= EPOLLIN;
-		return epoll_mod(sock);
+		epoll_mod(sock);
 	}
 	if (on_off == false)
 	{
 		if ((sock->m_epoll_events & EPOLLIN) == 0)
-			return ERR_NO_ERROR;
+			return;
 		sock->m_epoll_events ^= EPOLLIN;
-		return epoll_mod(sock);
+		epoll_mod(sock);
 	}
-	return ERR_NO_ERROR;
 }
 
-int NetworkManager::epollout(socket_ * sock, bool on_off)
+/*
+ * SyscallException
+ */
+
+void NetworkManager::epollout(socket_ * sock, bool on_off) throw (SyscallException)
 {
 	if (on_off == true)
 	{
 		if ((sock->m_epoll_events & EPOLLOUT) != 0)
-			return ERR_NO_ERROR;
+			return;
 		sock->m_epoll_events |= EPOLLOUT;
-		return epoll_mod(sock);
+		epoll_mod(sock);
 	}
 	if (on_off == false)
 	{
 		if ((sock->m_epoll_events & EPOLLOUT) == 0)
-			return ERR_NO_ERROR;
+			return;
 		sock->m_epoll_events ^= EPOLLOUT;
-		return epoll_mod(sock);
+		epoll_mod(sock);
 	}
-	return ERR_NO_ERROR;
 }
 
-int NetworkManager::ConnectResolvedSocket(Socket & sock)
+/*
+ * SyscallException
+ */
+
+void NetworkManager::ConnectResolvedSocket(Socket & sock) throw (SyscallException)
 {
-	if (sock == NULL)
-		return ERR_NULL_REF;
 	struct epoll_event event;
 	sock->m_connected = false;
 	memset(&sock->m_send_buffer,0,sizeof(struct buffer));
 	memset(&sock->m_recv_buffer,0,sizeof(struct buffer));
 	if ((sock->m_socket = socket (AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0)) == -1)
-		return ERR_SYSCALL_ERROR;
+		throw SyscallException();
 
 	event.data.ptr=(void*)sock.get();
 	event.events = EPOLLOUT;
 	sock->m_epoll_events = event.events;
 	if (epoll_ctl(m_epoll_fd, EPOLL_CTL_ADD, sock->m_socket, &event) == -1)
 	{
+		int err = errno;
 		close(sock->m_socket);
-		return ERR_SYSCALL_ERROR;
+		throw SyscallException(err);
 	}
 	if (connect(sock->m_socket, (const struct sockaddr *)&sock->m_peer, sizeof(struct sockaddr_in)) == -1)
 	{
@@ -838,15 +957,20 @@ int NetworkManager::ConnectResolvedSocket(Socket & sock)
 			goto end;
 		}
 		close(sock->m_socket);
-		return ERR_SYSCALL_ERROR;
+		int err = errno;
+		close(sock->m_socket);
+		throw SyscallException(err);
 	}
 	sock->m_state = STATE_TRANSMISSION;
 	m_connected_sockets.insert(sock);
 	sock->m_connected = true;
 end:
 	sock->m_timer = time(NULL);
-	return ERR_NO_ERROR;
 }
+
+/*
+ * SyscallException
+ */
 
 void * NetworkManager::timeout_thread(void * arg)
 {
@@ -891,11 +1015,18 @@ void * NetworkManager::timeout_thread(void * arg)
 					pthread_mutex_unlock(&nm->m_mutex_sockets);
 					continue;
 				}
-				if (nm->ConnectResolvedSocket(sock) != ERR_NO_ERROR)
-					nm->m_unresolved_sockets.insert(sock);
+				try
+				{
+					nm->ConnectResolvedSocket(sock);
+				}
+				catch(SyscallException & e)
+				{
+					pthread_mutex_unlock(&nm->m_mutex_sockets);
+					throw SyscallException(e);
+				}
 				pthread_mutex_unlock(&nm->m_mutex_sockets);
 			}
-			catch (Exception & e)
+			catch (...)
 			{
 #ifdef BITTORRENT_DEBUG
 	printf("DomainNameResolver is can not resolve %s\n", sock->m_domain.c_str());
