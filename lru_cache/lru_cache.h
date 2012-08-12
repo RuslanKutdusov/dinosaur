@@ -222,6 +222,10 @@ void LRU_Cache<cache_key, cache_element>::remove(cache_key key)
 		m_hash_table.erase(hash_table_iter_to_element);
 		m_time_queue.right.erase(time_queue_iter_to_element);
 	}
+	catch(Exception & e)
+	{
+		throw Exception(e);
+	}
 	catch(...)
 	{
 		throw Exception(Exception::ERR_CODE_UNDEF);

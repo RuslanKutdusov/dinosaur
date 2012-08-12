@@ -47,11 +47,15 @@ void FileManager::Init(cfg::Glob_cfg * cfg) throw (Exception)
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
 	pthread_mutexattr_t   mta;
-	pthread_mutexattr_init(&mta);
-	pthread_mutexattr_settype(&mta, PTHREAD_MUTEX_RECURSIVE);
-	pthread_mutex_init(&m_mutex, &mta);
-	pthread_cond_init (&m_cond, NULL);
-	//pthread_mutex_init(&m_mutex_timeout_sockets, NULL);
+	int ret = pthread_mutexattr_init(&mta);
+	if (ret != 0)
+		throw SyscallException(ret);
+	ret = pthread_mutexattr_settype(&mta, PTHREAD_MUTEX_RECURSIVE);
+	if (ret != 0)
+		throw SyscallException(ret);
+	ret = pthread_mutex_init(&m_mutex, &mta);
+	if (ret != 0)
+		throw SyscallException(ret);
 	if (pthread_create(&m_write_thread, &attr, FileManager::cache_thread, (void *)this))
 		throw Exception(Exception::ERR_CODE_CAN_NOT_CREATE_THREAD);
 	pthread_attr_destroy(&attr);
@@ -200,7 +204,7 @@ void FileManager::File_write(File & file, const char * buf, uint32_t length, uin
 	catch (SyscallException & e)
 	{
 		pthread_mutex_unlock(&m_mutex);
-		SyscallException(e);
+		throw SyscallException(e);
 	}
 }
 
@@ -243,11 +247,13 @@ int FileManager::File_read_immediately(File & file, char * buf, uint64_t offset,
 	catch (Exception & e) {
 		pthread_mutex_unlock(&m_mutex);
 		throw Exception(e);
+		return 0;
 	}
 	catch (SyscallException & e)
 	{
 		pthread_mutex_unlock(&m_mutex);
-		SyscallException(e);
+		throw SyscallException(e);
+		return 0;
 	}
 	return 0;
 }
@@ -277,7 +283,13 @@ void FileManager::File_delete(File & file)
 {
 	pthread_mutex_lock(&m_mutex);
 	m_files.erase(file);
-	m_fd_cache.remove(file);
+	try
+	{
+		m_fd_cache.remove(file);
+	}
+	catch (Exception  & e) {
+
+	}
 	if (file != NULL)
 		file->m_instance2delete = true;
 	file.reset();
@@ -364,6 +376,7 @@ void * FileManager::cache_thread(void * arg)
 				if (ce->file->m_instance2delete)
 				{
 					fm->m_write_cache.pop();
+					pthread_mutex_unlock(&fm->m_mutex);
 					continue;
 				}
 				write_event we;

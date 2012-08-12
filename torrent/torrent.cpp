@@ -124,11 +124,23 @@ void TorrentBase::prepare2release()
 #ifdef BITTORRENT_DEBUG
 	printf("Releasing torrent %s %s\n", m_metafile.name.c_str(), m_metafile.info_hash_hex);
 #endif
-	m_state = TORRENT_STATE_RELEASING;
+	m_state = TORRENT_STATE_INIT_RELEASING;
+}
+
+void TorrentBase::forced_releasing()
+{
+	m_state = TORRENT_STATE_INIT_FORCED_RELEASING;
+}
+
+void TorrentBase::releasing()
+{
 	for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
 	{
-		if ((*iter).second->prepare2release() != ERR_NO_ERROR)
-			m_trackers.erase(iter);
+		if (m_state == TORRENT_STATE_INIT_FORCED_RELEASING)
+			(*iter).second->forced_releasing();
+		else
+			if ((*iter).second->prepare2release() != ERR_NO_ERROR)
+				m_trackers.erase(iter);
 	}
 	for(peer_map_iter iter = m_seeders.begin(); iter != m_seeders.end(); ++iter)
 	{
@@ -144,31 +156,6 @@ void TorrentBase::prepare2release()
 	m_leechers.clear();
 	if (m_torrent_file != NULL)
 		m_torrent_file->ReleaseFiles();
-	m_torrent_file.reset();
-	m_piece_manager.reset();
-}
-
-void TorrentBase::forced_releasing()
-{
-	m_state = TORRENT_STATE_RELEASING;
-	for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
-	{
-		(*iter).second->forced_releasing();
-	}
-	for(peer_map_iter iter = m_seeders.begin(); iter != m_seeders.end(); ++iter)
-	{
-		(*iter).second->forced_releasing();
-	}
-	for(peer_map_iter iter = m_leechers.begin(); iter != m_leechers.end(); ++iter)
-	{
-		(*iter).second->forced_releasing();
-	}
-	m_trackers.clear();
-	m_seeders.clear();
-	m_active_seeders.clear();
-	m_waiting_seeders.clear();
-	m_leechers.clear();
-	m_torrent_file->ReleaseFiles();
 	m_torrent_file.reset();
 	m_piece_manager.reset();
 }
@@ -448,6 +435,11 @@ int TorrentBase::clock()
 	m_rx_speed = 0.0f;
 	m_tx_speed = 0.0f;
 	//TODO проверять насколько загружен кэш FileManager, напр. если свободно в кэше менее 50%-70% - работаем на всю катушку, иначе, как то ограничиваем себя
+	if (m_state == TORRENT_STATE_INIT_RELEASING || m_state == TORRENT_STATE_INIT_FORCED_RELEASING)
+	{
+		releasing();
+		m_state = TORRENT_STATE_RELEASING;
+	}
 	if (m_state == TORRENT_STATE_RELEASING)
 		for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
 		{

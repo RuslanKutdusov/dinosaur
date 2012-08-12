@@ -36,10 +36,17 @@ Dinosaur::Dinosaur()
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
 	pthread_mutexattr_t   mta;
-	pthread_mutexattr_init(&mta);
-	pthread_mutexattr_settype(&mta, PTHREAD_MUTEX_RECURSIVE);
-	pthread_mutex_init(&m_mutex, NULL);
-	pthread_mutex_unlock(&m_mutex);
+
+	int ret = pthread_mutexattr_init(&mta);
+	if (ret != 0)
+		throw SyscallException(ret);
+	ret = pthread_mutexattr_settype(&mta, PTHREAD_MUTEX_RECURSIVE);
+	if (ret != 0)
+		throw SyscallException(ret);
+	ret = pthread_mutex_init(&m_mutex, &mta);
+	if (ret != 0)
+		throw SyscallException(ret);
+
 	if (pthread_create(&m_thread, &attr, Dinosaur::thread, (void *)this))
 		throw Exception(Exception::ERR_CODE_DINOSAUR_INIT_ERROR);
 	pthread_attr_destroy(&attr);
@@ -80,17 +87,12 @@ Dinosaur::~Dinosaur() {
 	pthread_mutex_lock(&m_mutex);
 	for(torrent_map_iter iter = m_torrents.begin(); iter != m_torrents.end(); ++iter)
 	{
-		(*iter).second->prepare2release();
+;		(*iter).second->prepare2release();
 	}
 	pthread_mutex_unlock(&m_mutex);
 	time_t release_start = time(NULL);
 	while(m_torrents.size() != 0)
 	{
-		for(torrent_map_iter iter = m_torrents.begin(); iter != m_torrents.end(); ++iter)
-		{
-			if ((*iter).second.use_count() == 1)
-				m_torrents.erase(iter);
-		}
 		usleep(100000);
 		if (time(NULL) - release_start > MAX_RELEASE_TIME)
 		{
@@ -314,10 +316,8 @@ void Dinosaur::DeleteTorrent(const std::string & hash)
 	pthread_mutex_lock(&m_mutex);
 	torrent::TorrentInterfaceBasePtr torrent = m_torrents[hash];
 	m_torrents.erase(hash);
-	torrent->stop();
 	torrent->erase_state();
-	torrent->forced_releasing();
-	torrent.reset();
+	torrent->prepare2release();
 
 	std::ifstream fin;
 	std::ofstream fout;
@@ -571,11 +571,21 @@ void * Dinosaur::thread(void * arg)
 #endif
 		}
 		pthread_mutex_lock(&bt->m_mutex);
-		bt->m_nm.notify();
+		try
+		{
+			bt->m_nm.notify();
+		}
+		catch (Exception & e) {
+#ifdef BITTORRENT_DEBUG
+			printf("NetworkManager::notify throws exception: %s\n", exception_errcode2str(e).c_str());
+#endif
+		}
 		bt->m_fm.notify();
 		for(torrent_map_iter iter = bt->m_torrents.begin(); iter != bt->m_torrents.end(); ++iter)
 		{
 			(*iter).second->clock();
+			if ((*iter).second.use_count() == 1 || (*iter).second->i_am_releasing())
+				bt->m_torrents.erase(iter);
 		}
 		pthread_mutex_unlock(&bt->m_mutex);
 		usleep(1000);

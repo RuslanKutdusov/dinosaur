@@ -81,7 +81,7 @@ void int_bytes2str(uint64_t i, char * str, bool speed = false)
 		return;
 	}
 	float gb = i / 1073741824.0f;
-	sprintf(str, "%.2f MB%s", gb, c);
+	sprintf(str, "%.2f GB%s", gb, c);
 }
 
 void messagebox(const char * message)
@@ -193,6 +193,7 @@ extern "C" void on_button_delete_clicked (GtkWidget *object, gpointer user_data)
 			bt->DeleteTorrent(hash);
 		}
 		catch (dinosaur::Exception & e) {
+			printf("Exception\n");
 			messagebox(dinosaur::exception_errcode2str(e));
 		}
 		on_window1_show(NULL,NULL);
@@ -316,13 +317,18 @@ extern "C" void on_window1_show (GtkWidget *object, gpointer user_data)
 		switch(dyn.work)
 		{
 		case(dinosaur::TORRENT_WORK_DOWNLOADING):
-				work = "Downloading";
+				work = "Downloading ";
+				char per[10];
+				sprintf(per, "%d%%", dyn.progress);
+				work += per;
 				break;
 		case(dinosaur::TORRENT_WORK_UPLOADING):
 				work = "Uploading";
 				break;
 		case(dinosaur::TORRENT_WORK_CHECKING):
-				work = "Checking";
+				work = "Checking ";
+				sprintf(per, "%d%%", dyn.progress);
+				work += per;
 				break;
 		case(dinosaur::TORRENT_WORK_PAUSED):
 				work = "Paused";
@@ -466,13 +472,18 @@ gboolean foreach_torrent_list (GtkTreeModel *model,
 	switch(dyn.work)
 	{
 	case(dinosaur::TORRENT_WORK_DOWNLOADING):
-			work = "Downloading";
+			work = "Downloading ";
+			char per[10];
+			sprintf(per, "%d%%", dyn.progress);
+			work += per;
 			break;
 	case(dinosaur::TORRENT_WORK_UPLOADING):
 			work = "Uploading";
 			break;
 	case(dinosaur::TORRENT_WORK_CHECKING):
-			work = "Checking";
+			work = "Checking ";
+			sprintf(per, "%d%%", dyn.progress);
+			work += per;
 			break;
 	case(dinosaur::TORRENT_WORK_PAUSED):
 			work = "Paused";
@@ -481,6 +492,8 @@ gboolean foreach_torrent_list (GtkTreeModel *model,
 			work = "Failure";
 			break;
 	}
+
+
 
 	char seeds[256];
 	memset(seeds, 0, 256);

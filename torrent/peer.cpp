@@ -707,13 +707,7 @@ void Peer::goto_sleep()
 	m_sleep_time = time(NULL);
 	if (m_state == PEER_STATE_SLEEP)
 		return;
-	try
-	{
-		m_nm->Socket_delete(m_sock);
-	}
-	catch (Exception & e) {
-
-	}
+	m_nm->Socket_delete(m_sock);
 	m_peer_choking = true;
 	m_peer_interested = false;
 	m_am_choking = false;//
@@ -808,18 +802,7 @@ int Peer::get_info(info::peer & ref)
 
 void Peer::prepare2release()
 {
-	try
-	{
-		m_nm->Socket_delete(m_sock);
-	}
-	catch (Exception & e) {
-
-	}
-}
-
-void Peer::forced_releasing()
-{
-	prepare2release();
+	m_nm->Socket_delete(m_sock);
 }
 
 Peer::~Peer()

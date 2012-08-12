@@ -146,7 +146,6 @@ private:
 	cfg::Glob_cfg * m_cfg;
 	pthread_t m_write_thread;
 	pthread_mutex_t m_mutex;
-	pthread_cond_t m_cond;
 	bool m_thread_stop;
 	uint16_t m_cache_size;
 	//lockable vars

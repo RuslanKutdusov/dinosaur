@@ -447,76 +447,88 @@ int NetworkManager::clock()  throw (SyscallException)
 	return ERR_NO_ERROR;
 }
 
+/*
+ * Exception::ERR_CODE_UNDEF
+ */
+
 void NetworkManager::notify()
 {
 	pthread_mutex_lock(&m_mutex_sockets);
-	for(socket_set_iter listening_sockets_iter = m_listening_sockets.begin();
-			listening_sockets_iter != m_listening_sockets.end(); ++listening_sockets_iter)
+	try
 	{
-		for(socket_set_iter accepted_sockets_iter = (*listening_sockets_iter)->m_accepted_sockets.begin();
-				accepted_sockets_iter != (*listening_sockets_iter)->m_accepted_sockets.end(); ++accepted_sockets_iter)
-			if ((*listening_sockets_iter)->m_assoc != NULL)
+		for(socket_set_iter listening_sockets_iter = m_listening_sockets.begin();
+				listening_sockets_iter != m_listening_sockets.end(); ++listening_sockets_iter)
+		{
+			for(socket_set_iter accepted_sockets_iter = (*listening_sockets_iter)->m_accepted_sockets.begin();
+					accepted_sockets_iter != (*listening_sockets_iter)->m_accepted_sockets.end(); ++accepted_sockets_iter)
+				if ((*listening_sockets_iter)->m_assoc != NULL)
+				{
+					(*listening_sockets_iter)->m_assoc->event_sock_accepted(*listening_sockets_iter, *accepted_sockets_iter);
+					(*listening_sockets_iter)->m_accepted_sockets.erase(accepted_sockets_iter);
+				}
+		}
+
+		socket_set temp_ready2read_sockets = m_ready2read_sockets;
+		for(socket_set_iter iter = temp_ready2read_sockets.begin(); iter != temp_ready2read_sockets.end(); ++iter)
+		{
+			if ((*iter)->m_assoc != NULL)
+				(*iter)->m_assoc->event_sock_ready2read(*iter);
+		}
+
+		socket_set temp_sended_sockets = m_sended_sockets;
+		for(socket_set_iter iter = temp_sended_sockets.begin(); iter != temp_sended_sockets.end(); ++iter)
+		{
+			if ((*iter)->m_assoc != NULL)
 			{
-				(*listening_sockets_iter)->m_assoc->event_sock_accepted(*listening_sockets_iter, *accepted_sockets_iter);
-				(*listening_sockets_iter)->m_accepted_sockets.erase(accepted_sockets_iter);
+				(*iter)->m_assoc->event_sock_sended(*iter);
+				m_sended_sockets.erase(*iter);
 			}
-	}
+		}
 
-	socket_set temp_ready2read_sockets = m_ready2read_sockets;
-	for(socket_set_iter iter = temp_ready2read_sockets.begin(); iter != temp_ready2read_sockets.end(); ++iter)
-	{
-		if ((*iter)->m_assoc != NULL)
-			(*iter)->m_assoc->event_sock_ready2read(*iter);
-	}
-
-	socket_set temp_sended_sockets = m_sended_sockets;
-	for(socket_set_iter iter = temp_sended_sockets.begin(); iter != temp_sended_sockets.end(); ++iter)
-	{
-		if ((*iter)->m_assoc != NULL)
+		socket_set temp_connected_sockets = m_connected_sockets;
+		for(socket_set_iter iter = temp_connected_sockets.begin(); iter != temp_connected_sockets.end(); ++iter)
 		{
-			(*iter)->m_assoc->event_sock_sended(*iter);
-			m_sended_sockets.erase(*iter);
+			if ((*iter)->m_assoc != NULL)
+			{
+				(*iter)->m_assoc->event_sock_connected(*iter);
+				m_connected_sockets.erase(*iter);
+			}
+		}
+
+		socket_set temp_timeout_sockets = m_timeout_sockets;
+		for(socket_set_iter iter = temp_timeout_sockets.begin(); iter != temp_timeout_sockets.end(); ++iter)
+		{
+			if ((*iter)->m_assoc != NULL)
+			{
+				(*iter)->m_assoc->event_sock_timeout(*iter);
+				m_timeout_sockets.erase(*iter);
+			}
+		}
+
+		socket_set temp_unresolved_sockets = m_unresolved_sockets;
+		for(socket_set_iter iter = temp_unresolved_sockets.begin(); iter != temp_unresolved_sockets.end(); ++iter)
+		{
+			if ((*iter)->m_assoc != NULL)
+			{
+				(*iter)->m_assoc->event_sock_unresolved(*iter);
+				m_unresolved_sockets.erase(*iter);
+			}
+		}
+
+		socket_set temp_closed_sockets = m_closed_sockets;
+		for(socket_set_iter iter = temp_closed_sockets.begin(); iter != temp_closed_sockets.end(); ++iter)
+		{
+			if ((*iter)->m_assoc != NULL)
+			{
+				(*iter)->m_assoc->event_sock_closed(*iter);
+				m_closed_sockets.erase(*iter);
+			}
 		}
 	}
-
-	socket_set temp_connected_sockets = m_connected_sockets;
-	for(socket_set_iter iter = temp_connected_sockets.begin(); iter != temp_connected_sockets.end(); ++iter)
+	catch(...)
 	{
-		if ((*iter)->m_assoc != NULL)
-		{
-			(*iter)->m_assoc->event_sock_connected(*iter);
-			m_connected_sockets.erase(*iter);
-		}
-	}
-
-	socket_set temp_timeout_sockets = m_timeout_sockets;
-	for(socket_set_iter iter = temp_timeout_sockets.begin(); iter != temp_timeout_sockets.end(); ++iter)
-	{
-		if ((*iter)->m_assoc != NULL)
-		{
-			(*iter)->m_assoc->event_sock_timeout(*iter);
-			m_timeout_sockets.erase(*iter);
-		}
-	}
-
-	socket_set temp_unresolved_sockets = m_unresolved_sockets;
-	for(socket_set_iter iter = temp_unresolved_sockets.begin(); iter != temp_unresolved_sockets.end(); ++iter)
-	{
-		if ((*iter)->m_assoc != NULL)
-		{
-			(*iter)->m_assoc->event_sock_unresolved(*iter);
-			m_unresolved_sockets.erase(*iter);
-		}
-	}
-
-	socket_set temp_closed_sockets = m_closed_sockets;
-	for(socket_set_iter iter = temp_closed_sockets.begin(); iter != temp_closed_sockets.end(); ++iter)
-	{
-		if ((*iter)->m_assoc != NULL)
-		{
-			(*iter)->m_assoc->event_sock_closed(*iter);
-			m_closed_sockets.erase(*iter);
-		}
+		pthread_mutex_unlock(&m_mutex_sockets);
+		throw Exception(Exception::ERR_CODE_UNDEF);
 	}
 	pthread_mutex_unlock(&m_mutex_sockets);
 }
@@ -634,7 +646,8 @@ void NetworkManager::Socket_delete(Socket & sock)
 	m_timeout_sockets.erase(sock);
 	m_unresolved_sockets.erase(sock);
 	m_listening_sockets.erase(sock);
-	close(sock->m_socket);
+	if (close(sock->m_socket) == -1)
+		printf("ERRNO %X %d %s\n", sock.get(), sock->m_socket, sys_errlist[errno]);
 	sock->m_need2delete = true;
 	sock.reset();
 	pthread_mutex_unlock(&m_mutex_sockets);

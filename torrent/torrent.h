@@ -105,7 +105,7 @@ private:
 	//обрабатывает ответ сервера, парсит его
 	int process_response();
 	//формирует и отправляет запрос
-	int send_request(TRACKER_EVENT event );
+	void send_request(TRACKER_EVENT event );
 	int restore_socket();
 	int parse_announce();
 	int send_completed();
@@ -205,7 +205,6 @@ public:
 	const std::string & get_ip_str();
 	int get_info(info::peer & ref);
 	void prepare2release();
-	void forced_releasing();
 	~Peer();
 };
 
@@ -248,7 +247,7 @@ private:
 	};
 private:
 	TorrentInterfaceInternalPtr 					m_torrent;
-	BITFIELD 							m_bitfield;
+	BITFIELD 										m_bitfield;
 	size_t 											m_bitfield_len;
 	std::vector<piece_info> 						m_piece_info;
 	CSHA1 											m_csha1;
@@ -344,7 +343,7 @@ public:
 
 class TorrentBase : public boost::enable_shared_from_this<TorrentBase>
 {
-private:
+protected:
 	enum TORRENT_STATE
 	{
 		TORRENT_STATE_NONE,
@@ -352,6 +351,8 @@ private:
 		TORRENT_STATE_STOPPED,
 		TORRENT_STATE_PAUSED,
 		TORRENT_STATE_CHECKING,
+		TORRENT_STATE_INIT_RELEASING,
+		TORRENT_STATE_INIT_FORCED_RELEASING,
 		TORRENT_STATE_RELEASING,
 		TORRENT_STATE_FAILURE
 	};
@@ -408,6 +409,7 @@ protected:
 	virtual int erase_state();
 	virtual void prepare2release();
 	virtual void forced_releasing();
+	virtual void releasing();
 	virtual void set_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY prio);
 	virtual const torrent_failure & get_failure_desc();
 	TorrentBase(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc);
@@ -487,6 +489,10 @@ public:
 	virtual int erase_state() = 0;
 	virtual void prepare2release() = 0;
 	virtual void forced_releasing() = 0;
+	bool i_am_releasing()
+	{
+		return m_state == TORRENT_STATE_RELEASING;
+	}
 	virtual void set_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY prio) = 0;
 	virtual const torrent_failure & get_failure_desc() = 0;
 };
