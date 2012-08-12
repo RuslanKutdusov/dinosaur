@@ -155,18 +155,15 @@ void Dinosaur::init_torrent(const torrent::Metafile & metafile, const std::strin
 	hash = "";
 	torrent::TorrentInterfaceBasePtr torrent;
 
-	torrent::TorrentInterfaceBase::CreateTorrent(&m_nm, &Config, &m_fm, &m_bc, metafile, m_directory, download_directory, torrent);
-
 	std::string infohash_str = metafile.info_hash_hex;
 
 	pthread_mutex_lock(&m_mutex);
 	if (m_torrents.count(infohash_str) !=0)
 	{
-		torrent->erase_state();
-		torrent->forced_releasing();
 		pthread_mutex_unlock(&m_mutex);
 		throw Exception(Exception::ERR_CODE_TORRENT_EXISTS);
 	}
+	torrent::TorrentInterfaceBase::CreateTorrent(&m_nm, &Config, &m_fm, &m_bc, metafile, m_directory, download_directory, torrent);
 	m_torrents[infohash_str] = torrent;
 	pthread_mutex_unlock(&m_mutex);
 	hash = infohash_str;
@@ -561,25 +558,27 @@ void * Dinosaur::thread(void * arg)
 {
 	int ret = 1;
 	Dinosaur * bt = (Dinosaur*)arg;
-	try
+	while(!bt->m_thread_stop)
 	{
-		while(!bt->m_thread_stop)
+		try
 		{
 			bt->m_nm.clock();
-			pthread_mutex_lock(&bt->m_mutex);
-			bt->m_nm.notify();
-			bt->m_fm.notify();
-			for(torrent_map_iter iter = bt->m_torrents.begin(); iter != bt->m_torrents.end(); ++iter)
-			{
-				(*iter).second->clock();
-			}
-			pthread_mutex_unlock(&bt->m_mutex);
-			usleep(1000);
 		}
-	}
-	catch(SyscallException & e)
-	{
-
+		catch(SyscallException & e)
+		{
+#ifdef BITTORRENT_DEBUG
+			printf("NetworkManager::clock throws exception: %s\n", e.get_errno_str());
+#endif
+		}
+		pthread_mutex_lock(&bt->m_mutex);
+		bt->m_nm.notify();
+		bt->m_fm.notify();
+		for(torrent_map_iter iter = bt->m_torrents.begin(); iter != bt->m_torrents.end(); ++iter)
+		{
+			(*iter).second->clock();
+		}
+		pthread_mutex_unlock(&bt->m_mutex);
+		usleep(1000);
 	}
 	return (void*)ret;
 }

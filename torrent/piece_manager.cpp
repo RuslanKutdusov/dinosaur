@@ -11,7 +11,11 @@ namespace dinosaur {
 namespace torrent
 {
 
-PieceManager::PieceManager(const TorrentInterfaceInternalPtr & torrent, unsigned char * bitfield) throw (Exception)
+/*
+ * Exception::ERR_CODE_NO_MEMORY_AVAILABLE
+ */
+
+PieceManager::PieceManager(const TorrentInterfaceInternalPtr & torrent, unsigned char * bitfield)
 {
 	m_torrent = torrent;
 	uint32_t piece_count = m_torrent->get_piece_count();

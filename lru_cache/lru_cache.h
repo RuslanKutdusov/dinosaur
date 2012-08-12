@@ -186,6 +186,10 @@ void LRU_Cache<cache_key, cache_element>::get(cache_key key, cache_element * val
 			m_time_queue.right.replace_data(it, get_time());
 
 	}
+	catch(Exception & e)
+	{
+		throw Exception(e);
+	}
 	catch(...)
 	{
 		throw Exception(Exception::ERR_CODE_UNDEF);

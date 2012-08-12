@@ -60,6 +60,7 @@ void TorrentBase::init(const Metafile & metafile, const std::string & work_direc
 			file_should_exists = false;
 		}
 
+
 		uint32_t files_exists;
 		TorrentFile::CreateTorrentFile(boost::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()), m_download_directory, file_should_exists, files_exists, m_torrent_file);
 
@@ -205,7 +206,7 @@ void TorrentBase::add_seeders(uint32_t count, sockaddr_in * addrs)
  * Exception::ERR_CODE_SEED_REJECTED
  */
 
-void TorrentBase::add_seeder(sockaddr_in * addr) throw (Exception)
+void TorrentBase::add_seeder(sockaddr_in * addr)
 {
 	if (addr == NULL)
 		throw Exception(Exception::ERR_CODE_NULL_REF);
@@ -240,7 +241,7 @@ void TorrentBase::add_seeder(sockaddr_in * addr) throw (Exception)
  * Exception::ERR_CODE_LEECHER_REJECTED
  */
 
-void TorrentBase::add_leecher(network::Socket & sock) throw (Exception)
+void TorrentBase::add_leecher(network::Socket & sock)
 {
 	if (sock == NULL)
 		throw Exception(Exception::ERR_CODE_NULL_REF);
@@ -285,7 +286,7 @@ void TorrentBase::start()
 		inet_aton("127.0.0.1", &addr.sin_addr);
 		addr.sin_family = AF_INET;
 		addr.sin_port = htons(6881);
-		add_seeders(1, &addr);
+		//add_seeders(1, &addr);
 		m_state = TORRENT_STATE_STARTED;
 	}
 	else
@@ -431,12 +432,15 @@ void TorrentBase::check()
 
 void TorrentBase::set_failure(const torrent_failure & tf)
 {
-	//m_leechers.clear();
-#ifdef BITTORRENT_DEBUG
-	printf("Torrent %s FAILURE, error=%s\n", m_metafile.name.c_str());
-#endif
 	m_failure_desc = tf;
 	m_state = TORRENT_STATE_FAILURE;
+#ifdef BITTORRENT_DEBUG
+	printf("Torrent %s FAILURE, error=%s\n", m_metafile.name.c_str());
+	printf("Where: %d\n", m_failure_desc.where);
+	printf("errno: %s\n", sys_errlist[m_failure_desc.errno_]);
+	printf("exc_err: %s\n", exception_errcode2str(m_failure_desc.exception_errcode).c_str());
+	printf("desc: %s\n", m_failure_desc.description.c_str());
+#endif
 }
 
 int TorrentBase::clock()

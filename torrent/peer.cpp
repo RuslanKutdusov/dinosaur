@@ -52,7 +52,11 @@ int Peer::Init(sockaddr_in * addr, const TorrentInterfaceInternalPtr & torrent)
 	return ERR_NO_ERROR;
 }
 
-int Peer::Init(network::Socket & sock, const TorrentInterfaceInternalPtr & torrent, PEER_ADD peer_add) throw (Exception)
+/*
+ * Exception::ERR_CODE_NULL_REF
+ */
+
+int Peer::Init(network::Socket & sock, const TorrentInterfaceInternalPtr & torrent, PEER_ADD peer_add)
 {
 	m_nm->Socket_set_assoc(m_sock, shared_from_this());
 	memset(&m_buf, 0, sizeof(network::buffer));

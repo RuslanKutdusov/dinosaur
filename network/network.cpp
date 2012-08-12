@@ -815,6 +815,7 @@ void NetworkManager::handler_transmission(socket_ * sock, int transmission_type)
 				sock->m_send_buffer.length = 0;
 				sock->m_send_buffer.pos = 0;
 				epollout(sock, false);
+				return;
 			}
 			ssize_t sended = send(sock->m_socket, sock->m_send_buffer.data + sock->m_send_buffer.pos, ret, MSG_NOSIGNAL);
 			if (sended == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))

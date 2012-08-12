@@ -292,7 +292,7 @@ void FileManager::File_delete(File & file)
 bool FileManager::File_exists(const char *fn) const
 {
 	if (fn == NULL)
-		throw (Exception::ERR_CODE_NULL_REF);
+		throw Exception(Exception::ERR_CODE_NULL_REF);
 	int fd;
 	fd = open(fn, O_LARGEFILE);
 	if (fd != -1 && (errno == EISDIR || errno == ENOENT))
@@ -328,11 +328,11 @@ bool FileManager::File_exists(const std::string & fn) const
 bool FileManager::File_exists(const char *fn, uint64_t length) const
 {
 	if (fn == NULL)
-		throw (Exception::ERR_CODE_NULL_REF);
+		throw Exception(Exception::ERR_CODE_NULL_REF);
 	struct stat st;
 	if (stat(fn, &st) == -1)
 	{
-		if (errno == ENOENT)
+		if (errno != ENOENT)
 			throw SyscallException();
 		if ((uint64_t)st.st_size != length)
 			return false;

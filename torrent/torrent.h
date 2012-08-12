@@ -182,7 +182,7 @@ private:
 public:
 	Peer();
 	int Init(sockaddr_in * addr, const TorrentInterfaceInternalPtr & torrent);
-	int Init(network::Socket & sock, const TorrentInterfaceInternalPtr & torrent, PEER_ADD peer_add) throw (Exception);
+	int Init(network::Socket & sock, const TorrentInterfaceInternalPtr & torrent, PEER_ADD peer_add);
 	int event_sock_ready2read(network::Socket sock);
 	int event_sock_closed(network::Socket sock);
 	int event_sock_sended(network::Socket sock);
@@ -260,7 +260,7 @@ private:
 	void build_piece_info();
 	int push_piece2download(uint32_t piece_index);
 public:
-	PieceManager(const TorrentInterfaceInternalPtr & torrent, BITFIELD bitfield) throw (Exception);
+	PieceManager(const TorrentInterfaceInternalPtr & torrent, BITFIELD bitfield);
 	void reset();
 	~PieceManager();
 	void get_blocks_count_in_piece(PIECE_INDEX piece_index, uint32_t & blocks_count);
@@ -321,7 +321,7 @@ public:
 	 * SyscallException
 	 */
 	static void CreateTorrentFile(const TorrentInterfaceInternalPtr & t, const std::string & path,
-								bool files_should_exists, uint32_t & files_exists, TorrentFilePtr & ptr) throw (Exception)
+								bool files_should_exists, uint32_t & files_exists, TorrentFilePtr & ptr)
 	{
 		try
 		{
@@ -387,8 +387,8 @@ protected:
 	torrent_failure					m_failure_desc;
 
 	virtual void add_seeders(uint32_t count, sockaddr_in * addrs);
-	virtual void add_seeder(sockaddr_in * addr) throw (Exception);
-	virtual void add_leecher(network::Socket & sock) throw (Exception);
+	virtual void add_seeder(sockaddr_in * addr) ;
+	virtual void add_leecher(network::Socket & sock) ;
 	virtual void start();
 	virtual void stop();
 	virtual void pause();

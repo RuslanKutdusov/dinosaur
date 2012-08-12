@@ -201,12 +201,14 @@ int Tracker::process_response()
 	if (bencode::get_str(response,"warning message",&b_str) == 0)
 	{
 		c_str = bencode::str2c_str(b_str);
+		m_status = TRACKER_STATUS_SEE_FAILURE_MESSAGE;
 		m_tracker_failure = c_str;
 		delete[] c_str;
 	}
 	if (bencode::get_str(response,"failure reason",&b_str) == 0)
 	{
 		c_str = bencode::str2c_str(b_str);
+		m_status = TRACKER_STATUS_SEE_FAILURE_MESSAGE;
 		m_tracker_failure = c_str;
 		delete[] c_str;
 	}
