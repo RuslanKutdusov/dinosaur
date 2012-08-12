@@ -58,7 +58,7 @@ int Peer::Init(sockaddr_in * addr, const TorrentInterfaceInternalPtr & torrent)
 
 int Peer::Init(network::Socket & sock, const TorrentInterfaceInternalPtr & torrent, PEER_ADD peer_add)
 {
-	m_nm->Socket_set_assoc(m_sock, shared_from_this());
+	m_nm->Socket_set_assoc(sock, shared_from_this());
 	memset(&m_buf, 0, sizeof(network::buffer));
 	m_torrent = torrent;
 	m_nm = torrent->get_nm();

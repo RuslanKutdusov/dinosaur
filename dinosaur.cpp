@@ -584,7 +584,7 @@ void * Dinosaur::thread(void * arg)
 		for(torrent_map_iter iter = bt->m_torrents.begin(); iter != bt->m_torrents.end(); ++iter)
 		{
 			(*iter).second->clock();
-			if ((*iter).second.use_count() == 1 || (*iter).second->i_am_releasing())
+			if ((*iter).second.use_count() == 1 && (*iter).second->i_am_releasing())
 				bt->m_torrents.erase(iter);
 		}
 		pthread_mutex_unlock(&bt->m_mutex);
