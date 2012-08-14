@@ -108,7 +108,6 @@ private:
 	void send_request(TRACKER_EVENT event );
 	int restore_socket();
 	int parse_announce();
-	int send_completed();
 	void delete_socket()
 	{
 		m_nm->Socket_delete(m_sock);
@@ -132,6 +131,7 @@ public:
 	int clock(bool & release_me);
 	int send_stopped();
 	int send_started();
+	int send_completed();
 	int get_info(info::tracker & ref);
 };
 

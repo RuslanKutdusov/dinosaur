@@ -1000,7 +1000,7 @@ void * NetworkManager::timeout_thread(void * arg)
 			Socket sock = *iter;
 
 			if (sock->m_timer != 0 &&
-				time(NULL) - sock->m_timer >= 10 &&
+				time(NULL) - sock->m_timer >= TIMEOUT &&
 				(sock->m_state == STATE_CONNECTION || (sock->m_epoll_events & EPOLLIN) != 0) &&
 				!sock->m_closed)
 			{
