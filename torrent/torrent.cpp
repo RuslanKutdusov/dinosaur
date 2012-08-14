@@ -30,6 +30,7 @@ TorrentBase::TorrentBase(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs
 	m_state = TORRENT_STATE_NONE;
 	m_failure_desc.errno_ = 0;
 	m_failure_desc.exception_errcode = Exception::NO_ERROR;
+	m_remain_time = 0;
 }
 
 void TorrentBase::init(const Metafile & metafile, const std::string & work_directory, const std::string & download_directory)
@@ -47,14 +48,15 @@ void TorrentBase::init(const Metafile & metafile, const std::string & work_direc
 		size_t bitfield_len = ceil(m_metafile.piece_count / 8.0f);
 		bool file_should_exists = true;
 		bitfield = new unsigned char[bitfield_len];
-		if (s.deserialize(m_uploaded, m_download_directory, bitfield, bitfield_len) == -1)
+		if (s.deserialize(m_uploaded, m_download_directory, bitfield, bitfield_len, m_start_time) == -1)
 		{
 			m_download_directory = download_directory;
 			if (m_download_directory[m_download_directory.length() - 1] != '/')
 				m_download_directory.append("/");
 			m_uploaded = 0;
 			memset(bitfield, 0, bitfield_len);
-			s.serialize(m_uploaded, m_download_directory, bitfield, bitfield_len);
+			m_start_time = time(NULL);
+			s.serialize(m_uploaded, m_download_directory, bitfield, bitfield_len, m_start_time);
 			delete[] bitfield;
 			bitfield = NULL;
 			file_should_exists = false;
@@ -434,6 +436,7 @@ int TorrentBase::clock()
 {
 	m_rx_speed = 0.0f;
 	m_tx_speed = 0.0f;
+	m_remain_time = 0;
 	//TODO проверять насколько загружен кэш FileManager, напр. если свободно в кэше менее 50%-70% - работаем на всю катушку, иначе, как то ограничиваем себя
 	if (m_state == TORRENT_STATE_INIT_RELEASING || m_state == TORRENT_STATE_INIT_FORCED_RELEASING)
 	{
@@ -545,6 +548,7 @@ int TorrentBase::clock()
 
 		for(peer_map_iter leecher_iter = m_leechers.begin(); leecher_iter != m_leechers.end(); ++leecher_iter)
 		{
+			printf("Leech clock %s\n", leecher_iter->first.c_str());
 			PeerPtr leecher = leecher_iter->second;
 			leecher->clock();
 			if (leecher->is_sleep())
@@ -571,6 +575,11 @@ int TorrentBase::clock()
 			bool release_tracker_instance;
 			(*iter).second->clock(release_tracker_instance);
 		}
+
+		if (m_rx_speed > 0)
+			m_remain_time = m_downloaded / m_rx_speed;
+		else
+			m_remain_time = 0;
 	}
 
 	if (m_state == TORRENT_STATE_CHECKING)
@@ -585,7 +594,7 @@ int TorrentBase::clock()
 		BITFIELD bitfield = new unsigned char[m_piece_manager->get_bitfield_length()];
 		m_piece_manager->copy_bitfield(bitfield);
 		StateSerializator s(m_state_file_name);
-		s.serialize(m_uploaded, m_download_directory, bitfield,m_piece_manager->get_bitfield_length());
+		s.serialize(m_uploaded, m_download_directory, bitfield,m_piece_manager->get_bitfield_length(), m_start_time);
 		delete[] bitfield;
 		m_pieces2check.erase(iter);
 	}
@@ -614,7 +623,7 @@ int TorrentBase::event_file_write(const fs::write_event & we)
 		StateSerializator s(m_state_file_name);
 		BITFIELD bitfield = new unsigned char[m_piece_manager->get_bitfield_length()];
 		m_piece_manager->copy_bitfield(bitfield);
-		s.serialize(m_uploaded, m_download_directory, bitfield,m_piece_manager->get_bitfield_length());
+		s.serialize(m_uploaded, m_download_directory, bitfield,m_piece_manager->get_bitfield_length(), m_start_time);
 		delete[] bitfield;
 		m_piece_manager->clear_piece_taken_from(piece_index);
 		m_work = m_downloaded == m_metafile.length ? TORRENT_WORK_UPLOADING : TORRENT_WORK_DOWNLOADING;
@@ -648,6 +657,7 @@ void TorrentBase::get_info_stat(info::torrent_stat & ref)
 	ref.piece_count = m_metafile.piece_count;
 	ref.piece_length = m_metafile.piece_length;
 	ref.private_ = m_metafile.private_;
+	ref.start_time = m_start_time;
 	memcpy(ref.info_hash_hex, m_metafile.info_hash_hex, SHA1_HEX_LENGTH);
 }
 
@@ -665,6 +675,8 @@ void TorrentBase::get_info_dyn(info::torrent_dyn & ref)
 	else
 		ref.progress = (m_downloaded * 100) / m_metafile.length;
 	ref.work = m_work;
+	ref.remain_time = m_remain_time;
+	ref.ratio = m_downloaded == 0 ? 0.0f : m_uploaded / m_downloaded;
 }
 
 void TorrentBase::get_info_trackers(info::trackers & ref)
