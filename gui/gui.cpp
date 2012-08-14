@@ -203,12 +203,12 @@ extern "C" void on_button_delete_clicked (GtkWidget *object, gpointer user_data)
 		try
 		{
 			bt->DeleteTorrent(hash);
+			gtk_list_store_remove(torrent_list, &selected_iter);
 		}
 		catch (dinosaur::Exception & e) {
 			printf("Exception\n");
 			messagebox(dinosaur::exception_errcode2str(e));
 		}
-		on_window1_show(NULL,NULL);
 	}
 }
 
@@ -303,15 +303,155 @@ extern "C" void on_window1_show (GtkWidget *object, gpointer user_data)
 	bt->get_TorrentList(torrents);
 	if (torrents.empty())
 		return;
-	for(std::list<std::string>::iterator i = torrents.begin(); i != torrents.end(); ++i)
+	try
 	{
-		std::string hash = *i;
-		gtk_list_store_append(torrent_list, &iter);
-		dinosaur::info::torrent_dyn dyn;
-		dinosaur::info::torrent_stat stat;
-		bt->get_torrent_info_dyn(hash, dyn);
-		bt->get_torrent_info_stat(hash, stat);
+		for(std::list<std::string>::iterator i = torrents.begin(); i != torrents.end(); ++i)
+		{
+			std::string hash = *i;
+			gtk_list_store_append(torrent_list, &iter);
+			dinosaur::info::torrent_dyn dyn;
+			dinosaur::info::torrent_stat stat;
+			bt->get_torrent_info_dyn(hash, dyn);
+			bt->get_torrent_info_stat(hash, stat);
 
+
+			char downloaded[256];
+			int_bytes2str(dyn.downloaded, downloaded);
+
+			char uploaded[256];
+			int_bytes2str(dyn.uploaded, uploaded);
+
+			char rx_speed[256];
+			int_bytes2str(dyn.rx_speed, rx_speed, true);
+
+			char tx_speed[256];
+			int_bytes2str(dyn.tx_speed, tx_speed, true);
+
+			std::string work;
+			switch(dyn.work)
+			{
+			case(dinosaur::TORRENT_WORK_DOWNLOADING):
+					work = "Downloading ";
+					char per[10];
+					sprintf(per, "%d%%", dyn.progress);
+					work += per;
+					break;
+			case(dinosaur::TORRENT_WORK_UPLOADING):
+					work = "Uploading";
+					break;
+			case(dinosaur::TORRENT_WORK_CHECKING):
+					work = "Checking ";
+					sprintf(per, "%d%%", dyn.progress);
+					work += per;
+					break;
+			case(dinosaur::TORRENT_WORK_PAUSED):
+					work = "Paused";
+					break;
+			case(dinosaur::TORRENT_WORK_FAILURE):
+					work = "Failure";
+					break;
+			}
+
+			char seeds[256];
+			sprintf(seeds, "%u(%u)", dyn.seeders, dyn.total_seeders);
+
+			char leechs[256];
+			sprintf(leechs, "%u", dyn.leechers);
+
+			gtk_list_store_set (torrent_list, &iter,
+								TORRENT_LIST_COL_NAME, stat.name.c_str(),
+								TORRENT_LIST_COL_PROGRESS, (gint)dyn.progress,
+								TORRENT_LIST_COL_DOWNLOADED, downloaded,
+								TORRENT_LIST_COL_UPLOADED, uploaded,
+								TORRENT_LIST_COL_DOWN_SPEED, rx_speed,
+								TORRENT_LIST_COL_UP_SPEED, tx_speed,
+								TORRENT_LIST_COL_WORK, work.c_str(),
+								TORRENT_LIST_COL_SEEDS, seeds,
+								TORRENT_LIST_COL_LEECHS, leechs,
+								TORRENT_LIST_COL_HASH, hash.c_str(),
+							  -1);
+		}
+	}
+	catch (dinosaur::Exception & e) {
+		printf("%s\n", dinosaur::exception_errcode2str(e).c_str());
+	}
+}
+
+extern "C" void  on_torrent_view_cursor_changed(GtkWidget *object, gpointer user_data)
+{
+	GtkTreeSelection *selection;
+	GtkTreeModel     *model;
+	GtkTreeIter       iter;
+	selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(torrent_view));
+	if (gtk_tree_selection_get_selected(selection, &model, &iter))
+	{
+		try
+		{
+			gchar *g_hash;
+			gtk_tree_model_get (model, &iter, TORRENT_LIST_COL_HASH, &g_hash, -1);
+			std::string hash = g_hash;
+			g_free(g_hash);
+
+			gtk_list_store_clear(tracker_list);
+			gtk_list_store_clear(peer_list);
+
+			dinosaur::info::torrent_dyn dyn;
+			dinosaur::info::torrent_stat stat;
+			bt->get_torrent_info_dyn(hash, dyn);
+			bt->get_torrent_info_stat(hash, stat);
+
+			gtk_label_set_text(label_hash, hash.c_str());
+			gtk_label_set_text(label_dir, stat.download_directory.c_str());
+			char chars[100];
+			sprintf(chars, "%llu", stat.length);
+			gtk_label_set_text(label_length, chars);
+
+			sprintf(chars, "%llu", stat.piece_length);
+			gtk_label_set_text(label_piece_length, chars);
+
+			sprintf(chars, "%u", stat.piece_count);
+			gtk_label_set_text(label_piece_number, chars);
+
+			dinosaur::info::trackers trackers;
+			bt->get_torrent_info_trackers(hash, trackers);
+			for(dinosaur::info::trackers::iterator i = trackers.begin(); i != trackers.end(); ++i)
+			{
+				gtk_list_store_append(tracker_list, &iter);
+				gtk_list_store_set (tracker_list, &iter,
+						TRACKER_LIST_COL_ANNOUNCE, (*i).announce.c_str(),
+						//TRACKER_LIST_COL_STATUS, (*i).status.c_str(),
+						TRACKER_LIST_COL_UPDATE_IN, (gint)(*i).update_in,
+						TRACKER_LIST_COL_LEECHERS,(gint)(*i).leechers,
+						TRACKER_LIST_COL_SEEDERS,(gint)(*i).seeders,
+							  -1);
+			}
+		}
+		catch (dinosaur::Exception & e) {
+			printf("%s\n", dinosaur::exception_errcode2str(e).c_str());
+		}
+	}
+	else
+	{
+		gtk_list_store_clear(tracker_list);
+	}
+}
+
+gboolean foreach_torrent_list (GtkTreeModel *model,
+                GtkTreePath  *path,
+                GtkTreeIter  *iter,
+                gpointer      user_data)
+{
+	gchar * g_hash;
+	gtk_tree_model_get (model, iter,
+			TORRENT_LIST_COL_HASH, &g_hash,
+			-1);
+
+	std::string hash = g_hash;
+	try
+	{
+
+		dinosaur::info::torrent_dyn  dyn;
+		bt->get_torrent_info_dyn(hash, dyn);
 
 		char downloaded[256];
 		int_bytes2str(dyn.downloaded, downloaded);
@@ -350,14 +490,17 @@ extern "C" void on_window1_show (GtkWidget *object, gpointer user_data)
 				break;
 		}
 
+
+
 		char seeds[256];
+		memset(seeds, 0, 256);
 		sprintf(seeds, "%u(%u)", dyn.seeders, dyn.total_seeders);
 
 		char leechs[256];
 		sprintf(leechs, "%u", dyn.leechers);
 
-		gtk_list_store_set (torrent_list, &iter,
-							TORRENT_LIST_COL_NAME, stat.name.c_str(),
+		gtk_list_store_set (torrent_list, iter,
+							//TORRENT_LIST_COL_NAME, stat.name.c_str(),
 							TORRENT_LIST_COL_PROGRESS, (gint)dyn.progress,
 							TORRENT_LIST_COL_DOWNLOADED, downloaded,
 							TORRENT_LIST_COL_UPLOADED, uploaded,
@@ -366,167 +509,12 @@ extern "C" void on_window1_show (GtkWidget *object, gpointer user_data)
 							TORRENT_LIST_COL_WORK, work.c_str(),
 							TORRENT_LIST_COL_SEEDS, seeds,
 							TORRENT_LIST_COL_LEECHS, leechs,
-							TORRENT_LIST_COL_HASH, hash.c_str(),
 						  -1);
 	}
-}
-
-extern "C" void  on_torrent_view_cursor_changed(GtkWidget *object, gpointer user_data)
-{
-	GtkTreeSelection *selection;
-	GtkTreeModel     *model;
-	GtkTreeIter       iter;
-	selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(torrent_view));
-	if (gtk_tree_selection_get_selected(selection, &model, &iter))
-	{
-		gchar *g_hash;
-		gtk_tree_model_get (model, &iter, TORRENT_LIST_COL_HASH, &g_hash, -1);
-		std::string hash = g_hash;
-		g_free(g_hash);
-
-		gtk_list_store_clear(tracker_list);
-		gtk_list_store_clear(peer_list);
-
-		dinosaur::info::torrent_dyn dyn;
-		dinosaur::info::torrent_stat stat;
-		bt->get_torrent_info_dyn(hash, dyn);
-		bt->get_torrent_info_stat(hash, stat);
-
-		gtk_label_set_text(label_hash, hash.c_str());
-		gtk_label_set_text(label_dir, stat.download_directory.c_str());
-		char chars[100];
-		sprintf(chars, "%llu", stat.length);
-		gtk_label_set_text(label_length, chars);
-
-		sprintf(chars, "%llu", stat.piece_length);
-		gtk_label_set_text(label_piece_length, chars);
-
-		sprintf(chars, "%u", stat.piece_count);
-		gtk_label_set_text(label_piece_number, chars);
-
-		dinosaur::info::trackers trackers;
-		bt->get_torrent_info_trackers(hash, trackers);
-		for(dinosaur::info::trackers::iterator i = trackers.begin(); i != trackers.end(); ++i)
-		{
-			gtk_list_store_append(tracker_list, &iter);
-			gtk_list_store_set (tracker_list, &iter,
-					TRACKER_LIST_COL_ANNOUNCE, (*i).announce.c_str(),
-					//TRACKER_LIST_COL_STATUS, (*i).status.c_str(),
-					TRACKER_LIST_COL_UPDATE_IN, (gint)(*i).update_in,
-					TRACKER_LIST_COL_LEECHERS,(gint)(*i).leechers,
-					TRACKER_LIST_COL_SEEDERS,(gint)(*i).seeders,
-						  -1);
-		}
-
-		/*torrent::info::peers peers;
-		bt->get_torrent_info_seeders(hash, peers);
-		for(torrent::info::peers::iterator i = peers.begin(); i != peers.end(); ++i)
-		{
-			gtk_list_store_append(peer_list, &iter);
-			gtk_list_store_set (peer_list, &iter,
-					PEER_LIST_COL_IP, (*i).ip,
-					PEER_LIST_COL_DOWNLOADED, (gfloat)(*i).downloaded,
-					PEER_LIST_COL_UPLOADED, (gfloat)(*i).uploaded,
-					PEER_LIST_COL_DOWN_SPEED, (gfloat)(*i).downSpeed,
-					PEER_LIST_COL_UP_SPEED, (gfloat)(*i).upSpeed,
-					PEER_LIST_COL_AVAILABLE, (gfloat)(*i).available,
-					-1);
-		}
-
-		bt->get_torrent_info_leechers(hash, peers);
-		for(torrent::info::peers::iterator i = peers.begin(); i != peers.end(); ++i)
-		{
-			gtk_list_store_append(peer_list, &iter);
-			gtk_list_store_set (peer_list, &iter,
-					PEER_LIST_COL_IP, (*i).ip,
-					PEER_LIST_COL_DOWNLOADED, (gfloat)(*i).downloaded,
-					PEER_LIST_COL_UPLOADED, (gfloat)(*i).uploaded,
-					PEER_LIST_COL_DOWN_SPEED, (gfloat)(*i).downSpeed,
-					PEER_LIST_COL_UP_SPEED, (gfloat)(*i).upSpeed,
-					PEER_LIST_COL_AVAILABLE, (gfloat)(*i).available,
-					-1);
-		}*/
-	}
-	else
-	{
-		gtk_list_store_clear(tracker_list);
-	}
-}
-
-gboolean foreach_torrent_list (GtkTreeModel *model,
-                GtkTreePath  *path,
-                GtkTreeIter  *iter,
-                gpointer      user_data)
-{
-	gchar * g_hash;
-	gtk_tree_model_get (model, iter,
-			TORRENT_LIST_COL_HASH, &g_hash,
-			-1);
-
-	std::string hash = g_hash;
-
-	dinosaur::info::torrent_dyn  dyn;
-	bt->get_torrent_info_dyn(hash, dyn);
-
-	char downloaded[256];
-	int_bytes2str(dyn.downloaded, downloaded);
-
-	char uploaded[256];
-	int_bytes2str(dyn.uploaded, uploaded);
-
-	char rx_speed[256];
-	int_bytes2str(dyn.rx_speed, rx_speed, true);
-
-	char tx_speed[256];
-	int_bytes2str(dyn.tx_speed, tx_speed, true);
-
-	std::string work;
-	switch(dyn.work)
-	{
-	case(dinosaur::TORRENT_WORK_DOWNLOADING):
-			work = "Downloading ";
-			char per[10];
-			sprintf(per, "%d%%", dyn.progress);
-			work += per;
-			break;
-	case(dinosaur::TORRENT_WORK_UPLOADING):
-			work = "Uploading";
-			break;
-	case(dinosaur::TORRENT_WORK_CHECKING):
-			work = "Checking ";
-			sprintf(per, "%d%%", dyn.progress);
-			work += per;
-			break;
-	case(dinosaur::TORRENT_WORK_PAUSED):
-			work = "Paused";
-			break;
-	case(dinosaur::TORRENT_WORK_FAILURE):
-			work = "Failure";
-			break;
+	catch (dinosaur::Exception & e) {
+		printf("%s\n", dinosaur::exception_errcode2str(e).c_str());
 	}
 
-
-
-	char seeds[256];
-	memset(seeds, 0, 256);
-	sprintf(seeds, "%u(%u)", dyn.seeders, dyn.total_seeders);
-
-	char leechs[256];
-	sprintf(leechs, "%u", dyn.leechers);
-
-	gtk_list_store_set (torrent_list, iter,
-						//TORRENT_LIST_COL_NAME, stat.name.c_str(),
-						TORRENT_LIST_COL_PROGRESS, (gint)dyn.progress,
-						TORRENT_LIST_COL_DOWNLOADED, downloaded,
-						TORRENT_LIST_COL_UPLOADED, uploaded,
-						TORRENT_LIST_COL_DOWN_SPEED, rx_speed,
-						TORRENT_LIST_COL_UP_SPEED, tx_speed,
-						TORRENT_LIST_COL_WORK, work.c_str(),
-						TORRENT_LIST_COL_SEEDS, seeds,
-						TORRENT_LIST_COL_LEECHS, leechs,
-					  -1);
-
-	//g_free(tree_path_str);
 	g_free(g_hash);
 	return FALSE;
 }
@@ -536,52 +524,61 @@ gboolean foreach_tracker_list (GtkTreeModel *model,
                 GtkTreeIter  *iter,
                 gpointer      user_data)
 {
-	dinosaur::info::trackers * trackers = (dinosaur::info::trackers *)user_data;
+	dinosaur::info::trackers trackers;
+	std::string hash = (char*)user_data;
 	gchar * g_announce;
 	gtk_tree_model_get (model, iter,TRACKER_LIST_COL_ANNOUNCE, &g_announce,-1);
 	std::string announce = g_announce;
 	g_free(g_announce);
-	for(dinosaur::info::trackers::iterator i = trackers->begin(); i != trackers->end(); ++i)
+
+	try
 	{
-		if (announce == (*i).announce)
+		bt->get_torrent_info_trackers(hash, trackers);
+		for(dinosaur::info::trackers::iterator i = trackers.begin(); i != trackers.end(); ++i)
 		{
-			std::string status;
-			switch ((*i).status) {
-				case dinosaur::TRACKER_STATUS_OK:
-					status = "OK";
-					break;
-				case dinosaur::TRACKER_STATUS_CONNECTING:
-					status = "Connecting...";
-					break;
-				case dinosaur::TRACKER_STATUS_ERROR:
-					status = "Error";
-					break;
-				case dinosaur::TRACKER_STATUS_INVALID_ANNOUNCE:
-					status = "Invalid(unsupported) announce";
-					break;
-				case dinosaur::TRACKER_STATUS_SEE_FAILURE_MESSAGE:
-					status = (*i).failure_mes;
-					break;
-				case dinosaur::TRACKER_STATUS_TIMEOUT:
-					status = "Timeout";
-					break;
-				case dinosaur::TRACKER_STATUS_UNRESOLVED:
-					status = "Can not resolve domain name";
-					break;
-				case dinosaur::TRACKER_STATUS_UPDATING:
-					status = "Updating...";
-					break;
-				default:
-					break;
+			if (announce == (*i).announce)
+			{
+				std::string status;
+				switch ((*i).status) {
+					case dinosaur::TRACKER_STATUS_OK:
+						status = "OK";
+						break;
+					case dinosaur::TRACKER_STATUS_CONNECTING:
+						status = "Connecting...";
+						break;
+					case dinosaur::TRACKER_STATUS_ERROR:
+						status = "Error";
+						break;
+					case dinosaur::TRACKER_STATUS_INVALID_ANNOUNCE:
+						status = "Invalid(unsupported) announce";
+						break;
+					case dinosaur::TRACKER_STATUS_SEE_FAILURE_MESSAGE:
+						status = (*i).failure_mes;
+						break;
+					case dinosaur::TRACKER_STATUS_TIMEOUT:
+						status = "Timeout";
+						break;
+					case dinosaur::TRACKER_STATUS_UNRESOLVED:
+						status = "Can not resolve domain name";
+						break;
+					case dinosaur::TRACKER_STATUS_UPDATING:
+						status = "Updating...";
+						break;
+					default:
+						break;
+				}
+				gtk_list_store_set (tracker_list, iter,
+						TRACKER_LIST_COL_STATUS, status.c_str(),
+						TRACKER_LIST_COL_UPDATE_IN, (gint)(*i).update_in,
+						TRACKER_LIST_COL_LEECHERS,(gint)(*i).leechers,
+						TRACKER_LIST_COL_SEEDERS,(gint)(*i).seeders,
+							  -1);
+				break;
 			}
-			gtk_list_store_set (tracker_list, iter,
-					TRACKER_LIST_COL_STATUS, status.c_str(),
-					TRACKER_LIST_COL_UPDATE_IN, (gint)(*i).update_in,
-					TRACKER_LIST_COL_LEECHERS,(gint)(*i).leechers,
-					TRACKER_LIST_COL_SEEDERS,(gint)(*i).seeders,
-						  -1);
-			break;
 		}
+	}
+	catch (dinosaur::Exception & e) {
+		printf("%s\n", dinosaur::exception_errcode2str(e).c_str());
 	}
 	return FALSE;
 }
@@ -600,120 +597,125 @@ gboolean on_timer(gpointer data)
 		gchar *g_hash;
 		gtk_tree_model_get (model, &selected_iter, TORRENT_LIST_COL_HASH, &g_hash, -1);
 		std::string hash = g_hash;
+
+		gtk_tree_model_foreach(GTK_TREE_MODEL(tracker_list), foreach_tracker_list, g_hash);
+
 		g_free(g_hash);
 
-		dinosaur::info::trackers trackers;
-		bt->get_torrent_info_trackers(hash, trackers);
-		gtk_tree_model_foreach(GTK_TREE_MODEL(tracker_list), foreach_tracker_list, (gpointer)&trackers);
-
-		dinosaur::info::peers peers;
-		bt->get_torrent_info_seeders(hash, peers);
-		gtk_list_store_clear(peer_list);
-		for(dinosaur::info::peers::iterator i = peers.begin(); i != peers.end(); ++i)
+		try
 		{
-			GtkTreeIter iter;
-			gtk_list_store_append(peer_list, &iter);
-
-			char downloaded[256];
-			int_bytes2str((*i).downloaded, downloaded);
-
-			char uploaded[256];
-			int_bytes2str((*i).uploaded, uploaded);
-
-			char downSpeed[256];
-			int_bytes2str((*i).downSpeed, downSpeed, true);
-
-			char upSpeed[256];
-			int_bytes2str((*i).upSpeed, upSpeed, true);
-
-			char available[256];
-			sprintf(available, "%.3f", (*i).available);
-
-			char block2request[256];
-			sprintf(block2request, "%u", (*i).blocks2request);
-
-			char requested_blocks[256];
-			sprintf(requested_blocks, "%u", (*i).requested_blocks);
-
-			gtk_list_store_set (peer_list, &iter,
-					PEER_LIST_COL_IP, (*i).ip,
-					PEER_LIST_COL_DOWNLOADED, downloaded,
-					PEER_LIST_COL_UPLOADED, uploaded,
-					PEER_LIST_COL_DOWN_SPEED, downSpeed,
-					PEER_LIST_COL_UP_SPEED, upSpeed,
-					PEER_LIST_COL_AVAILABLE, available,
-					PEER_LIST_COL_BLOCK2REQUEST, block2request,
-					PEER_LIST_COL_REQUESTED_BLOCKS, requested_blocks,
-					-1);
-		}
-		bt->get_torrent_info_leechers(hash, peers);
-		for(dinosaur::info::peers::iterator i = peers.begin(); i != peers.end(); ++i)
-		{
-			GtkTreeIter iter;
-			gtk_list_store_append(peer_list, &iter);
-
-			char downloaded[256];
-			int_bytes2str((*i).downloaded, downloaded);
-
-			char uploaded[256];
-			int_bytes2str((*i).uploaded, uploaded);
-
-			char downSpeed[256];
-			int_bytes2str((*i).downSpeed, downSpeed, true);
-
-			char upSpeed[256];
-			int_bytes2str((*i).upSpeed, upSpeed, true);
-
-			char available[256];
-			sprintf(available, "%.3f", (*i).available);
-
-			gtk_list_store_set (peer_list, &iter,
-					PEER_LIST_COL_IP, (*i).ip,
-					PEER_LIST_COL_DOWNLOADED, downloaded,
-					PEER_LIST_COL_UPLOADED, uploaded,
-					PEER_LIST_COL_DOWN_SPEED, downSpeed,
-					PEER_LIST_COL_UP_SPEED, upSpeed,
-					PEER_LIST_COL_AVAILABLE, available,
-					-1);
-		}
-
-		dinosaur::info::downloadable_pieces dp;
-		bt->get_torrent_info_downloadable_pieces(hash, dp);
-		gtk_list_store_clear(dp_list);
-		for(dinosaur::info::downloadable_pieces::iterator i = dp.begin(); i != dp.end(); ++i)
-		{
-			GtkTreeIter iter;
-			gtk_list_store_append(dp_list, &iter);
-
-			char index[256];
-			sprintf(index, "%u", (*i).index);
-
-			char block2download[256];
-			sprintf(block2download, "%u", (*i).block2download);
-
-			char downloaded_blocks[256];
-			sprintf(downloaded_blocks, "%u", (*i).downloaded_blocks);
-
-			std::string prio;
-			switch((*i).priority)
+			dinosaur::info::peers peers;
+			bt->get_torrent_info_seeders(hash, peers);
+			gtk_list_store_clear(peer_list);
+			for(dinosaur::info::peers::iterator i = peers.begin(); i != peers.end(); ++i)
 			{
-			case(dinosaur::DOWNLOAD_PRIORITY_LOW):
-					prio = "Low";
-					break;
-			case(dinosaur::DOWNLOAD_PRIORITY_NORMAL):
-					prio = "Normal";
-					break;
-			case(dinosaur::DOWNLOAD_PRIORITY_HIGH):
-					prio = "High";
-					break;
+				GtkTreeIter iter;
+				gtk_list_store_append(peer_list, &iter);
+
+				char downloaded[256];
+				int_bytes2str((*i).downloaded, downloaded);
+
+				char uploaded[256];
+				int_bytes2str((*i).uploaded, uploaded);
+
+				char downSpeed[256];
+				int_bytes2str((*i).downSpeed, downSpeed, true);
+
+				char upSpeed[256];
+				int_bytes2str((*i).upSpeed, upSpeed, true);
+
+				char available[256];
+				sprintf(available, "%.3f", (*i).available);
+
+				char block2request[256];
+				sprintf(block2request, "%u", (*i).blocks2request);
+
+				char requested_blocks[256];
+				sprintf(requested_blocks, "%u", (*i).requested_blocks);
+
+				gtk_list_store_set (peer_list, &iter,
+						PEER_LIST_COL_IP, (*i).ip,
+						PEER_LIST_COL_DOWNLOADED, downloaded,
+						PEER_LIST_COL_UPLOADED, uploaded,
+						PEER_LIST_COL_DOWN_SPEED, downSpeed,
+						PEER_LIST_COL_UP_SPEED, upSpeed,
+						PEER_LIST_COL_AVAILABLE, available,
+						PEER_LIST_COL_BLOCK2REQUEST, block2request,
+						PEER_LIST_COL_REQUESTED_BLOCKS, requested_blocks,
+						-1);
+			}
+			bt->get_torrent_info_leechers(hash, peers);
+			for(dinosaur::info::peers::iterator i = peers.begin(); i != peers.end(); ++i)
+			{
+				GtkTreeIter iter;
+				gtk_list_store_append(peer_list, &iter);
+
+				char downloaded[256];
+				int_bytes2str((*i).downloaded, downloaded);
+
+				char uploaded[256];
+				int_bytes2str((*i).uploaded, uploaded);
+
+				char downSpeed[256];
+				int_bytes2str((*i).downSpeed, downSpeed, true);
+
+				char upSpeed[256];
+				int_bytes2str((*i).upSpeed, upSpeed, true);
+
+				char available[256];
+				sprintf(available, "%.3f", (*i).available);
+
+				gtk_list_store_set (peer_list, &iter,
+						PEER_LIST_COL_IP, (*i).ip,
+						PEER_LIST_COL_DOWNLOADED, downloaded,
+						PEER_LIST_COL_UPLOADED, uploaded,
+						PEER_LIST_COL_DOWN_SPEED, downSpeed,
+						PEER_LIST_COL_UP_SPEED, upSpeed,
+						PEER_LIST_COL_AVAILABLE, available,
+						-1);
 			}
 
-			gtk_list_store_set (dp_list, &iter,
-								DP_LIST_COL_INDEX, index,
-								DP_LIST_COL_BLOCK2DOWNLOAD, block2download,
-								DP_LIST_COL_DOWNLOADED_BLOCKS, downloaded_blocks,
-								DP_LIST_COL_PRIO, prio.c_str(),
-								-1);
+			dinosaur::info::downloadable_pieces dp;
+			bt->get_torrent_info_downloadable_pieces(hash, dp);
+			gtk_list_store_clear(dp_list);
+			for(dinosaur::info::downloadable_pieces::iterator i = dp.begin(); i != dp.end(); ++i)
+			{
+				GtkTreeIter iter;
+				gtk_list_store_append(dp_list, &iter);
+
+				char index[256];
+				sprintf(index, "%u", (*i).index);
+
+				char block2download[256];
+				sprintf(block2download, "%u", (*i).block2download);
+
+				char downloaded_blocks[256];
+				sprintf(downloaded_blocks, "%u", (*i).downloaded_blocks);
+
+				std::string prio;
+				switch((*i).priority)
+				{
+				case(dinosaur::DOWNLOAD_PRIORITY_LOW):
+						prio = "Low";
+						break;
+				case(dinosaur::DOWNLOAD_PRIORITY_NORMAL):
+						prio = "Normal";
+						break;
+				case(dinosaur::DOWNLOAD_PRIORITY_HIGH):
+						prio = "High";
+						break;
+				}
+
+				gtk_list_store_set (dp_list, &iter,
+									DP_LIST_COL_INDEX, index,
+									DP_LIST_COL_BLOCK2DOWNLOAD, block2download,
+									DP_LIST_COL_DOWNLOADED_BLOCKS, downloaded_blocks,
+									DP_LIST_COL_PRIO, prio.c_str(),
+									-1);
+			}
+		}
+		catch (dinosaur::Exception & e) {
+			printf("%s\n", dinosaur::exception_errcode2str(e).c_str());
 		}
 	}
 	else

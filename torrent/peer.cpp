@@ -74,6 +74,7 @@ int Peer::Init(network::Socket & sock, const TorrentInterfaceInternalPtr & torre
 	m_uploaded = 0;
 	m_sock = sock;
 	memcpy(&m_addr, &m_sock->m_peer, sizeof(sockaddr_in));
+	get_peer_key(&m_sock->m_peer, m_ip);//inet_ntoa(m_sock->m_peer.sin_addr);
 	switch(peer_add)
 	{
 	case PEER_ADD_TRACKER:
@@ -87,7 +88,6 @@ int Peer::Init(network::Socket & sock, const TorrentInterfaceInternalPtr & torre
 		m_state = PEER_STATE_GENERAL_READY;
 		break;
 	}
-	get_peer_key(&m_sock->m_peer, m_ip);//inet_ntoa(m_sock->m_peer.sin_addr);
 	return ERR_NO_ERROR;
 }
 

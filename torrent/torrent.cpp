@@ -618,6 +618,9 @@ int TorrentBase::event_file_write(const fs::write_event & we)
 		delete[] bitfield;
 		m_piece_manager->clear_piece_taken_from(piece_index);
 		m_work = m_downloaded == m_metafile.length ? TORRENT_WORK_UPLOADING : TORRENT_WORK_DOWNLOADING;
+		if (m_state == TORRENT_STATE_STARTED && m_downloaded == m_metafile.length)
+			for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
+				(*iter).second->send_completed();
 		if (m_g_cfg->get_send_have())
 			m_have_list.push_back(piece_index);
 		return ERR_NO_ERROR;

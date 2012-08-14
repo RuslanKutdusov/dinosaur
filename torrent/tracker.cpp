@@ -440,6 +440,7 @@ int Tracker::clock(bool & release_me)
 	{
 		if (restore_socket() != ERR_NO_ERROR)
 			m_status = TRACKER_STATUS_ERROR;
+		m_event_after_connect = TRACKER_EVENT_NONE;
 	}
 	if (m_state == TRACKER_STATE_STOPPING)
 		release_me = m_ready2release;
