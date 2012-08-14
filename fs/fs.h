@@ -44,18 +44,20 @@ typedef boost::shared_ptr<file> File;
 
 struct write_cache_element
 {
-	File file;
-	char block[BLOCK_LENGTH];
-	uint32_t length;
-	uint64_t offset;
-	BLOCK_ID block_id;
+	File 		file;
+	char 		block[BLOCK_LENGTH];
+	uint32_t 	length;
+	uint64_t	offset;
+	BLOCK_ID 	block_id;
 };
 
 struct write_event
 {
-	BLOCK_ID block_id;
-	ssize_t writted;
-	File file;
+	BLOCK_ID 				block_id;
+	ssize_t 				writted;
+	int 					errno_;
+	Exception::ERR_CODES 	exception_errcode;
+	File 					file;
 };
 
 class FileAssociation : public boost::enable_shared_from_this<FileAssociation>
@@ -77,24 +79,25 @@ class file
 private:
 	uint64_t 				m_length;
 	bool 					m_should_exists;
-	char * 					m_fn;
+	std::string				m_fn;
 	int 					m_fd;
 	FileAssociation::ptr 	m_assoc;
 	bool 					m_instance2delete;
 public:
 	file();
-	file(const char * fn, uint64_t length, bool should_exists, const FileAssociation::ptr & assoc);
-	int _open();
-	int _write(const char * buf, uint64_t offset, uint64_t length);
-	int _read(char * buf, uint64_t offset, uint64_t length);
+	file(const char * fn, uint64_t length, bool should_exists, const FileAssociation::ptr & assoc) throw(Exception);
+	void _open() throw(Exception, SyscallException);
+	size_t _write(const char * buf, uint64_t offset, uint64_t length) throw(Exception, SyscallException);
+	size_t _read(char * buf, uint64_t offset, uint64_t length) throw(Exception, SyscallException);
 	void _close();
 	bool is_opened();
 #ifdef FS_DEBUG
-	const char * fn() const {return m_fn;}
+	const std::string & fn() const {return m_fn;}
 	int get_fd() const {return m_fd;}
 	void set_fd(int fd) { m_fd = fd; }
 #endif
 	void get_name(std::string & name);
+	const std::string & get_name();
 	uint64_t get_length();
 	~file();
 	friend class FileManager;
@@ -107,7 +110,7 @@ private:
 public:
 	FD_LRU_Cache(){}
 	virtual ~FD_LRU_Cache(){}
-	int put(File & file_id, int file_desc, File & deleted_file);
+	int put(File & file_id, int file_desc, File & deleted_file)  throw(Exception);
 	void dump();
 };
 
@@ -127,11 +130,11 @@ private:
 	_queue * m_front;
 public:
 	cache();
-	void init_cache(uint16_t size);
+	void init_cache(uint16_t size) throw (Exception);
 	~cache();
 	const write_cache_element * const front() const;
 	void pop();
-	int push(const File & file, const char * buf, uint32_t length, uint64_t offset, const BLOCK_ID & id);
+	void push(const File & file, const char * buf, uint32_t length, uint64_t offset, const BLOCK_ID & id) throw (Exception);
 	bool empty() const;
 	uint16_t count() const
 	{return m_count;}
@@ -143,7 +146,6 @@ private:
 	cfg::Glob_cfg * m_cfg;
 	pthread_t m_write_thread;
 	pthread_mutex_t m_mutex;
-	pthread_cond_t m_cond;
 	bool m_thread_stop;
 	uint16_t m_cache_size;
 	//lockable vars
@@ -151,28 +153,22 @@ private:
 	FD_LRU_Cache m_fd_cache;
 	std::set<File> m_files;
 	std::list<write_event> m_write_event;
-	std::string m_error;
 	static void * cache_thread(void * arg);
-	int prepare_file(File & file);
+	void prepare_file(File & file)  throw (Exception, SyscallException);
 public:
 	FileManager();
-	int Init(cfg::Glob_cfg * cfg);
-	int Init_for_tests(uint16_t write_cache_size, uint16_t fd_cache_size);
+	void Init(cfg::Glob_cfg * cfg) throw (Exception);
 	~FileManager();
-	int File_add(const char * fn, uint64_t length, bool should_exists, const FileAssociation::ptr & assoc, File & file);
-	int File_add(const std::string & fn, uint64_t length, bool should_exists, const FileAssociation::ptr & assoc, File & file);
-	int File_write(File & file, const char * buf, uint32_t length, uint64_t offset, const BLOCK_ID & block_id );
-	int File_read_immediately(File & file, char * buf, uint64_t offset, uint64_t length);
+	int File_add(const char * fn, uint64_t length, bool should_exists, const FileAssociation::ptr & assoc, File & file) throw (Exception);
+	int File_add(const std::string & fn, uint64_t length, bool should_exists, const FileAssociation::ptr & assoc, File & file) throw (Exception);
+	void File_write(File & file, const char * buf, uint32_t length, uint64_t offset, const BLOCK_ID & block_id ) throw (Exception, SyscallException);
+	int File_read_immediately(File & file, char * buf, uint64_t offset, uint64_t length) throw (Exception, SyscallException);
 	void File_delete(File & file);
 	bool File_exists(const char *fn) const;
 	bool File_exists(const std::string & fn) const;
 	bool File_exists(const char *fn, uint64_t length) const;
 	bool File_exists(const std::string & fn, uint64_t length) const;
 	void notify();
-	const std::string & get_error()
-	{
-		return m_error;
-	}
 };
 
 }

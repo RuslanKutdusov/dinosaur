@@ -34,17 +34,47 @@ enum DOWNLOAD_PRIORITY
 
 enum TORRENT_WORK
 {
-	TORRENT_DOWNLOADING,
-	TORRENT_UPLOADING,
-	TORRENT_CHECKING,
-	TORRENT_PAUSED,
-	TORRENT_FAILURE
+	TORRENT_WORK_DOWNLOADING,
+	TORRENT_WORK_UPLOADING,
+	TORRENT_WORK_CHECKING,
+	TORRENT_WORK_PAUSED,
+	TORRENT_WORK_FAILURE
 };
 
-enum SOCKET_STATUS
+struct socket_status
 {
-	SOCKET_STATUS_OK,
-	SOCKET_STATUS_CLOSED
+	bool 					listen;
+	int 					errno_;
+	Exception::ERR_CODES 	exception_errcode;
+};
+
+enum TRACKER_STATUS
+{
+	TRACKER_STATUS_OK,
+	TRACKER_STATUS_UPDATING,
+	TRACKER_STATUS_ERROR,
+	TRACKER_STATUS_TIMEOUT,
+	TRACKER_STATUS_UNRESOLVED,
+	TRACKER_STATUS_INVALID_ANNOUNCE,
+	TRACKER_STATUS_CONNECTING,
+	TRACKER_STATUS_SEE_FAILURE_MESSAGE
+};
+
+enum TORRENT_FAILURE
+{
+	TORRENT_FAILURE_INITIALIZATION,
+	TORRENT_FAILURE_WRITE_FILE,
+	TORRENT_FAILURE_READ_FILE,
+	TORRENT_FAILURE_GET_BLOCK_CACHE,
+	TORRENT_FAILURE_PUT_BLOCK_CACHE
+};
+
+struct torrent_failure
+{
+	Exception::ERR_CODES	exception_errcode;
+	int						errno_;
+	TORRENT_FAILURE			where;
+	std::string				description;
 };
 
 namespace info
@@ -80,7 +110,8 @@ namespace info
 	struct tracker
 	{
 		std::string 		announce;
-		std::string 		status;
+		TRACKER_STATUS 		status;
+		std::string			failure_mes;
 		uint64_t 			seeders;
 		uint64_t 			leechers;
 		time_t 				update_in;
@@ -111,9 +142,20 @@ namespace info
 		double 		downSpeed;
 		double 		upSpeed;
 		double 		available;
+		uint32_t	blocks2request;
+		uint32_t	requested_blocks;
+		bool 		may_request;
 	};
-
 	typedef std::list<peer> peers;
+
+	struct downloadable_piece
+	{
+		PIECE_INDEX 		index;
+		uint32_t			block2download;
+		uint32_t			downloaded_blocks;
+		DOWNLOAD_PRIORITY 	priority;
+	};
+	typedef std::list<downloadable_piece> downloadable_pieces;
 }
 
 }

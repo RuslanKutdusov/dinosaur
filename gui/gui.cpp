@@ -14,6 +14,7 @@ GtkTreeView* torrent_view;
 GtkListStore* torrent_list;
 GtkListStore* tracker_list;
 GtkListStore* peer_list;
+GtkListStore* dp_list;
 GtkLabel* label_hash;
 GtkLabel* label_length;
 GtkLabel* label_dir;
@@ -56,7 +57,18 @@ enum
 	PEER_LIST_COL_DOWN_SPEED,
 	PEER_LIST_COL_UP_SPEED,
 	PEER_LIST_COL_AVAILABLE,
+	PEER_LIST_COL_BLOCK2REQUEST,
+	PEER_LIST_COL_REQUESTED_BLOCKS,
 	PEER_LIST_COLS
+};
+
+enum
+{
+	DP_LIST_COL_INDEX,
+	DP_LIST_COL_BLOCK2DOWNLOAD,
+	DP_LIST_COL_DOWNLOADED_BLOCKS,
+	DP_LIST_COL_PRIO,
+	DP_LIST_COLS
 };
 
 void int_bytes2str(uint64_t i, char * str, bool speed = false)
@@ -81,7 +93,7 @@ void int_bytes2str(uint64_t i, char * str, bool speed = false)
 		return;
 	}
 	float gb = i / 1073741824.0f;
-	sprintf(str, "%.2f MB%s", gb, c);
+	sprintf(str, "%.2f GB%s", gb, c);
 }
 
 void messagebox(const char * message)
@@ -93,6 +105,11 @@ void messagebox(const char * message)
 				"%s", message);
 	gtk_dialog_run (GTK_DIALOG (dialog));
 	gtk_widget_destroy (dialog);
+}
+
+void messagebox(const std::string & message)
+{
+	messagebox(message.c_str());
 }
 
 extern "C" void on_button_open_clicked (GtkWidget *object, gpointer user_data)
@@ -119,7 +136,7 @@ extern "C" void on_button_open_clicked (GtkWidget *object, gpointer user_data)
 		catch(dinosaur::Exception & e)
 		{
 			gtk_widget_destroy (dialog);
-			messagebox(e.get_error().c_str());
+			messagebox(exception_errcode2str(e));
 		}
 		g_free (filename);
 	}
@@ -139,7 +156,13 @@ extern "C" void on_button_start_clicked (GtkWidget *object, gpointer user_data)
 		gtk_tree_model_get (model, &selected_iter, TORRENT_LIST_COL_HASH, &g_hash, -1);
 		std::string hash = g_hash;
 		g_free(g_hash);
-		bt->ContinueTorrent(hash);
+		try
+		{
+			bt->ContinueTorrent(hash);
+		}
+		catch (dinosaur::Exception & e) {
+			messagebox(dinosaur::exception_errcode2str(e));
+		}
 	}
 }
 
@@ -155,7 +178,13 @@ extern "C" void on_button_stop_clicked (GtkWidget *object, gpointer user_data)
 		gtk_tree_model_get (model, &selected_iter, TORRENT_LIST_COL_HASH, &g_hash, -1);
 		std::string hash = g_hash;
 		g_free(g_hash);
-		bt->PauseTorrent(hash);
+		try
+		{
+			bt->PauseTorrent(hash);
+		}
+		catch (dinosaur::Exception & e) {
+			messagebox(dinosaur::exception_errcode2str(e));
+		}
 	}
 }
 
@@ -171,7 +200,14 @@ extern "C" void on_button_delete_clicked (GtkWidget *object, gpointer user_data)
 		gtk_tree_model_get (model, &selected_iter, TORRENT_LIST_COL_HASH, &g_hash, -1);
 		std::string hash = g_hash;
 		g_free(g_hash);
-		bt->DeleteTorrent(hash);
+		try
+		{
+			bt->DeleteTorrent(hash);
+		}
+		catch (dinosaur::Exception & e) {
+			printf("Exception\n");
+			messagebox(dinosaur::exception_errcode2str(e));
+		}
 		on_window1_show(NULL,NULL);
 	}
 }
@@ -188,7 +224,13 @@ extern "C" void on_button_check_clicked(GtkWidget *object, gpointer user_data)
 		gtk_tree_model_get (model, &selected_iter, TORRENT_LIST_COL_HASH, &g_hash, -1);
 		std::string hash = g_hash;
 		g_free(g_hash);
-		bt->CheckTorrent(hash);
+		try
+		{
+			bt->CheckTorrent(hash);
+		}
+		catch (dinosaur::Exception & e) {
+			messagebox(dinosaur::exception_errcode2str(e));
+		}
 	}
 }
 
@@ -220,28 +262,29 @@ extern "C" void on_open_dialog_button_ok_clicked (GtkWidget *object, gpointer us
 	}
 	std::string dir_str = dir;
 	std::string hash;
-	if (bt->AddTorrent(*metafile, dir_str, hash) != ERR_NO_ERROR)
+	try
 	{
+		bt->AddTorrent(*metafile, dir_str, hash);
+		bt->StartTorrent(hash);
+		g_free(dir);
 		gtk_object_destroy(GTK_OBJECT(open_dialog));
-		messagebox(bt->get_error().c_str());
 		open_dialog = NULL;
 		metafile.reset();
+		on_window1_show(NULL,NULL);
 		return;
 	}
-	if (bt->StartTorrent(hash) != ERR_NO_ERROR)
+	catch (dinosaur::Exception & e)
 	{
-		gtk_object_destroy(GTK_OBJECT(open_dialog));
-		messagebox(bt->get_error().c_str());
-		open_dialog = NULL;
-		metafile.reset();
-		return;
+		messagebox(dinosaur::exception_errcode2str(e));
 	}
-	g_free(dir);
-	//commit
+	catch (dinosaur::SyscallException & e)
+	{
+		messagebox(e.get_errno_str());
+	}
 	gtk_object_destroy(GTK_OBJECT(open_dialog));
 	open_dialog = NULL;
 	metafile.reset();
-	on_window1_show(NULL,NULL);
+	return;
 }
 
 extern "C" void on_open_dialog_button_cancel_clicked (GtkWidget *object, gpointer user_data)
@@ -285,19 +328,24 @@ extern "C" void on_window1_show (GtkWidget *object, gpointer user_data)
 		std::string work;
 		switch(dyn.work)
 		{
-		case(dinosaur::TORRENT_DOWNLOADING):
-				work = "Downloading";
+		case(dinosaur::TORRENT_WORK_DOWNLOADING):
+				work = "Downloading ";
+				char per[10];
+				sprintf(per, "%d%%", dyn.progress);
+				work += per;
 				break;
-		case(dinosaur::TORRENT_UPLOADING):
+		case(dinosaur::TORRENT_WORK_UPLOADING):
 				work = "Uploading";
 				break;
-		case(dinosaur::TORRENT_CHECKING):
-				work = "Checking";
+		case(dinosaur::TORRENT_WORK_CHECKING):
+				work = "Checking ";
+				sprintf(per, "%d%%", dyn.progress);
+				work += per;
 				break;
-		case(dinosaur::TORRENT_PAUSED):
+		case(dinosaur::TORRENT_WORK_PAUSED):
 				work = "Paused";
 				break;
-		case(dinosaur::TORRENT_FAILURE):
+		case(dinosaur::TORRENT_WORK_FAILURE):
 				work = "Failure";
 				break;
 		}
@@ -363,7 +411,7 @@ extern "C" void  on_torrent_view_cursor_changed(GtkWidget *object, gpointer user
 			gtk_list_store_append(tracker_list, &iter);
 			gtk_list_store_set (tracker_list, &iter,
 					TRACKER_LIST_COL_ANNOUNCE, (*i).announce.c_str(),
-					TRACKER_LIST_COL_STATUS, (*i).status.c_str(),
+					//TRACKER_LIST_COL_STATUS, (*i).status.c_str(),
 					TRACKER_LIST_COL_UPDATE_IN, (gint)(*i).update_in,
 					TRACKER_LIST_COL_LEECHERS,(gint)(*i).leechers,
 					TRACKER_LIST_COL_SEEDERS,(gint)(*i).seeders,
@@ -435,22 +483,29 @@ gboolean foreach_torrent_list (GtkTreeModel *model,
 	std::string work;
 	switch(dyn.work)
 	{
-	case(dinosaur::TORRENT_DOWNLOADING):
-			work = "Downloading";
+	case(dinosaur::TORRENT_WORK_DOWNLOADING):
+			work = "Downloading ";
+			char per[10];
+			sprintf(per, "%d%%", dyn.progress);
+			work += per;
 			break;
-	case(dinosaur::TORRENT_UPLOADING):
+	case(dinosaur::TORRENT_WORK_UPLOADING):
 			work = "Uploading";
 			break;
-	case(dinosaur::TORRENT_CHECKING):
-			work = "Checking";
+	case(dinosaur::TORRENT_WORK_CHECKING):
+			work = "Checking ";
+			sprintf(per, "%d%%", dyn.progress);
+			work += per;
 			break;
-	case(dinosaur::TORRENT_PAUSED):
+	case(dinosaur::TORRENT_WORK_PAUSED):
 			work = "Paused";
 			break;
-	case(dinosaur::TORRENT_FAILURE):
+	case(dinosaur::TORRENT_WORK_FAILURE):
 			work = "Failure";
 			break;
 	}
+
+
 
 	char seeds[256];
 	memset(seeds, 0, 256);
@@ -490,8 +545,37 @@ gboolean foreach_tracker_list (GtkTreeModel *model,
 	{
 		if (announce == (*i).announce)
 		{
+			std::string status;
+			switch ((*i).status) {
+				case dinosaur::TRACKER_STATUS_OK:
+					status = "OK";
+					break;
+				case dinosaur::TRACKER_STATUS_CONNECTING:
+					status = "Connecting...";
+					break;
+				case dinosaur::TRACKER_STATUS_ERROR:
+					status = "Error";
+					break;
+				case dinosaur::TRACKER_STATUS_INVALID_ANNOUNCE:
+					status = "Invalid(unsupported) announce";
+					break;
+				case dinosaur::TRACKER_STATUS_SEE_FAILURE_MESSAGE:
+					status = (*i).failure_mes;
+					break;
+				case dinosaur::TRACKER_STATUS_TIMEOUT:
+					status = "Timeout";
+					break;
+				case dinosaur::TRACKER_STATUS_UNRESOLVED:
+					status = "Can not resolve domain name";
+					break;
+				case dinosaur::TRACKER_STATUS_UPDATING:
+					status = "Updating...";
+					break;
+				default:
+					break;
+			}
 			gtk_list_store_set (tracker_list, iter,
-					TRACKER_LIST_COL_STATUS, (*i).status.c_str(),
+					TRACKER_LIST_COL_STATUS, status.c_str(),
 					TRACKER_LIST_COL_UPDATE_IN, (gint)(*i).update_in,
 					TRACKER_LIST_COL_LEECHERS,(gint)(*i).leechers,
 					TRACKER_LIST_COL_SEEDERS,(gint)(*i).seeders,
@@ -545,6 +629,12 @@ gboolean on_timer(gpointer data)
 			char available[256];
 			sprintf(available, "%.3f", (*i).available);
 
+			char block2request[256];
+			sprintf(block2request, "%u", (*i).blocks2request);
+
+			char requested_blocks[256];
+			sprintf(requested_blocks, "%u", (*i).requested_blocks);
+
 			gtk_list_store_set (peer_list, &iter,
 					PEER_LIST_COL_IP, (*i).ip,
 					PEER_LIST_COL_DOWNLOADED, downloaded,
@@ -552,6 +642,8 @@ gboolean on_timer(gpointer data)
 					PEER_LIST_COL_DOWN_SPEED, downSpeed,
 					PEER_LIST_COL_UP_SPEED, upSpeed,
 					PEER_LIST_COL_AVAILABLE, available,
+					PEER_LIST_COL_BLOCK2REQUEST, block2request,
+					PEER_LIST_COL_REQUESTED_BLOCKS, requested_blocks,
 					-1);
 		}
 		bt->get_torrent_info_leechers(hash, peers);
@@ -584,11 +676,51 @@ gboolean on_timer(gpointer data)
 					PEER_LIST_COL_AVAILABLE, available,
 					-1);
 		}
+
+		dinosaur::info::downloadable_pieces dp;
+		bt->get_torrent_info_downloadable_pieces(hash, dp);
+		gtk_list_store_clear(dp_list);
+		for(dinosaur::info::downloadable_pieces::iterator i = dp.begin(); i != dp.end(); ++i)
+		{
+			GtkTreeIter iter;
+			gtk_list_store_append(dp_list, &iter);
+
+			char index[256];
+			sprintf(index, "%u", (*i).index);
+
+			char block2download[256];
+			sprintf(block2download, "%u", (*i).block2download);
+
+			char downloaded_blocks[256];
+			sprintf(downloaded_blocks, "%u", (*i).downloaded_blocks);
+
+			std::string prio;
+			switch((*i).priority)
+			{
+			case(dinosaur::DOWNLOAD_PRIORITY_LOW):
+					prio = "Low";
+					break;
+			case(dinosaur::DOWNLOAD_PRIORITY_NORMAL):
+					prio = "Normal";
+					break;
+			case(dinosaur::DOWNLOAD_PRIORITY_HIGH):
+					prio = "High";
+					break;
+			}
+
+			gtk_list_store_set (dp_list, &iter,
+								DP_LIST_COL_INDEX, index,
+								DP_LIST_COL_BLOCK2DOWNLOAD, block2download,
+								DP_LIST_COL_DOWNLOADED_BLOCKS, downloaded_blocks,
+								DP_LIST_COL_PRIO, prio.c_str(),
+								-1);
+		}
 	}
 	else
 	{
 		gtk_list_store_clear(tracker_list);
 		gtk_list_store_clear(peer_list);
+		gtk_list_store_clear(dp_list);
 	}
 	return TRUE;
 }
@@ -596,12 +728,14 @@ gboolean on_timer(gpointer data)
 void update_statusbar()
 {
 	//gtk_statusbar_remove_all(statusbar, 0);
-	if (bt->get_socket_status() == dinosaur::SOCKET_STATUS_OK)
+	dinosaur::socket_status s= bt->get_socket_status();
+	if (s.listen)
 		 gtk_statusbar_push(statusbar, 0, "Socket status: ok");
 	else
 	{
 		char chars[256];
-		sprintf(chars, "Socket status: %s", bt->get_error().c_str());
+		std::string error_mes = s.exception_errcode == dinosaur::Exception::NO_ERROR ? sys_errlist[s.errno_] : dinosaur::exception_errcode2str(s.exception_errcode);
+		sprintf(chars, "Socket status: %s", error_mes.c_str());
 		gtk_statusbar_push(statusbar, 0, chars);
 	}
 }
@@ -614,10 +748,9 @@ void init_gui()
 	{
 		dinosaur::Dinosaur::CreateDinosaur(bt);
 	}
-	catch(dinosaur::Exception e)
+	catch(dinosaur::Exception & e)
 	{
-		e.print();
-		return;
+		std::cout<<dinosaur::exception_errcode2str(e);
 	}
 	catch(...)
 	{
@@ -672,6 +805,13 @@ void init_gui()
 			/* что-то не так, наверное, ошиблись в имени */
 			g_critical ("Ошибка при получении виджета диалога");
 	}
+
+	dp_list = GTK_LIST_STORE (gtk_builder_get_object (builder, "dp_list"));
+	if (!dp_list)
+		{
+				/* что-то не так, наверное, ошиблись в имени */
+				g_critical ("Ошибка при получении виджета диалога");
+		}
 
 	label_hash = GTK_LABEL(gtk_builder_get_object (builder, "label_hash"));
 	if (!label_hash)

@@ -14,6 +14,7 @@
 #include "../dinosaur.h"
 #include "../torrent/torrent.h"
 #include "../torrent/torrent_types.h"
+#include "../exceptions/exceptions.h"
 
 
 //extern "C" void on_window1_destroy (GtkObject *object, gpointer user_data);
@@ -24,6 +25,7 @@ void show_cfg_dialog();
 bool cfg_opened();
 void update_statusbar();
 void messagebox(const char * message);
+void messagebox(const std::string & message);
 extern "C" void on_window1_show (GtkWidget *object, gpointer user_data);
 
 extern dinosaur::DinosaurPtr bt;

@@ -2,6 +2,18 @@
 <interface>
   <!-- interface-requires gtk+ 3.0 -->
   <!-- interface-naming-policy toplevel-contextual -->
+  <object class="GtkListStore" id="dp_list">
+    <columns>
+      <!-- column-name index -->
+      <column type="gchararray"/>
+      <!-- column-name blocks2download -->
+      <column type="gchararray"/>
+      <!-- column-name downloaded_blocks -->
+      <column type="gchararray"/>
+      <!-- column-name prio -->
+      <column type="gchararray"/>
+    </columns>
+  </object>
   <object class="GtkListStore" id="peer_list">
     <columns>
       <!-- column-name ip -->
@@ -15,6 +27,10 @@
       <!-- column-name up_speed -->
       <column type="gchararray"/>
       <!-- column-name available -->
+      <column type="gchararray"/>
+      <!-- column-name blocks2request -->
+      <column type="gchararray"/>
+      <!-- column-name requested_blocks -->
       <column type="gchararray"/>
     </columns>
   </object>
@@ -307,6 +323,7 @@
               <object class="GtkNotebook" id="notebook1">
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
+                <property name="scrollable">True</property>
                 <child>
                   <object class="GtkScrolledWindow" id="scrolledwindow2">
                     <property name="visible">True</property>
@@ -467,6 +484,28 @@
                                   <object class="GtkCellRendererText" id="cellrenderertext17"/>
                                   <attributes>
                                     <attribute name="text">5</attribute>
+                                  </attributes>
+                                </child>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkTreeViewColumn" id="treeviewcolumn21">
+                                <property name="title" translatable="yes">Blocks to request</property>
+                                <child>
+                                  <object class="GtkCellRendererText" id="cellrenderertext20"/>
+                                  <attributes>
+                                    <attribute name="text">6</attribute>
+                                  </attributes>
+                                </child>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkTreeViewColumn" id="treeviewcolumn22">
+                                <property name="title" translatable="yes">Requested block2</property>
+                                <child>
+                                  <object class="GtkCellRendererText" id="cellrenderertext21"/>
+                                  <attributes>
+                                    <attribute name="text">7</attribute>
                                   </attributes>
                                 </child>
                               </object>
@@ -676,10 +715,69 @@
                   </packing>
                 </child>
                 <child>
-                  <placeholder/>
+                  <object class="GtkTreeView" id="dp_view">
+                    <property name="visible">True</property>
+                    <property name="can_focus">True</property>
+                    <property name="model">dp_list</property>
+                    <child>
+                      <object class="GtkTreeViewColumn" id="treeviewcolumn23">
+                        <property name="title" translatable="yes">Index</property>
+                        <child>
+                          <object class="GtkCellRendererText" id="cellrenderertext22"/>
+                          <attributes>
+                            <attribute name="text">0</attribute>
+                          </attributes>
+                        </child>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkTreeViewColumn" id="treeviewcolumn24">
+                        <property name="title" translatable="yes">Blocks to download</property>
+                        <child>
+                          <object class="GtkCellRendererText" id="cellrenderertext23"/>
+                          <attributes>
+                            <attribute name="text">1</attribute>
+                          </attributes>
+                        </child>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkTreeViewColumn" id="treeviewcolumn25">
+                        <property name="title" translatable="yes">Downloaded blocks</property>
+                        <child>
+                          <object class="GtkCellRendererText" id="cellrenderertext24"/>
+                          <attributes>
+                            <attribute name="text">2</attribute>
+                          </attributes>
+                        </child>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkTreeViewColumn" id="treeviewcolumn26">
+                        <property name="title" translatable="yes">Priority</property>
+                        <child>
+                          <object class="GtkCellRendererText" id="cellrenderertext25"/>
+                          <attributes>
+                            <attribute name="text">3</attribute>
+                          </attributes>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                  <packing>
+                    <property name="position">3</property>
+                  </packing>
                 </child>
                 <child type="tab">
-                  <placeholder/>
+                  <object class="GtkLabel" id="labelx">
+                    <property name="visible">True</property>
+                    <property name="can_focus">False</property>
+                    <property name="label" translatable="yes">Pieces</property>
+                  </object>
+                  <packing>
+                    <property name="position">3</property>
+                    <property name="tab_fill">False</property>
+                  </packing>
                 </child>
               </object>
               <packing>

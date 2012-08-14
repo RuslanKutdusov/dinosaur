@@ -23,38 +23,7 @@
 #define PEER_SLEEP_TIME 60
 #define PEER_MAX_REQUEST_NUMBER 64
 #define IP_CHAR_LENGHT 16 //xxx.xxx.xxx.xxx\0
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////STRING CONSTS////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////////
-#define TRACKER_STATUS_OK "OK"
-#define TRACKER_STATUS_UPDATING "Updating..."
-#define TRACKER_STATUS_ERROR "Error"
-#define TRACKER_STATUS_TIMEOUT "Timeout"
-#define TRACKER_STATUS_UNRESOLVED "Can not resolve domain name"
-#define TRACKER_STATUS_CONNECTING "Connecting..."
-
-#define TORRENT_ERROR_IO_ERROR "IO Error"
-#define TORRENT_ERROR_INVALID_METAFILE "Invalid torrent file"
-#define TORRENT_ERROR_NO_ERROR "No error"
-#define TORRENT_ERROR_EXISTS "Torrent is already exists"
-#define TORRENT_ERROR_NOT_EXISTS "Torrent is not exists"
-#define TORRENT_ERROR_CAN_NOT_START "Can not start torrent"
-#define TORRENT_ERROR_NO_STATE_FILE "Can not find state file"
-
-#define FS_ERROR_CAN_NOT_CREATE_CACHE "Can not create cache"
-#define FS_ERROR_CAN_NOT_CREATE_FILE "Can not create file"
-#define FS_ERROR_CACHE_ERROR "Cache error"
-#define FS_ERROR_CACHE_FULL "Cache full"
-#define FS_ERROR_FILE_NOT_EXISTS "File does not exists"
-#define FS_ERROR_CAN_NOT_CREATE_DIR "Can not create directory"
-
-#define GENERAL_ERROR_NO_MEMORY_AVAILABLE "No memory available"
-#define GENERAL_ERROR_UNDEF_ERROR "Something wrong"
-#define GENERAL_ERROR_CAN_NOT_CREATE_THREAD "Can not create thread"
-#define GENERAL_ERROR_NO_ERROR "No error"
-#define GENERAL_ERROR_SYSCALL "Syscall error: "
-
-#define CFG_CAN_NOT_SAVE_CFG "Can not save configs"
+#define EXCEPTIONS_DESCRIPTIONS_FILE "exceptions.xml"
 
 
 #endif /* CONSTS_H_ */

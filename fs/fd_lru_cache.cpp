@@ -11,16 +11,14 @@ namespace dinosaur {
 namespace fs
 {
 
-/*FD_LRU_Cache::FD_LRU_Cache()
-	: lru_cache::LRU_Cache<int, int>()
-{
-	Init(512);
-}*/
+/*
+ * Exception::ERR_CODE_UNDEF;
+ */
 
-int FD_LRU_Cache::put(File & file, int file_desc, File & deleted_file)
+int FD_LRU_Cache::put(File & file, int file_desc, File & deleted_file)  throw(Exception)
 {
 	if (file_desc < 0)
-		return ERR_BAD_ARG;
+		throw Exception(Exception::ERR_CODE_UNDEF);
 	try
 	{
 		if (m_free_elements.empty())
@@ -70,7 +68,7 @@ int FD_LRU_Cache::put(File & file, int file_desc, File & deleted_file)
 	}
 	catch(...)
 	{
-		return ERR_INTERNAL;
+		throw Exception(Exception::ERR_CODE_UNDEF);
 	}
 	return ERR_NO_ERROR;
 }
