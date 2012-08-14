@@ -150,6 +150,7 @@ private:
 		PEER_STATE_SLEEP
 	};
 private:
+	bool leech;
 	network::NetworkManager * 			m_nm;
 	cfg::Glob_cfg * 					m_g_cfg;
 	TorrentInterfaceInternalPtr			m_torrent;
@@ -387,6 +388,9 @@ protected:
 	TORRENT_WORK					m_work;
 
 	torrent_failure					m_failure_desc;
+
+	time_t							m_start_time;
+	time_t							m_remain_time;
 
 	virtual void add_seeders(uint32_t count, sockaddr_in * addrs);
 	virtual void add_seeder(sockaddr_in * addr) ;

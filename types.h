@@ -92,6 +92,7 @@ namespace info
 		uint64_t 			piece_length;
 		uint32_t 			piece_count;
 		SHA1_HASH_HEX 		info_hash_hex;
+		time_t				start_time;
 	};
 
 	struct torrent_dyn
@@ -105,6 +106,8 @@ namespace info
 		uint32_t			leechers;
 		int 				progress;
 		TORRENT_WORK		work;
+		time_t				remain_time;
+		float				ratio;
 	};
 
 	struct tracker
