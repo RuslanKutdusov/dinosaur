@@ -109,9 +109,9 @@ int TorrentFile::save_block(PIECE_INDEX piece, BLOCK_OFFSET block_offset, uint32
 	while(pos < block_length)
 	{
 		//определяем сколько возможно записать в файл
-		uint32_t remain = m_files[file_index].length - offset;
+		uint64_t remain = m_files[file_index].length - offset;
 		//если данных для записи больше,чем это возможно, пишем в файл сколько можем(remain), иначе пишем все что есть
-		uint32_t to_write = block_length - pos > remain ? remain : block_length - pos;
+		uint64_t to_write = block_length - pos > remain ? remain : block_length - pos;
 		try
 		{
 			m_fm->File_write(m_files[file_index++].file_, &block[pos], to_write, offset, block_id);
@@ -180,9 +180,9 @@ int TorrentFile::read_block(PIECE_INDEX piece, BLOCK_INDEX block_index, char * b
 	while(pos < block_length)
 	{
 		//определяем сколько возможно прочитать из файла
-		uint32_t remain = m_files[file_index].length - offset;
+		uint64_t remain = m_files[file_index].length - offset;
 		//если прочитать надо больше, чем это возможно, читаем сколько можем(remain), иначе читаем все
-		uint32_t to_read = block_length - pos > remain ? remain : block_length - pos;
+		uint64_t to_read = block_length - pos > remain ? remain : block_length - pos;
 		try
 		{
 			m_fm->File_read_immediately(m_files[file_index++].file_, &block[pos], offset, to_read);
@@ -249,9 +249,9 @@ int TorrentFile::read_piece(PIECE_INDEX piece_index, unsigned char * dst)
 	while(pos < piece_length)
 	{
 		//определяем сколько возможно прочитать из файла
-		uint32_t remain = m_files[file_index].length - offset;
+		uint64_t remain = m_files[file_index].length - offset;
 		//если прочитать надо больше, чем это возможно, читаем сколько можем(remain), иначе читаем все
-		uint32_t to_read = piece_length - pos > remain ? remain : piece_length - pos;
+		uint64_t to_read = piece_length - pos > remain ? remain : piece_length - pos;
 		try
 		{
 			m_fm->File_read_immediately(m_files[file_index++].file_, (char*)&dst[pos], offset, to_read);
