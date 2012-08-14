@@ -281,7 +281,8 @@ public:
 	int get_piece_priority(PIECE_INDEX piece_index, DOWNLOAD_PRIORITY & priority);
 	int set_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY prio);
 	int get_block2download(PIECE_INDEX piece_index, BLOCK_INDEX & block_index);
-	int get_block2download_count(PIECE_INDEX piece_index);
+	size_t get_block2download_count(PIECE_INDEX piece_index);
+	size_t get_donwloaded_blocks_count(PIECE_INDEX piece_index);
 	int push_block2download(PIECE_INDEX piece_index, BLOCK_INDEX block_index);
 	int event_file_write(const fs::write_event & we, PIECE_STATE & piece_state);
 
@@ -406,6 +407,7 @@ protected:
 	virtual void get_info_file_dyn(FILE_INDEX index, info::file_dyn & ref);
 	virtual void get_info_seeders(info::peers & ref);
 	virtual void get_info_leechers(info::peers & ref);
+	virtual void get_info_downloadable_pieces(info::downloadable_pieces & ref);
 	virtual int erase_state();
 	virtual void prepare2release();
 	virtual void forced_releasing();
@@ -486,6 +488,7 @@ public:
 	virtual void get_info_file_dyn(FILE_INDEX index, info::file_dyn &ref) = 0;
 	virtual void get_info_seeders(info::peers & ref) = 0;
 	virtual void get_info_leechers(info::peers & ref) = 0;
+	virtual void get_info_downloadable_pieces(info::downloadable_pieces & ref) = 0;
 	virtual int erase_state() = 0;
 	virtual void prepare2release() = 0;
 	virtual void forced_releasing() = 0;

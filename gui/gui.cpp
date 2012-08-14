@@ -14,6 +14,7 @@ GtkTreeView* torrent_view;
 GtkListStore* torrent_list;
 GtkListStore* tracker_list;
 GtkListStore* peer_list;
+GtkListStore* dp_list;
 GtkLabel* label_hash;
 GtkLabel* label_length;
 GtkLabel* label_dir;
@@ -56,7 +57,18 @@ enum
 	PEER_LIST_COL_DOWN_SPEED,
 	PEER_LIST_COL_UP_SPEED,
 	PEER_LIST_COL_AVAILABLE,
+	PEER_LIST_COL_BLOCK2REQUEST,
+	PEER_LIST_COL_REQUESTED_BLOCKS,
 	PEER_LIST_COLS
+};
+
+enum
+{
+	DP_LIST_COL_INDEX,
+	DP_LIST_COL_BLOCK2DOWNLOAD,
+	DP_LIST_COL_DOWNLOADED_BLOCKS,
+	DP_LIST_COL_PRIO,
+	DP_LIST_COLS
 };
 
 void int_bytes2str(uint64_t i, char * str, bool speed = false)
@@ -533,8 +545,37 @@ gboolean foreach_tracker_list (GtkTreeModel *model,
 	{
 		if (announce == (*i).announce)
 		{
+			std::string status;
+			switch ((*i).status) {
+				case dinosaur::TRACKER_STATUS_OK:
+					status = "OK";
+					break;
+				case dinosaur::TRACKER_STATUS_CONNECTING:
+					status = "Connecting...";
+					break;
+				case dinosaur::TRACKER_STATUS_ERROR:
+					status = "Error";
+					break;
+				case dinosaur::TRACKER_STATUS_INVALID_ANNOUNCE:
+					status = "Invalid(unsupported) announce";
+					break;
+				case dinosaur::TRACKER_STATUS_SEE_FAILURE_MESSAGE:
+					status = (*i).failure_mes;
+					break;
+				case dinosaur::TRACKER_STATUS_TIMEOUT:
+					status = "Timeout";
+					break;
+				case dinosaur::TRACKER_STATUS_UNRESOLVED:
+					status = "Can not resolve domain name";
+					break;
+				case dinosaur::TRACKER_STATUS_UPDATING:
+					status = "Updating...";
+					break;
+				default:
+					break;
+			}
 			gtk_list_store_set (tracker_list, iter,
-					//TRACKER_LIST_COL_STATUS, (*i).status.c_str(),
+					TRACKER_LIST_COL_STATUS, status.c_str(),
 					TRACKER_LIST_COL_UPDATE_IN, (gint)(*i).update_in,
 					TRACKER_LIST_COL_LEECHERS,(gint)(*i).leechers,
 					TRACKER_LIST_COL_SEEDERS,(gint)(*i).seeders,
@@ -588,6 +629,12 @@ gboolean on_timer(gpointer data)
 			char available[256];
 			sprintf(available, "%.3f", (*i).available);
 
+			char block2request[256];
+			sprintf(block2request, "%u", (*i).blocks2request);
+
+			char requested_blocks[256];
+			sprintf(requested_blocks, "%u", (*i).requested_blocks);
+
 			gtk_list_store_set (peer_list, &iter,
 					PEER_LIST_COL_IP, (*i).ip,
 					PEER_LIST_COL_DOWNLOADED, downloaded,
@@ -595,6 +642,8 @@ gboolean on_timer(gpointer data)
 					PEER_LIST_COL_DOWN_SPEED, downSpeed,
 					PEER_LIST_COL_UP_SPEED, upSpeed,
 					PEER_LIST_COL_AVAILABLE, available,
+					PEER_LIST_COL_BLOCK2REQUEST, block2request,
+					PEER_LIST_COL_REQUESTED_BLOCKS, requested_blocks,
 					-1);
 		}
 		bt->get_torrent_info_leechers(hash, peers);
@@ -627,11 +676,51 @@ gboolean on_timer(gpointer data)
 					PEER_LIST_COL_AVAILABLE, available,
 					-1);
 		}
+
+		dinosaur::info::downloadable_pieces dp;
+		bt->get_torrent_info_downloadable_pieces(hash, dp);
+		gtk_list_store_clear(dp_list);
+		for(dinosaur::info::downloadable_pieces::iterator i = dp.begin(); i != dp.end(); ++i)
+		{
+			GtkTreeIter iter;
+			gtk_list_store_append(dp_list, &iter);
+
+			char index[256];
+			sprintf(index, "%u", (*i).index);
+
+			char block2download[256];
+			sprintf(block2download, "%u", (*i).block2download);
+
+			char downloaded_blocks[256];
+			sprintf(downloaded_blocks, "%u", (*i).downloaded_blocks);
+
+			std::string prio;
+			switch((*i).priority)
+			{
+			case(dinosaur::DOWNLOAD_PRIORITY_LOW):
+					prio = "Low";
+					break;
+			case(dinosaur::DOWNLOAD_PRIORITY_NORMAL):
+					prio = "Normal";
+					break;
+			case(dinosaur::DOWNLOAD_PRIORITY_HIGH):
+					prio = "High";
+					break;
+			}
+
+			gtk_list_store_set (dp_list, &iter,
+								DP_LIST_COL_INDEX, index,
+								DP_LIST_COL_BLOCK2DOWNLOAD, block2download,
+								DP_LIST_COL_DOWNLOADED_BLOCKS, downloaded_blocks,
+								DP_LIST_COL_PRIO, prio.c_str(),
+								-1);
+		}
 	}
 	else
 	{
 		gtk_list_store_clear(tracker_list);
 		gtk_list_store_clear(peer_list);
+		gtk_list_store_clear(dp_list);
 	}
 	return TRUE;
 }
@@ -716,6 +805,13 @@ void init_gui()
 			/* что-то не так, наверное, ошиблись в имени */
 			g_critical ("Ошибка при получении виджета диалога");
 	}
+
+	dp_list = GTK_LIST_STORE (gtk_builder_get_object (builder, "dp_list"));
+	if (!dp_list)
+		{
+				/* что-то не так, наверное, ошиблись в имени */
+				g_critical ("Ошибка при получении виджета диалога");
+		}
 
 	label_hash = GTK_LABEL(gtk_builder_get_object (builder, "label_hash"));
 	if (!label_hash)

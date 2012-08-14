@@ -582,6 +582,11 @@ int TorrentBase::clock()
 		}
 		std::list<uint32_t>::iterator iter = m_pieces2check.begin();
 		m_piece_manager->check_piece_hash(*iter);
+		BITFIELD bitfield = new unsigned char[m_piece_manager->get_bitfield_length()];
+		m_piece_manager->copy_bitfield(bitfield);
+		StateSerializator s(m_state_file_name);
+		s.serialize(m_uploaded, m_download_directory, bitfield,m_piece_manager->get_bitfield_length());
+		delete[] bitfield;
 		m_pieces2check.erase(iter);
 	}
 
@@ -714,6 +719,20 @@ void TorrentBase::get_info_leechers(info::peers & ref)
 		info::peer l;
 		(*iter).second->get_info(l);
 		ref.push_back(l);
+	}
+}
+
+void TorrentBase::get_info_downloadable_pieces(info::downloadable_pieces & ref)
+{
+	ref.clear();
+	for(std::list<uint32_t>::iterator iter = m_downloadable_pieces.begin(); iter != m_downloadable_pieces.end(); ++iter)
+	{
+		info::downloadable_piece dp;
+		dp.block2download = m_piece_manager->get_block2download_count(*iter);
+		dp.downloaded_blocks = m_piece_manager->get_donwloaded_blocks_count(*iter);
+		dp.index = *iter;
+		m_piece_manager->get_piece_priority(*iter, dp.priority);
+		ref.push_back(dp);
 	}
 }
 

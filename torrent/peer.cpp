@@ -557,6 +557,9 @@ int Peer::event_sock_ready2read(network::Socket sock)
 
 int Peer::event_sock_closed(network::Socket sock)
 {
+#ifdef PEER_DEBUG
+	printf("Peer %s close connection\n", m_ip.c_str());
+#endif
 	try
 	{
 		if (m_nm->Socket_datalen(sock) > 0)
@@ -594,6 +597,9 @@ int Peer::event_sock_accepted(network::Socket sock, network::Socket accepted_soc
 
 int Peer::event_sock_timeout(network::Socket sock)
 {
+#ifdef PEER_DEBUG
+	printf("Peer %s timeout\n", m_ip.c_str());
+#endif
 	try
 	{
 		if (m_nm->Socket_datalen(sock) > 0)
@@ -795,6 +801,9 @@ int Peer::get_info(info::peer & ref)
 	ref.downloaded = m_downloaded;
 	ref.uploaded = m_uploaded;
 	ref.available = m_available_pieces.size() / m_torrent->get_piece_count();
+	ref.blocks2request = m_blocks2request.size();
+	ref.requested_blocks = m_requested_blocks.size();
+	ref.may_request = may_request();
 	memset(ref.ip, 0, 22);
 	memcpy(ref.ip, m_ip.c_str(), 22);
 	return ERR_NO_ERROR;

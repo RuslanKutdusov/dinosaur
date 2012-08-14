@@ -315,7 +315,6 @@ void Dinosaur::DeleteTorrent(const std::string & hash)
 		throw Exception(Exception::ERR_CODE_TORRENT_NOT_EXISTS);
 	pthread_mutex_lock(&m_mutex);
 	torrent::TorrentInterfaceBasePtr torrent = m_torrents[hash];
-	m_torrents.erase(hash);
 	torrent->erase_state();
 	torrent->prepare2release();
 
@@ -447,6 +446,19 @@ void Dinosaur::get_torrent_info_leechers(const std::string & hash, info::peers &
 	pthread_mutex_unlock(&m_mutex);
 }
 
+/*
+ * Exception::ERR_CODE_TORRENT_NOT_EXISTS
+ */
+
+void Dinosaur::get_torrent_info_downloadable_pieces(const std::string & hash, info::downloadable_pieces & ref)
+{
+	if (m_torrents.count(hash) == 0)
+		throw Exception(Exception::ERR_CODE_TORRENT_NOT_EXISTS);
+	pthread_mutex_lock(&m_mutex);
+	m_torrents[hash]->get_info_downloadable_pieces(ref);
+	pthread_mutex_unlock(&m_mutex);
+}
+
 
 int Dinosaur::get_TorrentList(std::list<std::string> & ref)
 {
@@ -487,11 +499,13 @@ int Dinosaur::event_sock_ready2read(network::Socket sock)
 		m_nm.Socket_recv(sock, handshake, HANDSHAKE_LENGHT);
 		if (handshake[0] != '\x13')
 		{
+			printf("Not handshake\n");
 			m_nm.Socket_delete(sock);
 			return ERR_INTERNAL;
 		}
 		if (memcmp(&handshake[1], "BitTorrent protocol", 19) != 0)
 		{
+			printf("Not bt\n");
 			m_nm.Socket_delete(sock);
 			return ERR_INTERNAL;
 		}
@@ -503,6 +517,7 @@ int Dinosaur::event_sock_ready2read(network::Socket sock)
 		torrent_map_iter iter = m_torrents.find(str_infohash);
 		if (iter == m_torrents.end() && m_torrents.count(str_infohash) == 0)
 		{
+			printf("Not torrent\n");
 			m_nm.Socket_delete(sock);
 			return ERR_INTERNAL;
 		}
@@ -510,6 +525,7 @@ int Dinosaur::event_sock_ready2read(network::Socket sock)
 		return 0;
 	}
 	catch (Exception & e) {
+		printf("Rejected\n");
 		m_nm.Socket_delete(sock);
 		return ERR_INTERNAL;
 	}

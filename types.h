@@ -142,9 +142,20 @@ namespace info
 		double 		downSpeed;
 		double 		upSpeed;
 		double 		available;
+		uint32_t	blocks2request;
+		uint32_t	requested_blocks;
+		bool 		may_request;
 	};
-
 	typedef std::list<peer> peers;
+
+	struct downloadable_piece
+	{
+		PIECE_INDEX 		index;
+		uint32_t			block2download;
+		uint32_t			downloaded_blocks;
+		DOWNLOAD_PRIORITY 	priority;
+	};
+	typedef std::list<downloadable_piece> downloadable_pieces;
 }
 
 }

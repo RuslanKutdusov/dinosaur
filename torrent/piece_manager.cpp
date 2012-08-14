@@ -412,9 +412,14 @@ int PieceManager::get_block2download(PIECE_INDEX piece_index, BLOCK_INDEX & bloc
 	return ERR_NO_ERROR;
 }
 
-int PieceManager::get_block2download_count(PIECE_INDEX piece_index)
+size_t PieceManager::get_block2download_count(PIECE_INDEX piece_index)
 {
 	return m_piece_info[piece_index].block2download.size();
+}
+
+size_t PieceManager::get_donwloaded_blocks_count(PIECE_INDEX piece_index)
+{
+	return m_piece_info[piece_index].downloaded_blocks.size();
 }
 
 int PieceManager::push_block2download(PIECE_INDEX piece_index, BLOCK_INDEX block_index)
