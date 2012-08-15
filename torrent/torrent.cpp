@@ -683,7 +683,7 @@ void TorrentBase::get_info_dyn(info::torrent_dyn & ref)
 		ref.progress = (m_downloaded * 100) / m_metafile.length;
 	ref.work = m_work;
 	ref.remain_time = m_remain_time;
-	ref.ratio = m_downloaded == 0 ? 0.0f : m_uploaded / m_downloaded;
+	ref.ratio = m_downloaded == 0 ? 0.0f : (float)m_uploaded / (float)m_downloaded;
 }
 
 void TorrentBase::get_info_trackers(info::trackers & ref)

@@ -37,6 +37,7 @@ enum
 	TORRENT_LIST_COL_LEECHS,
 	TORRENT_LIST_COL_START_TIME,
 	TORRENT_LIST_COL_REMAIN_TIME,
+	TORRENT_LIST_COL_RATIO,
 	TORRENT_LIST_COL_HASH,
 	TORRENT_LIST_COLS
 };
@@ -360,6 +361,16 @@ extern "C" void on_window1_show (GtkWidget *object, gpointer user_data)
 			char leechs[256];
 			sprintf(leechs, "%u", dyn.leechers);
 
+			char start[256];
+			sprintf(start, "%d", (int)stat.start_time);
+
+			char remain[256];
+			sprintf(remain, "%d",  (int)dyn.remain_time);
+
+			char ratio[256];
+			sprintf(ratio, "%.3f", dyn.ratio);
+
+
 			gtk_list_store_set (torrent_list, &iter,
 								TORRENT_LIST_COL_NAME, stat.name.c_str(),
 								TORRENT_LIST_COL_PROGRESS, (gint)dyn.progress,
@@ -370,6 +381,9 @@ extern "C" void on_window1_show (GtkWidget *object, gpointer user_data)
 								TORRENT_LIST_COL_WORK, work.c_str(),
 								TORRENT_LIST_COL_SEEDS, seeds,
 								TORRENT_LIST_COL_LEECHS, leechs,
+								TORRENT_LIST_COL_START_TIME, start,
+								TORRENT_LIST_COL_REMAIN_TIME, remain,
+								TORRENT_LIST_COL_RATIO, ratio,
 								TORRENT_LIST_COL_HASH, hash.c_str(),
 							  -1);
 		}
@@ -501,6 +515,12 @@ gboolean foreach_torrent_list (GtkTreeModel *model,
 		char leechs[256];
 		sprintf(leechs, "%u", dyn.leechers);
 
+		char remain[256];
+		sprintf(remain, "%d",  (int)dyn.remain_time);
+
+		char ratio[256];
+		sprintf(ratio, "%.3f", dyn.ratio);
+
 		gtk_list_store_set (torrent_list, iter,
 							//TORRENT_LIST_COL_NAME, stat.name.c_str(),
 							TORRENT_LIST_COL_PROGRESS, (gint)dyn.progress,
@@ -511,6 +531,8 @@ gboolean foreach_torrent_list (GtkTreeModel *model,
 							TORRENT_LIST_COL_WORK, work.c_str(),
 							TORRENT_LIST_COL_SEEDS, seeds,
 							TORRENT_LIST_COL_LEECHS, leechs,
+							TORRENT_LIST_COL_REMAIN_TIME, remain,
+							TORRENT_LIST_COL_RATIO, ratio,
 						  -1);
 	}
 	catch (dinosaur::Exception & e) {

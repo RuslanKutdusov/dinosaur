@@ -149,7 +149,7 @@ void PieceManager::build_piece_info()
 			m_piece_info[piece_index].block_info.push_back(block_info);
 
 			#ifdef BITTORRENT_DEBUG
-				printf("PIECE %u Block %u file %u offset %llu\n", piece_index, block, m_piece_info[piece_index].block_info[block].first, m_piece_info[piece_index].block_info[block].second);
+				//printf("PIECE %u Block %u file %u offset %llu\n", piece_index, block, m_piece_info[piece_index].block_info[block].first, m_piece_info[piece_index].block_info[block].second);
 			#endif
 			offset += BLOCK_LENGTH;
 			if (need2download)
