@@ -62,20 +62,17 @@ Dir * Dir::add_child(const char * name)
 	return add_child(str_name);
 }
 
-int Dir::make(std::string current_dir)
+void Dir::make(std::string current_dir) throw (SyscallException)
 {
 	current_dir += m_name + "/";
 	//std::cout<<"making "<<current_dir<<std::endl;
 	if (mkdir(current_dir.c_str(), S_IRWXU) != 0 && errno != EEXIST)
-		return ERR_SYSCALL_ERROR;
+		throw SyscallException();
 	for(children_map_iter iter = m_children.begin(); iter != m_children.end(); ++iter)
 	{
 		Dir * dir = (*iter).second;
-		int ret = dir->make(current_dir);
-		if (ret != ERR_NO_ERROR)
-			return ret;
+		dir->make(current_dir);
 	}
-	return ERR_NO_ERROR;
 }
 
 Dir::~Dir()
@@ -121,49 +118,37 @@ DirTree::~DirTree() {
 		delete m_root;
 }
 
-int DirTree::reset()
+void DirTree::reset()
 {
 	if (m_root == NULL)
-		return ERR_INTERNAL;
+		return;
 	if (m_root != NULL)
 		m_iter = m_root;
-	return ERR_NO_ERROR;
 }
 
-int DirTree::put(const std::string & dir2put)
+void DirTree::put(const std::string & dir2put) throw (Exception)
 {
 	return put(dir2put.c_str());
 }
 
-int DirTree::put(const char * dir2put)
+void DirTree::put(const char * dir2put) throw (Exception)
 {
-	if (m_iter == NULL)
-		return ERR_INTERNAL;
-	if (dir2put == NULL)
-		return ERR_BAD_ARG;
+	if (m_iter == NULL || dir2put == NULL)
+		throw Exception(Exception::ERR_CODE_UNDEF);
 	Dir * dir;
-	try
-	{
-		dir = m_iter->add_child(dir2put);
-		if (dir == NULL)
-			return ERR_INTERNAL;
-		m_iter = dir;
-		return ERR_NO_ERROR;
-	}
-	catch(...)
-	{
-		return ERR_INTERNAL;
-	}
-	return ERR_NO_ERROR;
+	dir = m_iter->add_child(dir2put);
+	if (dir == NULL)
+		throw Exception(Exception::ERR_CODE_UNDEF);
+	m_iter = dir;
 }
 
-int DirTree::make_dir_tree(std::string  current_dir)
+void DirTree::make_dir_tree(std::string  current_dir) throw (Exception, SyscallException)
 {
 	if (m_root == NULL)
-		return ERR_UNDEF;
+		throw Exception(Exception::ERR_CODE_UNDEF);
 	if (current_dir.length() != 0 && current_dir[current_dir.length() - 1] != '/')
 		current_dir += "/";
-	return m_root->make(current_dir);
+	m_root->make(current_dir);
 }
 
 } /* namespace Bittorrent */

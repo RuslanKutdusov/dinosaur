@@ -15,17 +15,19 @@ TorrentFile::TorrentFile(const TorrentInterfaceInternalPtr & t)
 #ifdef BITTORRENT_DEBUG
 	printf("TorrentFile default constructor\n");
 #endif
-	if (t == NULL)
-		throw Exception(GENERAL_ERROR_UNDEF_ERROR);
-
 	m_torrent = t;
 	m_fm = t->get_fm();
 }
 
+/*
+ * Exception::ERR_CODE_UNDEF
+ * SyscallException
+ */
+
 void TorrentFile::init(const std::string & path, bool files_should_exists, uint32_t & files_exists)
 {
 	if (path == "" || path[0] != '/')
-		throw Exception(GENERAL_ERROR_UNDEF_ERROR);
+		throw Exception(Exception::ERR_CODE_UNDEF);
 
 	std::string i_path(path);
 	if (i_path[i_path.length() - 1] != '/')
@@ -35,15 +37,7 @@ void TorrentFile::init(const std::string & path, bool files_should_exists, uint3
 
 	if (files_count > 1)
 	{
-		int ret = m_torrent->get_dirtree().make_dir_tree(i_path);
-		if (ret == ERR_UNDEF)
-			throw Exception(GENERAL_ERROR_UNDEF_ERROR);
-		if (ret == ERR_SYSCALL_ERROR)
-		{
-			std::string err = GENERAL_ERROR_SYSCALL;
-			err += sys_errlist[errno];
-			throw Exception(err);
-		}
+		m_torrent->get_dirtree().make_dir_tree(i_path);
 		i_path.append(m_torrent->get_name() + "/");
 	}
 	files_exists = 0;
@@ -55,13 +49,29 @@ void TorrentFile::init(const std::string & path, bool files_should_exists, uint3
 		f.name = i_path + fi->name;
 		f.download = true;
 		f.priority = DOWNLOAD_PRIORITY_NORMAL;
-		if (m_fm->File_exists(f.name, f.length))
-			files_exists++;
-		if (m_fm->File_add(f.name, f.length, false, shared_from_this(), f.file_) != ERR_NO_ERROR)
+		try
+		{
+			if (m_fm->File_exists(f.name, f.length))
+				files_exists++;
+			m_fm->File_add(f.name, f.length, false, shared_from_this(), f.file_);
+		}
+		catch(Exception & e)
 		{
 			ReleaseFiles();
 			files_exists = 0;
-			throw Exception(m_fm->get_error());
+			throw Exception(Exception::ERR_CODE_UNDEF);
+		}
+		catch (SyscallException & e)
+		{
+			ReleaseFiles();
+			files_exists = 0;
+			throw SyscallException(e);
+		}
+		catch(...)
+		{
+			ReleaseFiles();
+			files_exists = 0;
+			throw Exception(Exception::ERR_CODE_UNDEF);
 		}
 		m_files.push_back(f);
 	}
@@ -99,18 +109,38 @@ int TorrentFile::save_block(PIECE_INDEX piece, BLOCK_OFFSET block_offset, uint32
 	while(pos < block_length)
 	{
 		//определяем сколько возможно записать в файл
-		uint32_t remain = m_files[file_index].length - offset;
+		uint64_t remain = m_files[file_index].length - offset;
 		//если данных для записи больше,чем это возможно, пишем в файл сколько можем(remain), иначе пишем все что есть
-		uint32_t to_write = block_length - pos > remain ? remain : block_length - pos;
-		int ret = m_fm->File_write(m_files[file_index++].file_, &block[pos], to_write, offset, block_id);
-		if (ret == ERR_UNDEF || ret == ERR_FILE_NOT_EXISTS || ret == ERR_SYSCALL_ERROR)
+		uint64_t to_write = block_length - pos > remain ? remain : block_length - pos;
+		try
 		{
-			m_torrent->set_error(m_fm->get_error());
-			m_torrent->set_failure();
+			m_fm->File_write(m_files[file_index++].file_, &block[pos], to_write, offset, block_id);
+		}
+		catch (Exception & e)
+		{
+			if (e.get_errcode() == Exception::ERR_CODE_NULL_REF || e.get_errcode() == Exception::ERR_CODE_FILE_NOT_EXISTS ||
+					e.get_errcode() == Exception::ERR_CODE_UNDEF || e.get_errcode() ==  Exception::ERR_CODE_FILE_WRITE_OFFSET_OVERFLOW ||
+					e.get_errcode() == Exception::ERR_CODE_BLOCK_TOO_BIG)
+			{
+				torrent_failure tf;
+				tf.exception_errcode = e.get_errcode();
+				tf.errno_ = 0;
+				tf.description = m_files[file_index - 1].name;
+				tf.where = TORRENT_FAILURE_WRITE_FILE;
+				m_torrent->set_failure(tf);
+			}
 			return ERR_INTERNAL;
 		}
-		if (ret == ERR_FULL_CACHE)
+		catch (SyscallException & e)
+		{
+			torrent_failure tf;
+			tf.exception_errcode = Exception::NO_ERROR;
+			tf.errno_ = e.get_errno();
+			tf.description = m_files[file_index - 1].name;
+			tf.where = TORRENT_FAILURE_WRITE_FILE;
+			m_torrent->set_failure(tf);
 			return ERR_INTERNAL;
+		}
 		pos += to_write;
 		offset = 0;
 	}
@@ -124,8 +154,23 @@ int TorrentFile::read_block(PIECE_INDEX piece, BLOCK_INDEX block_index, char * b
 	BLOCK_ID block_id;
 	generate_block_id(piece, block_index, block_id);
 	block_cache::cache_key key(m_torrent.get(), block_id);
-	if (m_torrent->get_bc()->get(key, (block_cache::cache_element *)block) == ERR_NO_ERROR)
+	try
+	{
+		m_torrent->get_bc()->get(key, (block_cache::cache_element *)block);
 		return ERR_NO_ERROR;
+	}
+	catch (Exception & e) {
+		if (e.get_errcode() != Exception::ERR_CODE_LRU_CACHE_NE)
+		{
+			torrent_failure tf;
+			tf.exception_errcode = e.get_errcode();
+			tf.errno_ = 0;
+			tf.description = "";
+			tf.where = TORRENT_FAILURE_GET_BLOCK_CACHE;
+			m_torrent->set_failure(tf);
+			return ERR_INTERNAL;
+		}
+	}
 
 	FILE_INDEX file_index;
 	FILE_OFFSET offset;
@@ -135,21 +180,55 @@ int TorrentFile::read_block(PIECE_INDEX piece, BLOCK_INDEX block_index, char * b
 	while(pos < block_length)
 	{
 		//определяем сколько возможно прочитать из файла
-		uint32_t remain = m_files[file_index].length - offset;
+		uint64_t remain = m_files[file_index].length - offset;
 		//если прочитать надо больше, чем это возможно, читаем сколько можем(remain), иначе читаем все
-		uint32_t to_read = block_length - pos > remain ? remain : block_length - pos;
-		int ret = m_fm->File_read_immediately(m_files[file_index++].file_, &block[pos], offset, to_read);
-		if (ret == ERR_UNDEF || ret == ERR_FILE_NOT_EXISTS || ret == ERR_SYSCALL_ERROR)
+		uint64_t to_read = block_length - pos > remain ? remain : block_length - pos;
+		try
 		{
-			m_torrent->set_error(m_fm->get_error());
-			m_torrent->set_failure();
+			m_fm->File_read_immediately(m_files[file_index++].file_, &block[pos], offset, to_read);
+		}
+		catch (Exception & e)
+		{
+			if (e.get_errcode() == Exception::ERR_CODE_NULL_REF || e.get_errcode() == Exception::ERR_CODE_FILE_NOT_EXISTS ||
+					e.get_errcode() == Exception::ERR_CODE_UNDEF || e.get_errcode() ==  Exception::ERR_CODE_FILE_WRITE_OFFSET_OVERFLOW ||
+					e.get_errcode() == Exception::ERR_CODE_FILE_NOT_OPENED)
+			{
+				torrent_failure tf;
+				tf.exception_errcode = e.get_errcode();
+				tf.errno_ = 0;
+				tf.description = m_files[file_index - 1].name;
+				tf.where = TORRENT_FAILURE_WRITE_FILE;
+				m_torrent->set_failure(tf);
+			}
+			return ERR_INTERNAL;
+		}
+		catch (SyscallException & e)
+		{
+			torrent_failure tf;
+			tf.exception_errcode = Exception::NO_ERROR;
+			tf.errno_ = e.get_errno();
+			tf.description = m_files[file_index - 1].name;
+			tf.where = TORRENT_FAILURE_WRITE_FILE;
+			m_torrent->set_failure(tf);
 			return ERR_INTERNAL;
 		}
 		pos += to_read;
 		offset = 0;
 	}
-	//printf("Put in cache\n");
-	m_torrent->get_bc()->put(key, (block_cache::cache_element*)block);
+	try
+	{
+		m_torrent->get_bc()->put(key, (block_cache::cache_element*)block);
+	}
+	catch(Exception & e)
+	{
+		torrent_failure tf;
+		tf.exception_errcode = e.get_errcode();
+		tf.errno_ = 0;
+		tf.description = "";
+		tf.where = TORRENT_FAILURE_PUT_BLOCK_CACHE;
+		m_torrent->set_failure(tf);
+		return ERR_INTERNAL;
+	}
 	return ERR_NO_ERROR;
 
 }
@@ -170,14 +249,36 @@ int TorrentFile::read_piece(PIECE_INDEX piece_index, unsigned char * dst)
 	while(pos < piece_length)
 	{
 		//определяем сколько возможно прочитать из файла
-		uint32_t remain = m_files[file_index].length - offset;
+		uint64_t remain = m_files[file_index].length - offset;
 		//если прочитать надо больше, чем это возможно, читаем сколько можем(remain), иначе читаем все
-		uint32_t to_read = piece_length - pos > remain ? remain : piece_length - pos;
-		int ret = m_fm->File_read_immediately(m_files[file_index++].file_, (char*)&dst[pos], offset, to_read);
-		if (ret == ERR_UNDEF || ret == ERR_FILE_NOT_EXISTS || ret == ERR_SYSCALL_ERROR)
+		uint64_t to_read = piece_length - pos > remain ? remain : piece_length - pos;
+		try
 		{
-			m_torrent->set_error(m_fm->get_error());
-			m_torrent->set_failure();
+			m_fm->File_read_immediately(m_files[file_index++].file_, (char*)&dst[pos], offset, to_read);
+		}
+		catch (Exception & e)
+		{
+			if (e.get_errcode() == Exception::ERR_CODE_NULL_REF || e.get_errcode() == Exception::ERR_CODE_FILE_NOT_EXISTS ||
+					e.get_errcode() == Exception::ERR_CODE_UNDEF || e.get_errcode() ==  Exception::ERR_CODE_FILE_WRITE_OFFSET_OVERFLOW ||
+					e.get_errcode() == Exception::ERR_CODE_FILE_NOT_OPENED)
+			{
+				torrent_failure tf;
+				tf.exception_errcode = e.get_errcode();
+				tf.errno_ = 0;
+				tf.description = m_files[file_index - 1].name;
+				tf.where = TORRENT_FAILURE_WRITE_FILE;
+				m_torrent->set_failure(tf);
+			}
+			return ERR_INTERNAL;
+		}
+		catch (SyscallException & e)
+		{
+			torrent_failure tf;
+			tf.exception_errcode = Exception::NO_ERROR;
+			tf.errno_ = e.get_errno();
+			tf.description = m_files[file_index - 1].name;
+			tf.where = TORRENT_FAILURE_WRITE_FILE;
+			m_torrent->set_failure(tf);
 			return ERR_INTERNAL;
 		}
 		pos += to_read;

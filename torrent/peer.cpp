@@ -32,8 +32,6 @@ Peer::Peer()
 
 int Peer::Init(sockaddr_in * addr, const TorrentInterfaceInternalPtr & torrent)
 {
-	if (addr == NULL || torrent == NULL)
-		return ERR_BAD_ARG;
 	memset(&m_buf, 0, sizeof(network::buffer));
 	m_torrent = torrent;
 	m_nm = torrent->get_nm();
@@ -48,18 +46,19 @@ int Peer::Init(sockaddr_in * addr, const TorrentInterfaceInternalPtr & torrent)
 	m_downloaded = 0;
 	m_uploaded = 0;
 	m_sock.reset();
-	if (m_nm == NULL || m_g_cfg == NULL)
-		return ERR_BAD_ARG;
 	memcpy(&m_addr, addr, sizeof(sockaddr_in));
 	m_state = PEER_STATE_SEND_HANDSHAKE;
 	get_peer_key(addr, m_ip);//inet_ntoa(m_sock->m_peer.sin_addr);
 	return ERR_NO_ERROR;
 }
 
+/*
+ * Exception::ERR_CODE_NULL_REF
+ */
+
 int Peer::Init(network::Socket & sock, const TorrentInterfaceInternalPtr & torrent, PEER_ADD peer_add)
 {
-	if (sock == NULL || torrent == NULL)
-		return ERR_BAD_ARG;
+	m_nm->Socket_set_assoc(sock, shared_from_this());
 	memset(&m_buf, 0, sizeof(network::buffer));
 	m_torrent = torrent;
 	m_nm = torrent->get_nm();
@@ -73,11 +72,9 @@ int Peer::Init(network::Socket & sock, const TorrentInterfaceInternalPtr & torre
 	m_am_interested = false;//
 	m_downloaded = 0;
 	m_uploaded = 0;
-	if (m_nm == NULL || m_g_cfg == NULL)
-		return ERR_BAD_ARG;
 	m_sock = sock;
-	m_nm->Socket_set_assoc(m_sock, shared_from_this());
 	memcpy(&m_addr, &m_sock->m_peer, sizeof(sockaddr_in));
+	get_peer_key(&m_sock->m_peer, m_ip);//inet_ntoa(m_sock->m_peer.sin_addr);
 	switch(peer_add)
 	{
 	case PEER_ADD_TRACKER:
@@ -91,15 +88,11 @@ int Peer::Init(network::Socket & sock, const TorrentInterfaceInternalPtr & torre
 		m_state = PEER_STATE_GENERAL_READY;
 		break;
 	}
-	get_peer_key(&m_sock->m_peer, m_ip);//inet_ntoa(m_sock->m_peer.sin_addr);
 	return ERR_NO_ERROR;
 }
 
 int Peer::send_handshake()
 {
-	if (m_state != PEER_STATE_SEND_HANDSHAKE)
-		return ERR_INTERNAL;
-
 #ifdef PEER_DEBUG
 	printf("Peer %s sending handshake\n", m_ip.c_str());
 #endif
@@ -108,20 +101,23 @@ int Peer::send_handshake()
 	memset(handshake, 0, HANDSHAKE_LENGHT);
 	handshake[0] = '\x13';
 	strncpy((char*)&handshake[1], "BitTorrent protocol", 19);
-	//memcpy(&handshake[28], m_torrent->m_info_hash_bin, 20);
 	m_torrent->copy_infohash_bin(&handshake[28]);
 	m_g_cfg->get_peer_id((char*)&handshake[48]);
-	if (m_nm->Socket_send(m_sock, handshake, HANDSHAKE_LENGHT) == HANDSHAKE_LENGHT)
-		return ERR_NO_ERROR;
-	else
+	try
+	{
+		if (m_nm->Socket_send(m_sock, handshake, HANDSHAKE_LENGHT) == HANDSHAKE_LENGHT)
+			return ERR_NO_ERROR;
+		else
+			return ERR_INTERNAL;
+	}
+	catch (Exception  & e)
+	{
 		return ERR_INTERNAL;
+	}
 }
 
 int Peer::send_bitfield()
 {
-	if (m_state == PEER_STATE_WAIT_HANDSHAKE)
-		return ERR_INTERNAL;
-
 #ifdef PEER_DEBUG
 	printf("Peer %s sending bitfield\n", m_ip.c_str());
 #endif
@@ -133,7 +129,15 @@ int Peer::send_bitfield()
 	bitfield[4] = '\x05';
 	//memcpy(&bitfield[5], m_torrent->m_bitfield, len);
 	m_torrent->copy_bitfield(&bitfield[5]);
-	int ret =  m_nm->Socket_send(m_sock, bitfield, 5 + len);
+	int ret;
+	try
+	{
+		ret = m_nm->Socket_send(m_sock, bitfield, 5 + len);
+	}
+	catch (Exception & e) {
+		delete[] bitfield;
+		return ERR_INTERNAL;
+	}
 	delete[] bitfield;
 	if (ret == 5 + len)
 		return ERR_NO_ERROR;
@@ -143,9 +147,6 @@ int Peer::send_bitfield()
 
 int Peer::send_request(PIECE_INDEX piece, BLOCK_INDEX block, uint32_t block_length)
 {
-	if (m_peer_choking || m_state == PEER_STATE_WAIT_HANDSHAKE || m_state == PEER_STATE_SEND_HANDSHAKE || m_state == PEER_STATE_SLEEP)
-			return ERR_INTERNAL;
-
 #ifdef PEER_DEBUG
 	printf("Peer %s sending request piece=%u block=%u\n", m_ip.c_str(), piece, block);
 #endif
@@ -162,7 +163,15 @@ int Peer::send_request(PIECE_INDEX piece, BLOCK_INDEX block, uint32_t block_leng
 	memcpy(&request[9], &offset, 4);
 	block_length = htonl(block_length);
 	memcpy(&request[13], &block_length, 4);
-	int ret = m_nm->Socket_send(m_sock, request, 17);
+	int ret;
+	try
+	{
+		ret = m_nm->Socket_send(m_sock, request, 17);
+	}
+	catch (Exception &e)
+	{
+		return ERR_INTERNAL;
+	}
 	if (ret == 17)
 		return ERR_NO_ERROR;
 	return ERR_INTERNAL;
@@ -170,9 +179,6 @@ int Peer::send_request(PIECE_INDEX piece, BLOCK_INDEX block, uint32_t block_leng
 
 int Peer::send_piece(PIECE_INDEX piece, BLOCK_OFFSET offset, uint32_t length, char * block)
 { //<len=0009+X><id=7><index><begin><block>
-	if (m_state == PEER_STATE_WAIT_HANDSHAKE || m_state == PEER_STATE_SEND_HANDSHAKE || m_state == PEER_STATE_SLEEP)
-			return ERR_INTERNAL;
-
 #ifdef PEER_DEBUG
 	printf("Peer %s sending piece piece=%u offset=%u\n", m_ip.c_str(), piece, offset);
 #endif
@@ -186,17 +192,20 @@ int Peer::send_piece(PIECE_INDEX piece, BLOCK_OFFSET offset, uint32_t length, ch
 	uint32_t begin =htonl(offset);
 	memcpy(&mes[9], &begin, 4);
 	memcpy(&mes[13], block, length);
-	if (m_nm->Socket_send(m_sock, mes, length + 13) == (int)length + 13)
-		return ERR_NO_ERROR;
-	else
+	try
+	{
+		if (m_nm->Socket_send(m_sock, mes, length + 13) == length + 13)
+			return ERR_NO_ERROR;
+		else
+			return ERR_INTERNAL;
+	}
+	catch (Exception & e) {
 		return ERR_INTERNAL;
+	}
 }
 
 int Peer::send_choke()
 {
-	if (m_state == PEER_STATE_WAIT_HANDSHAKE || m_state == PEER_STATE_SEND_HANDSHAKE || m_state == PEER_STATE_SLEEP)
-			return ERR_INTERNAL;
-
 #ifdef PEER_DEBUG
 	printf("Peer %s sending choke\n", m_ip.c_str());
 #endif
@@ -205,17 +214,20 @@ int Peer::send_choke()
 	memset(mes, 0, 5);
 	mes[3] = '\x01';
 	mes[4] = '\x00';
-	if (m_nm->Socket_send(m_sock, mes, 5) == 5)
-		return ERR_NO_ERROR;
-	else
+	try
+	{
+		if (m_nm->Socket_send(m_sock, mes, 5) == 5)
+			return ERR_NO_ERROR;
+		else
+			return ERR_INTERNAL;
+	}
+	catch (Exception & e) {
 		return ERR_INTERNAL;
+	}
 }
 
 int Peer::send_unchoke()
 {
-	if (m_state == PEER_STATE_WAIT_HANDSHAKE || m_state == PEER_STATE_SEND_HANDSHAKE || m_state == PEER_STATE_SLEEP)
-			return ERR_INTERNAL;
-
 #ifdef PEER_DEBUG
 	printf("Peer %s sending unchoke\n", m_ip.c_str());
 #endif
@@ -224,17 +236,20 @@ int Peer::send_unchoke()
 	memset(mes, 0, 5);
 	mes[3] = '\x01';
 	mes[4] = '\x01';
-	if (m_nm->Socket_send(m_sock, mes, 5) == 5)
-		return ERR_NO_ERROR;
-	else
+	try
+	{
+		if (m_nm->Socket_send(m_sock, mes, 5) == 5)
+			return ERR_NO_ERROR;
+		else
+			return ERR_INTERNAL;
+	}
+	catch (Exception & e) {
 		return ERR_INTERNAL;
+	}
 }
 
 int Peer::send_interested()
 {
-	if (m_state == PEER_STATE_WAIT_HANDSHAKE || m_state == PEER_STATE_SEND_HANDSHAKE || m_state == PEER_STATE_SLEEP)
-			return ERR_INTERNAL;
-
 #ifdef PEER_DEBUG
 	printf("Peer %s sending interested\n", m_ip.c_str());
 #endif
@@ -243,17 +258,20 @@ int Peer::send_interested()
 	memset(mes, 0, 5);
 	mes[3] = '\x01';
 	mes[4] = '\x02';
-	if (m_nm->Socket_send(m_sock, mes, 5) == 5)
-		return ERR_NO_ERROR;
-	else
+	try
+	{
+		if (m_nm->Socket_send(m_sock, mes, 5) == 5)
+			return ERR_NO_ERROR;
+		else
+			return ERR_INTERNAL;
+	}
+	catch (Exception & e) {
 		return ERR_INTERNAL;
+	}
 }
 
 int Peer::send_not_interested()
 {
-	if (m_state == PEER_STATE_WAIT_HANDSHAKE || m_state == PEER_STATE_SEND_HANDSHAKE || m_state == PEER_STATE_SLEEP)
-			return ERR_INTERNAL;
-
 #ifdef PEER_DEBUG
 	printf("Peer %s sending not interested\n", m_ip.c_str());
 #endif
@@ -262,10 +280,16 @@ int Peer::send_not_interested()
 	memset(mes, 0, 5);
 	mes[3] = '\x01';
 	mes[4] = '\x03';
-	if (m_nm->Socket_send(m_sock, mes, 5) == 5)
-		return ERR_NO_ERROR;
-	else
+	try
+	{
+		if (m_nm->Socket_send(m_sock, mes, 5) == 5)
+			return ERR_NO_ERROR;
+		else
+			return ERR_INTERNAL;
+	}
+	catch (Exception & e) {
 		return ERR_INTERNAL;
+	}
 }
 
 int Peer::send_have(PIECE_INDEX piece_index)
@@ -283,10 +307,16 @@ int Peer::send_have(PIECE_INDEX piece_index)
 	mes[4] = '\x4';
 	uint32_t pi = htonl(piece_index);
 	memcpy(&mes[5], &pi, 4);
-	if (m_nm->Socket_send(m_sock, mes, 9) == 9)
-		return ERR_NO_ERROR;
-	else
+	try
+	{
+		if (m_nm->Socket_send(m_sock, mes, 9) == 9)
+			return ERR_NO_ERROR;
+		else
+			return ERR_INTERNAL;
+	}
+	catch (Exception & e) {
 		return ERR_INTERNAL;
+	}
 
 }
 
@@ -296,7 +326,6 @@ int Peer::process_messages()
 	if (m_buf.length - m_buf.pos >= HANDSHAKE_LENGHT &&
 		m_buf.data[m_buf.pos] == '\x13' &&
 		memcmp(&m_buf.data[m_buf.pos + 1], "BitTorrent protocol", 19) == 0 &&
-		//memcmp(&m_buf.data[m_buf.pos + 28], m_torrent->m_info_hash_bin, SHA1_LENGTH) == 0)
 		m_torrent->memcmp_infohash_bin((unsigned char*)&m_buf.data[m_buf.pos + 28]) == 0)
 	{
 		if (m_state != PEER_STATE_WAIT_HANDSHAKE)
@@ -510,9 +539,15 @@ end:
 
 int Peer::event_sock_ready2read(network::Socket sock)
 {
-	int ret = m_nm->Socket_recv(sock, m_buf.data + m_buf.length, BUFFER_SIZE - m_buf.length);
-	if (ret != -1)
-		m_buf.length += ret;
+	int ret;
+	try
+	{
+		ret = m_nm->Socket_recv(sock, m_buf.data + m_buf.length, BUFFER_SIZE - m_buf.length);
+	}
+	catch (Exception & e) {
+		return ERR_INTERNAL;
+	}
+	m_buf.length += ret;
 	if (process_messages() != ERR_NO_ERROR)
 	{
 		goto_sleep();
@@ -522,10 +557,19 @@ int Peer::event_sock_ready2read(network::Socket sock)
 
 int Peer::event_sock_closed(network::Socket sock)
 {
-	if (m_nm->Socket_datalen(sock) > 0)
-		event_sock_ready2read(sock);
-	goto_sleep();
-	return ERR_NO_ERROR;
+#ifdef PEER_DEBUG
+	printf("Peer %s close connection\n", m_ip.c_str());
+#endif
+	try
+	{
+		if (m_nm->Socket_datalen(sock) > 0)
+			event_sock_ready2read(sock);
+		goto_sleep();
+		return ERR_NO_ERROR;
+	}
+	catch (Exception & e) {
+		return ERR_INTERNAL;
+	}
 
 }
 
@@ -553,10 +597,19 @@ int Peer::event_sock_accepted(network::Socket sock, network::Socket accepted_soc
 
 int Peer::event_sock_timeout(network::Socket sock)
 {
-	if (m_nm->Socket_datalen(sock) > 0)
-		event_sock_ready2read(sock);
-	goto_sleep();
-	return ERR_NO_ERROR;
+#ifdef PEER_DEBUG
+	printf("Peer %s timeout\n", m_ip.c_str());
+#endif
+	try
+	{
+		if (m_nm->Socket_datalen(sock) > 0)
+			event_sock_ready2read(sock);
+		goto_sleep();
+		return ERR_NO_ERROR;
+	}
+	catch (Exception & e) {
+		return ERR_INTERNAL;
+	}
 }
 
 int Peer::event_sock_unresolved(network::Socket sock)
@@ -567,6 +620,11 @@ int Peer::event_sock_unresolved(network::Socket sock)
 bool Peer::have_piece(PIECE_INDEX piece_index)
 {
 	return bit_in_bitfield(piece_index, m_torrent->get_piece_count(), m_bitfield);
+}
+
+bool Peer::peer_interested()
+{
+	return m_peer_interested;
 }
 
 bool Peer::is_choking()
@@ -580,8 +638,11 @@ int Peer::clock()
 	{
 		if (m_sock == NULL)
 		{
-			m_nm->Socket_add(&m_addr, shared_from_this(), m_sock);
-			if (m_sock == NULL)
+			try
+			{
+				m_nm->Socket_add(&m_addr, shared_from_this(), m_sock);
+			}
+			catch (...)
 			{
 				goto_sleep();
 				return ERR_INTERNAL;
@@ -711,12 +772,26 @@ bool Peer::get_requested_block(BLOCK_ID & block_id)
 
 double Peer::get_rx_speed()
 {
-	return m_nm->Socket_get_rx_speed(m_sock);
+	try
+	{
+		return m_nm->Socket_get_rx_speed(m_sock);
+	}
+	catch (Exception & e) {
+		return 0.0f;
+	}
+	return 0.0f;
 }
 
 double Peer::get_tx_speed()
 {
-	return m_nm->Socket_get_tx_speed(m_sock);
+	try
+	{
+		return m_nm->Socket_get_tx_speed(m_sock);
+	}
+	catch (Exception & e) {
+		return 0.0f;
+	}
+	return 0.0f;
 }
 
 const std::string & Peer::get_ip_str()
@@ -731,32 +806,29 @@ int Peer::get_info(info::peer & ref)
 	ref.downloaded = m_downloaded;
 	ref.uploaded = m_uploaded;
 	ref.available = m_available_pieces.size() / m_torrent->get_piece_count();
+	ref.blocks2request = m_blocks2request.size();
+	ref.requested_blocks = m_requested_blocks.size();
+	ref.may_request = may_request();
 	memset(ref.ip, 0, 22);
 	memcpy(ref.ip, m_ip.c_str(), 22);
 	return ERR_NO_ERROR;
 }
 
-int Peer::prepare2release()
+void Peer::prepare2release()
 {
 	m_nm->Socket_delete(m_sock);
-	return ERR_NO_ERROR;
-}
-
-void Peer::forced_releasing()
-{
-	prepare2release();
 }
 
 Peer::~Peer()
 {
 #ifdef BITTORRENT_DEBUG
-	printf("Peer destructor\n");
+	printf("Peer destructor %s\n", m_ip.c_str());
 #endif
 	if (m_bitfield != NULL)
 		delete[] m_bitfield;
 	prepare2release();
 #ifdef BITTORRENT_DEBUG
-	printf("Peer destroyed\n");
+	printf("Peer destroyed %s\n", m_ip.c_str());
 #endif
 }
 

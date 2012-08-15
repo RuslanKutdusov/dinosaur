@@ -11,17 +11,19 @@ namespace dinosaur {
 namespace torrent
 {
 
+/*
+ * Exception::ERR_CODE_NO_MEMORY_AVAILABLE
+ */
+
 PieceManager::PieceManager(const TorrentInterfaceInternalPtr & torrent, unsigned char * bitfield)
 {
-	if (torrent == NULL)
-		throw Exception(GENERAL_ERROR_UNDEF_ERROR);
 	m_torrent = torrent;
 	uint32_t piece_count = m_torrent->get_piece_count();
 
 	m_bitfield_len = ceil(piece_count / 8.0f);
 	m_bitfield = new(std::nothrow) unsigned char[m_bitfield_len];
 	if (m_bitfield == NULL)
-		throw Exception(GENERAL_ERROR_NO_MEMORY_AVAILABLE);
+		throw Exception(Exception::ERR_CODE_NO_MEMORY_AVAILABLE);
 
 	if (bitfield == NULL)
 		memset(m_bitfield, 0, m_bitfield_len);
@@ -32,7 +34,7 @@ PieceManager::PieceManager(const TorrentInterfaceInternalPtr & torrent, unsigned
 	if (m_piece_for_check_hash == NULL)
 	{
 		delete[] bitfield;
-		throw Exception(GENERAL_ERROR_NO_MEMORY_AVAILABLE);
+		throw Exception(Exception::ERR_CODE_NO_MEMORY_AVAILABLE);
 	}
 
 
@@ -73,15 +75,14 @@ void PieceManager::reset()
 
 		m_piece_info[i].taken_from.clear();
 	}
-
 }
 
 void PieceManager::build_piece_info()
 {
-	uint32_t piece_length_ = m_torrent->get_piece_length();
+	uint64_t piece_length_ = m_torrent->get_piece_length();
 	uint64_t length = m_torrent->get_length();
 	size_t file_count = m_torrent->get_files_count();
-	uint32_t piece_count = m_torrent->get_piece_count();
+	uint64_t piece_count = m_torrent->get_piece_count();
 	m_piece_info.resize(piece_count);
 	FILE_INDEX file_index = 0;
 	FILE_INDEX file_iter = 0;
@@ -91,7 +92,7 @@ void PieceManager::build_piece_info()
 	for (PIECE_INDEX piece_index = 0; piece_index < piece_count; piece_index++)
 	{
 		FILE_OFFSET offset = piece_index * piece_length_;//смещение до начала куска
-		uint32_t piece_length = (piece_index == piece_count - 1) ? length - piece_length_ * piece_index : piece_length_; //размер последнего куска может быть меньше m_piece_length
+		uint64_t piece_length = (piece_index == piece_count - 1) ? length - piece_length_ * piece_index : piece_length_; //размер последнего куска может быть меньше m_piece_length
 		FILE_OFFSET end_of_piece = offset + piece_length;
 
 		m_piece_info[piece_index].block_count = (uint32_t)ceil((double)piece_length / (double)BLOCK_LENGTH);
@@ -135,7 +136,7 @@ void PieceManager::build_piece_info()
 
 
 			Metafile::file_info * finfo = m_torrent->get_file_info(file_index);
-			uint64_t file_offset = last_files_length - finfo->length;//смещение до file_index файла
+			FILE_OFFSET file_offset = last_files_length - finfo->length;//смещение до file_index файла
 			if (block == 0)
 			{
 				m_piece_info[piece_index].file_index = file_index;
@@ -147,9 +148,9 @@ void PieceManager::build_piece_info()
 			block_info.second = offset - file_offset;
 			m_piece_info[piece_index].block_info.push_back(block_info);
 
-			/*#ifdef BITTORRENT_DEBUG
-				printf("PIECE %u Block %u file %u offset %llu\n", piece_index, block, m_piece_info[piece_index].block_info[block].first, m_piece_info[piece_index].block_info[block].second);
-			#endif*/
+			#ifdef BITTORRENT_DEBUG
+				//printf("PIECE %u Block %u file %u offset %llu\n", piece_index, block, m_piece_info[piece_index].block_info[block].first, m_piece_info[piece_index].block_info[block].second);
+			#endif
 			offset += BLOCK_LENGTH;
 			if (need2download)
 				m_piece_info[piece_index].block2download.insert(block);
@@ -411,9 +412,14 @@ int PieceManager::get_block2download(PIECE_INDEX piece_index, BLOCK_INDEX & bloc
 	return ERR_NO_ERROR;
 }
 
-int PieceManager::get_block2download_count(PIECE_INDEX piece_index)
+size_t PieceManager::get_block2download_count(PIECE_INDEX piece_index)
 {
 	return m_piece_info[piece_index].block2download.size();
+}
+
+size_t PieceManager::get_donwloaded_blocks_count(PIECE_INDEX piece_index)
+{
+	return m_piece_info[piece_index].downloaded_blocks.size();
 }
 
 int PieceManager::push_block2download(PIECE_INDEX piece_index, BLOCK_INDEX block_index)

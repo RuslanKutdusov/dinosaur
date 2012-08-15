@@ -66,11 +66,14 @@ private:
 	std::string 			m_cfg_file_name;
 	config 					cfg;
 	dinosaur::PEER_ID		m_peer_id;
+	/*
+	 * Exception::ERR_CODE_CAN_NOT_SAVE_CONFIG
+	 */
 	int serialize()
 	{
 		std::ofstream ofs(m_cfg_file_name.c_str());
 		if (ofs.fail())
-			return -1;
+			throw Exception(Exception::ERR_CODE_CAN_NOT_SAVE_CONFIG);
 		try
 		{
 			boost::archive::text_oarchive oa(ofs);
@@ -78,40 +81,48 @@ private:
 		}
 		catch(boost::archive::archive_exception & e)
 		{
-			return -1;
+			ofs.close();
+			throw Exception(Exception::ERR_CODE_CAN_NOT_SAVE_CONFIG);
 		}
 		catch(...)
 		{
-			return -1;
+			ofs.close();
+			throw Exception(Exception::ERR_CODE_CAN_NOT_SAVE_CONFIG);
 		}
+		ofs.close();
 		return 0;
 	}
 	int deserialize()
 	{
 		std::ifstream ifs(m_cfg_file_name.c_str());
 		if (ifs.fail())
+		{
+			ifs.close();
 			return -1;
+		}
 		try
 		{
 			boost::archive::text_iarchive ia(ifs);
 			ia >> cfg;
 		}
-		catch(boost::archive::archive_exception & e)
-		{
-			return -1;
-		}
 		catch(...)
 		{
+			ifs.close();
 			return -1;
 		}
+		ifs.close();
 		return 0;
 	}
+	/*
+	 * SyscallException
+	 */
 	int init_default_config()
 	{
 		//дефолтная папка для загрузок - пользовательская директория
+		errno = 0;
 		passwd *pw = getpwuid(getuid());
 		if (pw == NULL)
-			return ERR_SYSCALL_ERROR;
+			throw SyscallException();
 		cfg.download_directory = pw->pw_dir;
 
 		if (cfg.download_directory[cfg.download_directory.length() - 1] != '/')
@@ -127,10 +138,14 @@ private:
 		cfg.send_have = true;
 		inet_pton(AF_INET, "0.0.0.0", &cfg.listen_on);
 		cfg.max_active_torrents = 5;
-		return ERR_NO_ERROR;
+		return 0;
 	}
 public:
 	Glob_cfg(){}
+	/*
+	 * SyscallException
+	 * Exception::ERR_CODE_CAN_NOT_SAVE_CONFIG
+	 */
 	Glob_cfg(std::string work_directory)
 	{
 		m_work_directory = work_directory;
@@ -144,9 +159,12 @@ public:
 		}
 		strncpy(m_peer_id, CLIENT_ID, PEER_ID_LENGTH);
 	}
-	int save()
+	/*
+	* Exception::ERR_CODE_CAN_NOT_SAVE_CONFIG
+	*/
+	void save()
 	{
-		return serialize() == -1 ? ERR_UNDEF : ERR_NO_ERROR;
+		serialize();
 	}
 	const std::string & get_download_directory()
 	{
@@ -202,90 +220,110 @@ public:
 	}
 
 
-	int set_download_directory(const char * dir)
+	/*
+	 * Exception::ERR_CODE_DIR_NOT_EXISTS
+	 * SyscallException
+	 */
+	void set_download_directory(const char * dir)
 	{
 		struct stat st;
 		if(stat(dir, &st) == 0)
 		{
 			if (S_ISDIR(st.st_mode))
-			{
 				cfg.download_directory = dir;
-				return ERR_NO_ERROR;
-			}
 			else
-				return ERR_DIR_NOT_EXISTS;
+				throw Exception(Exception::ERR_CODE_DIR_NOT_EXISTS);
 		}
 		else
-			return ERR_SYSCALL_ERROR;
+			throw SyscallException();
 	}
-
-	int set_download_directory(const std::string & dir)
+	/*
+	 * Exception::ERR_CODE_DIR_NOT_EXISTS
+	 * SyscallException
+	 */
+	void set_download_directory(const std::string & dir)
 	{
-		return set_download_directory(dir.c_str());
+		set_download_directory(dir.c_str());
 	}
 	void set_port(uint16_t port)
 	{
 		cfg.port = port;
 	}
-	int set_write_cache_size(uint16_t s)
+	/*
+	 * Exception::ERR_CODE_INVALID_CONFIG_VALUE
+	 */
+	void set_write_cache_size(uint16_t s)
 	{
 		if (s == 0)
-			return ERR_BAD_ARG;
+			throw Exception(Exception::ERR_CODE_INVALID_W_CACHE_SIZE);
 		cfg.write_cache_size = s;
-		return ERR_NO_ERROR;
 	}
-	int set_read_cache_size(uint16_t s)
+	/*
+	 * Exception::ERR_CODE_INVALID_CONFIG_VALUE
+	 */
+	void set_read_cache_size(uint16_t s)
 	{
 		if (s == 0)
-			return ERR_BAD_ARG;
+			throw Exception(Exception::ERR_CODE_INVALID_R_CACHE_SIZE);
 		cfg.read_cache_size = s;
-		return ERR_NO_ERROR;
 	}
 	void set_tracker_numwant(uint32_t v)
 	{
 		cfg.tracker_numwant = v;
 	}
-	int set_tracker_default_interval(uint64_t v)
+	/*
+	 * Exception::ERR_CODE_INVALID_CONFIG_VALUE
+	 */
+	void set_tracker_default_interval(uint64_t v)
 	{
 		if (v == 0)
-			return ERR_BAD_ARG;
+			throw Exception(Exception::ERR_CODE_INVALID_TRACKER_DEF_INTERVAL);
 		cfg.tracker_default_interval = v;
-		return ERR_NO_ERROR;
 	}
-	int set_max_active_seeders(uint32_t v)
+	/*
+	 * Exception::ERR_CODE_INVALID_CONFIG_VALUE
+	 */
+	void set_max_active_seeders(uint32_t v)
 	{
 		if (v == 0)
-			return ERR_BAD_ARG;
+			throw Exception(Exception::ERR_CODE_INVALID_MAX_ACTIVE_SEEDS);
 		cfg.max_active_seeders = v;
-		return ERR_NO_ERROR;
 	}
-	int set_max_active_leechers(uint32_t v)
+	/*
+	 * Exception::ERR_CODE_INVALID_CONFIG_VALUE
+	 */
+	void set_max_active_leechers(uint32_t v)
 	{
 		if (v == 0)
-			return ERR_BAD_ARG;
+			throw Exception(Exception::ERR_CODE_INVALID_MAX_ACTIVE_LEECHS);
 		cfg.max_active_leechers = v;
-		return ERR_NO_ERROR;
 	}
 	void set_send_have(bool v)
 	{
 		cfg.send_have = v;
 	}
-	int set_listen_on(IP_CHAR ip)
+	/*
+	 * Exception::ERR_CODE_INVALID_CONFIG_VALUE
+	 */
+	void set_listen_on(IP_CHAR ip)
 	{
 		if (inet_pton(AF_INET, ip, &cfg.listen_on) <= 0)
-			return ERR_BAD_ARG;
-		return ERR_NO_ERROR;
+			throw Exception(Exception::ERR_CODE_INVALID_LISTEN_ON);
 	}
 	void set_listen_on(in_addr * addr)
 	{
+		if (addr == NULL)
+			throw Exception(Exception::ERR_CODE_NULL_REF);
 		memcpy(&cfg.listen_on, addr, sizeof(in_addr));
 	}
-	int set_max_active_torrents(uint16_t v)
+	/*
+	 * Exception::ERR_CODE_INVALID_CONFIG_VALUE
+	 */
+	void set_max_active_torrents(uint16_t v)
 	{
 		if (v == 0)
-		return ERR_BAD_ARG;
+			throw Exception(Exception::ERR_CODE_INVALID_MAX_ACTIVE_TORRENTS);
 		cfg.max_active_torrents = v;
-		return ERR_NO_ERROR;
 	}
 	~Glob_cfg(){}
 };
