@@ -30,7 +30,7 @@ double get_time();
 
 #define BUFFER_SIZE 32768
 #define MAX_EPOLL_EVENT 200
-#define TIMEOUT 3
+#define TIMEOUT 10
 #define POW10_9 1000000000
 
 enum

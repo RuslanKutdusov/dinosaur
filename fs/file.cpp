@@ -129,7 +129,7 @@ size_t file::_write(const char * buf, uint64_t offset, uint64_t length) throw(Ex
 		#endif
 		throw Exception(Exception::ERR_CODE_FILE_NOT_OPENED);
 	}
-	ret = lseek64 ( m_fd , offset , SEEK_SET );
+	ret = lseek ( m_fd , offset , SEEK_SET );
 	if (ret == -1)
 	{
 		#ifdef FS_DEBUG
@@ -161,7 +161,7 @@ size_t file::_read(char * buf, uint64_t offset, uint64_t length) throw(Exception
 	int ret;
 	if (!is_opened())
 		throw Exception(Exception::ERR_CODE_FILE_NOT_OPENED);
-	ret = lseek64(m_fd, offset, SEEK_SET);
+	ret = lseek(m_fd, offset, SEEK_SET);
 	if (ret == -1)
 	{
 		throw SyscallException();
