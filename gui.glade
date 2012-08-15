@@ -54,6 +54,12 @@
       <column type="gchararray"/>
       <!-- column-name leechs -->
       <column type="gchararray"/>
+      <!-- column-name start_time -->
+      <column type="gchararray"/>
+      <!-- column-name remain_time -->
+      <column type="gchararray"/>
+      <!-- column-name ratio -->
+      <column type="gchararray"/>
       <!-- column-name hash -->
       <column type="gchararray"/>
     </columns>
@@ -299,12 +305,45 @@
                           </object>
                         </child>
                         <child>
+                          <object class="GtkTreeViewColumn" id="treeviewcolumn27">
+                            <property name="title" translatable="yes">Start time</property>
+                            <child>
+                              <object class="GtkCellRendererText" id="cellrenderertext26"/>
+                              <attributes>
+                                <attribute name="text">9</attribute>
+                              </attributes>
+                            </child>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkTreeViewColumn" id="treeviewcolumn28">
+                            <property name="title" translatable="yes">Remain time</property>
+                            <child>
+                              <object class="GtkCellRendererText" id="cellrenderertext27"/>
+                              <attributes>
+                                <attribute name="text">10</attribute>
+                              </attributes>
+                            </child>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkTreeViewColumn" id="treeviewcolumn29">
+                            <property name="title" translatable="yes">Ratio</property>
+                            <child>
+                              <object class="GtkCellRendererText" id="cellrenderertext28"/>
+                              <attributes>
+                                <attribute name="text">11</attribute>
+                              </attributes>
+                            </child>
+                          </object>
+                        </child>
+                        <child>
                           <object class="GtkTreeViewColumn" id="treeviewcolumn7">
                             <property name="title" translatable="yes">hash</property>
                             <child>
                               <object class="GtkCellRendererText" id="cellrenderertext6"/>
                               <attributes>
-                                <attribute name="text">9</attribute>
+                                <attribute name="text">12</attribute>
                               </attributes>
                             </child>
                           </object>
