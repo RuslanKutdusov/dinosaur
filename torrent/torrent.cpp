@@ -546,9 +546,11 @@ int TorrentBase::clock()
 			m_tx_speed += seed->get_tx_speed();
 		}
 
-		for(peer_map_iter leecher_iter = m_leechers.begin(); leecher_iter != m_leechers.end(); ++leecher_iter)
+		for(peer_map_iter leecher_iter = m_leechers.begin(), leecher_iter2 = leecher_iter; leecher_iter != m_leechers.end(); leecher_iter = leecher_iter2)
 		{
-			printf("Leech clock %s\n", leecher_iter->first.c_str());
+			++leecher_iter2;
+			if (leecher_iter->second == NULL ||leecher_iter->first.c_str() == NULL)
+				printf("Leech clock %s\n", leecher_iter->first.c_str());
 			PeerPtr leecher = leecher_iter->second;
 			leecher->clock();
 			if (leecher->is_sleep())
@@ -560,12 +562,13 @@ int TorrentBase::clock()
 			{
 				m_rx_speed += leecher->get_rx_speed();
 				m_tx_speed += leecher->get_tx_speed();
-				for(std::list<uint32_t>::iterator have_iter = m_have_list.begin();
-						have_iter != m_have_list.end();
-						++have_iter)
-				{
-					leecher->send_have(*have_iter);
-				}
+				if (leecher->peer_interested())
+					for(std::list<uint32_t>::iterator have_iter = m_have_list.begin();
+							have_iter != m_have_list.end();
+							++have_iter)
+					{
+						leecher->send_have(*have_iter);
+					}
 			}
 		}
 		m_have_list.clear();
