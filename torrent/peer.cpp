@@ -622,6 +622,11 @@ bool Peer::have_piece(PIECE_INDEX piece_index)
 	return bit_in_bitfield(piece_index, m_torrent->get_piece_count(), m_bitfield);
 }
 
+bool Peer::peer_interested()
+{
+	return m_peer_interested;
+}
+
 bool Peer::is_choking()
 {
 	return m_peer_choking;
@@ -817,13 +822,13 @@ void Peer::prepare2release()
 Peer::~Peer()
 {
 #ifdef BITTORRENT_DEBUG
-	printf("Peer destructor\n");
+	printf("Peer destructor %s\n", m_ip.c_str());
 #endif
 	if (m_bitfield != NULL)
 		delete[] m_bitfield;
 	prepare2release();
 #ifdef BITTORRENT_DEBUG
-	printf("Peer destroyed\n");
+	printf("Peer destroyed %s\n", m_ip.c_str());
 #endif
 }
 

@@ -199,6 +199,8 @@ void TorrentBase::add_seeder(sockaddr_in * addr)
 {
 	if (addr == NULL)
 		throw Exception(Exception::ERR_CODE_NULL_REF);
+	if (m_state != TORRENT_STATE_STARTED)
+		throw Exception(Exception::ERR_CODE_LEECHER_REJECTED);
 	std::string key;
 	get_peer_key(addr, key);
 	try
@@ -234,6 +236,8 @@ void TorrentBase::add_leecher(network::Socket & sock)
 {
 	if (sock == NULL)
 		throw Exception(Exception::ERR_CODE_NULL_REF);
+	if (m_state != TORRENT_STATE_STARTED)
+		throw Exception(Exception::ERR_CODE_LEECHER_REJECTED);
 	try
 	{
 		std::string key;

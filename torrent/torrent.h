@@ -150,7 +150,6 @@ private:
 		PEER_STATE_SLEEP
 	};
 private:
-	bool leech;
 	network::NetworkManager * 			m_nm;
 	cfg::Glob_cfg * 					m_g_cfg;
 	TorrentInterfaceInternalPtr			m_torrent;
@@ -193,6 +192,7 @@ public:
 	int event_sock_unresolved(network::Socket sock);
 	int send_have(PIECE_INDEX piece_index);
 	bool have_piece(PIECE_INDEX piece_index);
+	bool peer_interested();
 	bool is_choking();
 	int clock();
 	void goto_sleep();
@@ -218,7 +218,7 @@ typedef tracker_map::iterator tracker_map_iter;
 typedef std::map<std::string, PeerPtr> peer_map;
 typedef peer_map::iterator peer_map_iter;
 
-typedef std::list<PeerPtr> peer_list;
+typedef std::deque<PeerPtr> peer_list;
 typedef peer_list::iterator peer_list_iter;
 
 class PieceManager

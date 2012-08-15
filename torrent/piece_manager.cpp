@@ -79,10 +79,10 @@ void PieceManager::reset()
 
 void PieceManager::build_piece_info()
 {
-	uint32_t piece_length_ = m_torrent->get_piece_length();
+	uint64_t piece_length_ = m_torrent->get_piece_length();
 	uint64_t length = m_torrent->get_length();
 	size_t file_count = m_torrent->get_files_count();
-	uint32_t piece_count = m_torrent->get_piece_count();
+	uint64_t piece_count = m_torrent->get_piece_count();
 	m_piece_info.resize(piece_count);
 	FILE_INDEX file_index = 0;
 	FILE_INDEX file_iter = 0;
@@ -92,7 +92,7 @@ void PieceManager::build_piece_info()
 	for (PIECE_INDEX piece_index = 0; piece_index < piece_count; piece_index++)
 	{
 		FILE_OFFSET offset = piece_index * piece_length_;//смещение до начала куска
-		uint32_t piece_length = (piece_index == piece_count - 1) ? length - piece_length_ * piece_index : piece_length_; //размер последнего куска может быть меньше m_piece_length
+		uint64_t piece_length = (piece_index == piece_count - 1) ? length - piece_length_ * piece_index : piece_length_; //размер последнего куска может быть меньше m_piece_length
 		FILE_OFFSET end_of_piece = offset + piece_length;
 
 		m_piece_info[piece_index].block_count = (uint32_t)ceil((double)piece_length / (double)BLOCK_LENGTH);
@@ -136,7 +136,7 @@ void PieceManager::build_piece_info()
 
 
 			Metafile::file_info * finfo = m_torrent->get_file_info(file_index);
-			uint64_t file_offset = last_files_length - finfo->length;//смещение до file_index файла
+			FILE_OFFSET file_offset = last_files_length - finfo->length;//смещение до file_index файла
 			if (block == 0)
 			{
 				m_piece_info[piece_index].file_index = file_index;
@@ -148,9 +148,9 @@ void PieceManager::build_piece_info()
 			block_info.second = offset - file_offset;
 			m_piece_info[piece_index].block_info.push_back(block_info);
 
-			/*#ifdef BITTORRENT_DEBUG
+			#ifdef BITTORRENT_DEBUG
 				printf("PIECE %u Block %u file %u offset %llu\n", piece_index, block, m_piece_info[piece_index].block_info[block].first, m_piece_info[piece_index].block_info[block].second);
-			#endif*/
+			#endif
 			offset += BLOCK_LENGTH;
 			if (need2download)
 				m_piece_info[piece_index].block2download.insert(block);
