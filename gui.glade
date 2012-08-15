@@ -754,51 +754,65 @@
                   </packing>
                 </child>
                 <child>
-                  <object class="GtkTreeView" id="dp_view">
+                  <object class="GtkScrolledWindow" id="scrolledwindow5">
                     <property name="visible">True</property>
                     <property name="can_focus">True</property>
-                    <property name="model">dp_list</property>
+                    <property name="hscrollbar_policy">automatic</property>
+                    <property name="vscrollbar_policy">automatic</property>
                     <child>
-                      <object class="GtkTreeViewColumn" id="treeviewcolumn23">
-                        <property name="title" translatable="yes">Index</property>
+                      <object class="GtkViewport" id="viewport5">
+                        <property name="visible">True</property>
+                        <property name="can_focus">False</property>
                         <child>
-                          <object class="GtkCellRendererText" id="cellrenderertext22"/>
-                          <attributes>
-                            <attribute name="text">0</attribute>
-                          </attributes>
-                        </child>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkTreeViewColumn" id="treeviewcolumn24">
-                        <property name="title" translatable="yes">Blocks to download</property>
-                        <child>
-                          <object class="GtkCellRendererText" id="cellrenderertext23"/>
-                          <attributes>
-                            <attribute name="text">1</attribute>
-                          </attributes>
-                        </child>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkTreeViewColumn" id="treeviewcolumn25">
-                        <property name="title" translatable="yes">Downloaded blocks</property>
-                        <child>
-                          <object class="GtkCellRendererText" id="cellrenderertext24"/>
-                          <attributes>
-                            <attribute name="text">2</attribute>
-                          </attributes>
-                        </child>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkTreeViewColumn" id="treeviewcolumn26">
-                        <property name="title" translatable="yes">Priority</property>
-                        <child>
-                          <object class="GtkCellRendererText" id="cellrenderertext25"/>
-                          <attributes>
-                            <attribute name="text">3</attribute>
-                          </attributes>
+                          <object class="GtkTreeView" id="dp_view">
+                            <property name="visible">True</property>
+                            <property name="can_focus">True</property>
+                            <property name="model">dp_list</property>
+                            <child>
+                              <object class="GtkTreeViewColumn" id="treeviewcolumn23">
+                                <property name="title" translatable="yes">Index</property>
+                                <child>
+                                  <object class="GtkCellRendererText" id="cellrenderertext22"/>
+                                  <attributes>
+                                    <attribute name="text">0</attribute>
+                                  </attributes>
+                                </child>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkTreeViewColumn" id="treeviewcolumn24">
+                                <property name="title" translatable="yes">Blocks to download</property>
+                                <child>
+                                  <object class="GtkCellRendererText" id="cellrenderertext23"/>
+                                  <attributes>
+                                    <attribute name="text">1</attribute>
+                                  </attributes>
+                                </child>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkTreeViewColumn" id="treeviewcolumn25">
+                                <property name="title" translatable="yes">Downloaded blocks</property>
+                                <child>
+                                  <object class="GtkCellRendererText" id="cellrenderertext24"/>
+                                  <attributes>
+                                    <attribute name="text">2</attribute>
+                                  </attributes>
+                                </child>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkTreeViewColumn" id="treeviewcolumn26">
+                                <property name="title" translatable="yes">Priority</property>
+                                <child>
+                                  <object class="GtkCellRendererText" id="cellrenderertext25"/>
+                                  <attributes>
+                                    <attribute name="text">3</attribute>
+                                  </attributes>
+                                </child>
+                              </object>
+                            </child>
+                          </object>
                         </child>
                       </object>
                     </child>
