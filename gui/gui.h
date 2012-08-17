@@ -11,10 +11,10 @@
 #include <list>
 #include <string>
 #include <errno.h>
-#include "../dinosaur.h"
-#include "../torrent/torrent.h"
-#include "../torrent/torrent_types.h"
-#include "../exceptions/exceptions.h"
+#include "../libdinosaur/dinosaur.h"
+#include "../libdinosaur/torrent/torrent.h"
+#include "../libdinosaur/torrent/torrent_types.h"
+#include "../libdinosaur/exceptions/exceptions.h"
 
 
 //extern "C" void on_window1_destroy (GtkObject *object, gpointer user_data);

@@ -67,7 +67,7 @@ public:
 	void get_torrent_info_dyn(const std::string & hash, info::torrent_dyn & ref);
 	void get_torrent_info_trackers(const std::string & hash, info::trackers & ref);
 	void get_torrent_info_files(const std::string & hash, info::files & ref);
-	void  get_torrent_info_file_dyn(const std::string & hash, FILE_INDEX index, info::file_dyn & ref);
+	void get_torrent_info_file_dyn(const std::string & hash, FILE_INDEX index, info::file_dyn & ref);
 	void get_torrent_info_seeders(const std::string & hash, info::peers & ref);
 	void get_torrent_info_leechers(const std::string & hash, info::peers & ref);
 	void get_torrent_info_downloadable_pieces(const std::string & hash, info::downloadable_pieces & ref);

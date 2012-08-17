@@ -584,7 +584,7 @@ int TorrentBase::clock()
 		}
 
 		if (m_rx_speed > 0)
-			m_remain_time = m_downloaded / m_rx_speed;
+			m_remain_time = m_metafile.length - m_downloaded / m_rx_speed;
 		else
 			m_remain_time = 0;
 	}
