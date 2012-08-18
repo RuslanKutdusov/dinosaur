@@ -74,7 +74,7 @@ size_t TorrentInterfaceInternal::get_bitfield_length()
 	return m_piece_manager->get_bitfield_length();
 }
 
-Metafile::file_info * TorrentInterfaceInternal::get_file_info(FILE_INDEX file_index)
+info::file_stat * TorrentInterfaceInternal::get_file_info(FILE_INDEX file_index)
 {
 	return file_index >= (FILE_INDEX)m_metafile.files.size() ? NULL : &m_metafile.files[file_index];
 }

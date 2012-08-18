@@ -646,8 +646,7 @@ void NetworkManager::Socket_delete(Socket & sock)
 	m_timeout_sockets.erase(sock);
 	m_unresolved_sockets.erase(sock);
 	m_listening_sockets.erase(sock);
-	if (close(sock->m_socket) == -1)
-		printf("ERRNO %X %d %s\n", sock.get(), sock->m_socket, sys_errlist[errno]);
+	close(sock->m_socket);
 	sock->m_need2delete = true;
 	sock.reset();
 	pthread_mutex_unlock(&m_mutex_sockets);

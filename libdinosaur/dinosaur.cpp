@@ -9,6 +9,10 @@
 
 namespace dinosaur {
 
+/*
+ * SyscallException
+ */
+
 Dinosaur::Dinosaur()
  {
 	m_thread = 0;
@@ -126,9 +130,18 @@ int Dinosaur::load_our_torrents()
 	while(fin>>fname)
 	{
 		std::string full_path2torrent_file = m_directory + fname;
-		//std::cout<<full_path2torrent_file<<std::endl;
-		init_torrent(full_path2torrent_file, Config.get_download_directory(), hash);
-		StartTorrent(hash);
+		try
+		{
+			init_torrent(full_path2torrent_file, Config.get_download_directory(), hash);
+			StartTorrent(hash);
+		}
+		catch (Exception & e) {
+			torrent_failure tf;
+			tf.exception_errcode = e.get_errcode();
+			tf.errno_ = 0;
+			tf.where = TORRENT_FAILURE_INIT_TORRENT;
+			m_fails_torrents.push_back(tf);
+		}
 	}
 	fin.close();
 	return ERR_NO_ERROR;
@@ -175,7 +188,7 @@ void Dinosaur::init_torrent(const torrent::Metafile & metafile, const std::strin
  * Exception::ERR_CODE_UNDEF
  * Exception::ERR_CODE_TORRENT_EXISTS
  * Exception::ERR_CODE_NULL_REF
- * Exception::ERR_CODE_BENCODE_PARSE_ERROR
+ * Exception::ERR_CODE_BENCODE_ENCODE_ERROR
  * Exception::ERR_CODE_STATE_FILE_ERROR
  * SyscallException
  */
@@ -390,13 +403,20 @@ void Dinosaur::get_torrent_info_trackers(const std::string & hash, info::tracker
  * Exception::ERR_CODE_TORRENT_NOT_EXISTS
  */
 
-void Dinosaur::get_torrent_info_files(const std::string & hash, info::files & ref)
+void Dinosaur::get_torrent_info_file_stat(const std::string & hash, FILE_INDEX index, info::file_stat & ref)
 {
 	if (m_torrents.count(hash) == 0)
 		throw Exception(Exception::ERR_CODE_TORRENT_NOT_EXISTS);
 	pthread_mutex_lock(&m_mutex);
-	m_torrents[hash]->get_info_files(ref);
-	pthread_mutex_unlock(&m_mutex);
+	try
+	{
+		m_torrents[hash]->get_info_file_stat(index, ref);
+		pthread_mutex_unlock(&m_mutex);
+	}
+	catch (Exception & e) {
+		pthread_mutex_unlock(&m_mutex);
+		throw Exception(e);
+	}
 }
 
 /*

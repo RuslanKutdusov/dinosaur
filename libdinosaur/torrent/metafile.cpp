@@ -259,7 +259,7 @@ void Metafile::get_files_info(bencode::be_node * info)
 			throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
 		files.resize(1);
 		files[0].length = length;
-		files[0].name = name;
+		files[0].path = name;
 	}
 	else
 	{//определяем кол-во файлов
@@ -282,13 +282,14 @@ void Metafile::get_files_info(bencode::be_node * info)
 
 			dir_tree.reset();
 			int path_list_size = bencode::get_list_size(path_node);
+			files[i].index = i;
 			for(int j = 0; j < path_list_size; j++)
 			{
 				bencode::be_str * str;
 				if (bencode::get_str(path_node, j, &str) == -1)
 					throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
 				char * name = bencode::str2c_str(str);
-				files[i].name += name;
+				files[i].path += name;
 				if (j < path_list_size - 1)
 				{
 					try
@@ -299,7 +300,7 @@ void Metafile::get_files_info(bencode::be_node * info)
 					{
 						throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
 					}
-					files[i].name += '/';
+					files[i].path += '/';
 				}
 				delete[] name;
 
@@ -370,7 +371,7 @@ void Metafile::calculate_info_hash(bencode::be_node * info, uint64_t metafile_le
 /*
  * Exception::ERR_CODE_NULL_REF
  * Exception::ERR_CODE_UNDEF
- * Exception::ERR_CODE_BENCODE_PARSE_ERROR
+ * Exception::ERR_CODE_BENCODE_ENCODE_ERROR
  * SyscallException
  */
 
@@ -382,7 +383,7 @@ void Metafile::save2file(const std::string & filepath)
 /*
  * Exception::ERR_CODE_NULL_REF
  * Exception::ERR_CODE_UNDEF
- * Exception::ERR_CODE_BENCODE_PARSE_ERROR
+ * Exception::ERR_CODE_BENCODE_ENCODE_ERROR
  * SyscallException
  */
 
@@ -401,7 +402,7 @@ void Metafile::save2file(const char * filepath)
 	if (bencode::encode(m_metafile, &bencoded_metafile, m_metafile_len, &bencoded_metafile_len) != ERR_NO_ERROR)
 	{
 		delete[] bencoded_metafile;
-		throw Exception(Exception::ERR_CODE_BENCODE_PARSE_ERROR);
+		throw Exception(Exception::ERR_CODE_BENCODE_ENCODE_ERROR);
 	}
 	int fd = open(filepath, O_RDWR | O_CREAT, S_IRWXU);
 	if (fd == -1)
@@ -434,9 +435,9 @@ void Metafile::dump()
 	std::cout<<"PRIVATE: "<<private_<<std::endl;
 	std::cout<<"LENGHT: "<<length<<std::endl;
 	std::cout<<"FILES:"<<std::endl;
-	for(std::vector<file_info>::iterator iter = files.begin(); iter != files.end(); ++iter)
+	for(std::vector<info::file_stat>::iterator iter = files.begin(); iter != files.end(); ++iter)
 	{
-		std::cout<<"	"<<iter->name<<"	"<<iter->length<<std::endl;
+		std::cout<<"	"<<iter->path<<"	"<<iter->length<<std::endl;
 	}
 	std::cout<<"PIECE LENGHT: "<<piece_length<<std::endl;
 	std::cout<<"PIECE COUNT: "<<piece_count<<std::endl;

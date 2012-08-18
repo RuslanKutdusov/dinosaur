@@ -772,7 +772,8 @@ void init_gui()
 {
 	try
 	{
-		dinosaur::Dinosaur::CreateDinosaur(bt);
+		dinosaur::torrent_failures tfs;
+		dinosaur::Dinosaur::CreateDinosaur(bt, tfs);
 	}
 	catch(dinosaur::Exception & e)
 	{
@@ -982,7 +983,7 @@ void show_open_dialog()
 	{
 		gtk_list_store_append(file_list, &iter);
 		gtk_list_store_set (file_list, &iter,
-							0, metafile->files[i].name.c_str(),
+							0, metafile->files[i].path.c_str(),
 							1, (guint64)metafile->files[i].length,
 							-1);
 	}

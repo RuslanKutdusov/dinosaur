@@ -43,10 +43,10 @@ void TorrentFile::init(const std::string & path, bool files_should_exists, uint3
 	files_exists = 0;
 	for(uint32_t i = 0; i < files_count; i++)
 	{
-		Metafile::file_info * fi = m_torrent->get_file_info(i);
+		info::file_stat * fi = m_torrent->get_file_info(i);
 		file f;
 		f.length = fi->length;
-		f.name = i_path + fi->name;
+		f.name = i_path + fi->path;
 		f.download = true;
 		f.priority = DOWNLOAD_PRIORITY_NORMAL;
 		try

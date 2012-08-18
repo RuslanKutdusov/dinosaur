@@ -86,7 +86,7 @@ void TorrentBase::init(const Metafile & metafile, const std::string & work_direc
 		m_failure_desc.exception_errcode = Exception::ERR_CODE_NO_MEMORY_AVAILABLE;
 		m_failure_desc.errno_ = 0;
 		m_failure_desc.description = "";
-		m_failure_desc.where = TORRENT_FAILURE_INITIALIZATION;
+		m_failure_desc.where = TORRENT_FAILURE_INIT_TORRENT;
 		m_state = TORRENT_STATE_FAILURE;
 	}
 	catch ( Exception & e)
@@ -96,7 +96,7 @@ void TorrentBase::init(const Metafile & metafile, const std::string & work_direc
 		m_failure_desc.exception_errcode = e.get_errcode();
 		m_failure_desc.errno_ = 0;
 		m_failure_desc.description = "";
-		m_failure_desc.where = TORRENT_FAILURE_INITIALIZATION;
+		m_failure_desc.where = TORRENT_FAILURE_INIT_TORRENT;
 		m_state = TORRENT_STATE_FAILURE;
 	}
 	catch( SyscallException & e )
@@ -106,7 +106,7 @@ void TorrentBase::init(const Metafile & metafile, const std::string & work_direc
 		m_failure_desc.exception_errcode = Exception::NO_ERROR;
 		m_failure_desc.errno_ = e.get_errno();
 		m_failure_desc.description = "";
-		m_failure_desc.where = TORRENT_FAILURE_INITIALIZATION;
+		m_failure_desc.where = TORRENT_FAILURE_INIT_TORRENT;
 		m_state = TORRENT_STATE_FAILURE;
 	}
 }
@@ -428,7 +428,7 @@ void TorrentBase::set_failure(const torrent_failure & tf)
 	m_failure_desc = tf;
 	m_state = TORRENT_STATE_FAILURE;
 #ifdef BITTORRENT_DEBUG
-	printf("Torrent %s FAILURE, error=%s\n", m_metafile.name.c_str());
+	printf("Torrent %s FAILURE\n", m_metafile.name.c_str());
 	printf("Where: %d\n", m_failure_desc.where);
 	printf("errno: %s\n", sys_errlist[m_failure_desc.errno_]);
 	printf("exc_err: %s\n", exception_errcode2str(m_failure_desc.exception_errcode).c_str());
@@ -665,6 +665,7 @@ void TorrentBase::get_info_stat(info::torrent_stat & ref)
 	ref.piece_length = m_metafile.piece_length;
 	ref.private_ = m_metafile.private_;
 	ref.start_time = m_start_time;
+	ref.files_count = m_metafile.files.size();
 	memcpy(ref.info_hash_hex, m_metafile.info_hash_hex, SHA1_HEX_LENGTH);
 }
 
@@ -697,17 +698,11 @@ void TorrentBase::get_info_trackers(info::trackers & ref)
 	}
 }
 
-void TorrentBase::get_info_files(info::files & ref)
+void TorrentBase::get_info_file_stat(FILE_INDEX index, info::file_stat & ref)
 {
-	ref.clear();
-	for(size_t i = 0; i < m_metafile.files.size(); i++)
-	{
-		info::file_stat f;
-		f.path = m_metafile.files[i].name;
-		f.length = m_metafile.files[i].length;
-		f.index = i;
-		ref.push_back(f);
-	}
+	if (index >= m_metafile.files.size())
+		throw Exception(Exception::ERR_CODE_INVALID_FILE_INDEX);
+    ref = m_metafile.files[index];
 }
 
 /*

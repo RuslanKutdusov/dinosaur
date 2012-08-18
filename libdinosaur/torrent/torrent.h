@@ -407,7 +407,7 @@ protected:
 	virtual void get_info_stat(info::torrent_stat & ref);
 	virtual void get_info_dyn(info::torrent_dyn & ref);
 	virtual void get_info_trackers(info::trackers & ref);
-	virtual void get_info_files(info::files & ref);
+	virtual void get_info_file_stat(FILE_INDEX index, info::file_stat & ref);
 	virtual void get_info_file_dyn(FILE_INDEX index, info::file_dyn & ref);
 	virtual void get_info_seeders(info::peers & ref);
 	virtual void get_info_leechers(info::peers & ref);
@@ -485,7 +485,10 @@ public:
 	virtual void get_info_stat(info::torrent_stat & ref) = 0;
 	virtual void get_info_dyn(info::torrent_dyn & ref) = 0;
 	virtual void get_info_trackers(info::trackers & ref) = 0;
-	virtual void get_info_files(info::files & ref) = 0;
+	/*
+	 * Exception::ERR_CODE_INVALID_FILE_INDEX
+	 */
+	virtual void get_info_file_stat(FILE_INDEX index, info::file_stat & ref) = 0;
 	/*
 	 * Exception::ERR_CODE_INVALID_FILE_INDEX
 	 */
@@ -520,7 +523,7 @@ public:
 	uint64_t get_uploaded();
 	size_t get_bitfield_length();
 	dir_tree::DirTree & get_dirtree();
-	Metafile::file_info * get_file_info(FILE_INDEX file_index);
+	info::file_stat * get_file_info(FILE_INDEX file_index);
 	void get_blocks_count_in_piece(PIECE_INDEX piece, uint32_t & blocks_count);
 	void get_piece_length(PIECE_INDEX piece, uint32_t & piece_length);
 	void get_block_index_by_offset(PIECE_INDEX piece_index, BLOCK_OFFSET block_offset, BLOCK_INDEX & index);

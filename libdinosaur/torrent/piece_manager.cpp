@@ -105,7 +105,7 @@ void PieceManager::build_piece_info()
 				m_file_contains_pieces.resize(f + 1);
 			m_file_contains_pieces[f].insert(piece_index);
 
-			Metafile::file_info * finfo = m_torrent->get_file_info(f);
+			info::file_stat * finfo = m_torrent->get_file_info(f);
 			last_file_length2 += finfo->length;
 			if (last_file_length2 >= end_of_piece)
 			{
@@ -123,7 +123,7 @@ void PieceManager::build_piece_info()
 				for(FILE_INDEX j = file_iter; j < file_count; j++)
 				{
 
-					Metafile::file_info * finfo = m_torrent->get_file_info(j);
+					info::file_stat * finfo = m_torrent->get_file_info(j);
 					last_files_length += finfo->length;//считает размер файлов, когда он станет больше смещения => кусок начинается в j-ом файле
 					if (last_files_length >= offset)
 					{
@@ -135,7 +135,7 @@ void PieceManager::build_piece_info()
 			}
 
 
-			Metafile::file_info * finfo = m_torrent->get_file_info(file_index);
+			info::file_stat * finfo = m_torrent->get_file_info(file_index);
 			FILE_OFFSET file_offset = last_files_length - finfo->length;//смещение до file_index файла
 			if (block == 0)
 			{

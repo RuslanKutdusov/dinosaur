@@ -10,6 +10,7 @@
 
 #include "consts.h"
 #include <list>
+#include <vector>
 
 namespace dinosaur
 {
@@ -17,7 +18,7 @@ namespace dinosaur
 typedef unsigned char 		SHA1_HASH[SHA1_LENGTH];
 typedef char 				SHA1_HASH_HEX[SHA1_HEX_LENGTH];
 typedef unsigned char * 	BITFIELD;
-typedef uint32_t			FILE_INDEX;
+typedef uint64_t			FILE_INDEX;
 typedef uint32_t 			BLOCK_INDEX;
 typedef uint32_t 			PIECE_INDEX;
 typedef uint32_t 			BLOCK_OFFSET;
@@ -62,7 +63,7 @@ enum TRACKER_STATUS
 
 enum TORRENT_FAILURE
 {
-	TORRENT_FAILURE_INITIALIZATION,
+	TORRENT_FAILURE_INIT_TORRENT,
 	TORRENT_FAILURE_WRITE_FILE,
 	TORRENT_FAILURE_READ_FILE,
 	TORRENT_FAILURE_GET_BLOCK_CACHE,
@@ -76,6 +77,8 @@ struct torrent_failure
 	TORRENT_FAILURE			where;
 	std::string				description;
 };
+
+typedef std::list<torrent_failure> torrent_failures;
 
 namespace info
 {
@@ -93,6 +96,7 @@ namespace info
 		uint32_t 			piece_count;
 		SHA1_HASH_HEX 		info_hash_hex;
 		time_t				start_time;
+		uint64_t			files_count;
 	};
 
 	struct torrent_dyn
@@ -135,7 +139,7 @@ namespace info
 		uint64_t			downloaded;
 	};
 
-	typedef std::list<file_stat> files;
+	typedef std::vector<file_stat> files_stat;
 
 	struct peer
 	{
