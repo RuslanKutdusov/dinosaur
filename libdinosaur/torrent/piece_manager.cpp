@@ -148,9 +148,6 @@ void PieceManager::build_piece_info()
 			block_info.second = offset - file_offset;
 			m_piece_info[piece_index].block_info.push_back(block_info);
 
-			#ifdef BITTORRENT_DEBUG
-				//printf("PIECE %u Block %u file %u offset %llu\n", piece_index, block, m_piece_info[piece_index].block_info[block].first, m_piece_info[piece_index].block_info[block].second);
-			#endif
 			offset += BLOCK_LENGTH;
 			if (need2download)
 				m_piece_info[piece_index].block2download.insert(block);
@@ -172,15 +169,6 @@ void PieceManager::build_piece_info()
 			m_piece_info[piece_index].prio_iter = m_tag_list.begin();
 		}
 	}
-/*#ifdef BITTORRENT_DEBUG
-	for(size_t i = 0; i < m_file_contains_pieces.size(); i++)
-	{
-		printf("File %u contains: ", i);
-		for(std::set<PIECE_INDEX>::iterator iter = m_file_contains_pieces[i].begin(); iter != m_file_contains_pieces[i].end(); ++iter)
-			printf("%u", *iter);
-		printf("\n");
-	}
-#endif*/
 }
 
 void PieceManager::get_blocks_count_in_piece(PIECE_INDEX piece_index, uint32_t & blocks_count)
@@ -463,9 +451,6 @@ int PieceManager::event_file_write(const fs::write_event & we, PIECE_STATE & pie
 	uint32_t block_length = 0;
 	piece_state = PIECE_STATE_NOT_FIN;
 	get_piece_block_from_block_id(we.block_id, piece_index, block_index);
-#ifdef BITTORRENT_DEBUG
-	//printf("event_file_write piece=%u block=%u writted=%d\n", piece_index, block_index, we->writted);
-#endif
 	if (we.writted < 0)
 	{
 		m_downloadable_blocks.erase(we.block_id);
@@ -498,7 +483,7 @@ int PieceManager::event_file_write(const fs::write_event & we, PIECE_STATE & pie
 				piece_state = PIECE_STATE_FIN_HASH_BAD;
 			}
 #ifdef BITTORRENT_DEBUG
-			printf("PIECE DONE %u ret=%d\n", piece_index, (int)ret);
+			LOG(INFO) << "PIECE DONE " << piece_index << " ret=" << ret;
 #endif
 		}
 	}

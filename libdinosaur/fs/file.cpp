@@ -14,7 +14,7 @@ namespace fs
 file::file()
 {
 #ifdef BITTORRENT_DEBUG
-	printf("file default constructor\n");
+	LOG(INFO) << "file default constructor";
 #endif
 	m_length = 0;
 	m_should_exists = false;
@@ -29,7 +29,8 @@ file::file()
 file::file(const char * fn, uint64_t length, bool should_exists, const FileAssociation::ptr & assoc) throw (Exception)
 {
 #ifdef BITTORRENT_DEBUG
-	printf("file constructor fn=%s length=%llu\n", fn, length);
+	LOG(INFO) << "file constructor fn=" << fn
+			  << " length=" << length;
 #endif
 	if (fn == NULL)
 		throw Exception(Exception::ERR_CODE_NULL_REF);
@@ -44,11 +45,12 @@ file::file(const char * fn, uint64_t length, bool should_exists, const FileAssoc
 file::~file()
 {
 #ifdef BITTORRENT_DEBUG
-	printf("file destructor fn=%s %X\n",m_fn.c_str(), this);
+	LOG(INFO) << "file destructor fn=" << m_fn.c_str()
+			  << " " << this;
 #endif
 	_close();
 #ifdef BITTORRENT_DEBUG
-	printf("file destructed\n");
+	LOG(INFO) << "file destructed";
 #endif
 }
 
@@ -60,7 +62,7 @@ file::~file()
 void file::_open() throw(Exception, SyscallException)
 {
 #ifdef FS_DEBUG
-	printf("Opening file %s\n", m_fn.c_str());
+	LOG(INFO) << "Opening file " << m_fn.c_str();
 #endif
 	bool not_exists = false;
 	struct stat st;
@@ -70,7 +72,7 @@ void file::_open() throw(Exception, SyscallException)
 	if (not_exists && m_should_exists)
 	{
 			#ifdef FS_DEBUG
-				printf("Fail: file %s does not exists\n", m_fn.c_str());
+				LOG(INFO) << "Fail: file " << m_fn.c_str() <<" does not exists";
 			#endif
 		throw Exception(Exception::ERR_CODE_FILE_NOT_EXISTS);
 	}
@@ -80,7 +82,7 @@ void file::_open() throw(Exception, SyscallException)
 		if (m_fd == -1)
 		{
 			#ifdef FS_DEBUG
-				printf("Fail: %s\n", sys_errlist[errno]);
+				LOG(INFO) << "Fail: " << sys_errlist[errno];
 			#endif
 			throw SyscallException();
 		}
@@ -93,21 +95,21 @@ void file::_open() throw(Exception, SyscallException)
 		if (m_fd == -1)
 		{
 			#ifdef FS_DEBUG
-				printf("Fail: %s\n", sys_errlist[errno]);
+				LOG(INFO) << "Fail: " << sys_errlist[errno];
 			#endif
 			throw SyscallException();
 		}
-		//printf("truncating\n");
+		//LOG(INFO) << "truncating";
 		if (ftruncate64(m_fd, m_length) == -1)
 		{
 			#ifdef FS_DEBUG
-				printf("Fail: %s\n", sys_errlist[errno]);
+				LOG(INFO) << "Fail: " << sys_errlist[errno];
 			#endif
 			throw SyscallException();
 		}
 	}
 	#ifdef FS_DEBUG
-		printf("OK\n");
+		LOG(INFO) << "OK";
 	#endif
 }
 
@@ -119,13 +121,15 @@ void file::_open() throw(Exception, SyscallException)
 size_t file::_write(const char * buf, uint64_t offset, uint64_t length) throw(Exception, SyscallException)
 {
 	#ifdef FS_DEBUG
-		printf("Writing to file %s offset=%llu length=%llu\n", m_fn.c_str(),  offset, length);
+		LOG(INFO) << "Writing to file " <<  m_fn.c_str()
+				  << " offset=" << offset
+				  << " length=" << length;
 	#endif
 	int ret;
 	if (!is_opened())
 	{
 		#ifdef FS_DEBUG
-			printf("Fail: File is not opened\n");
+			LOG(INFO) << "Fail: File is not opened";
 		#endif
 		throw Exception(Exception::ERR_CODE_FILE_NOT_OPENED);
 	}
@@ -133,7 +137,7 @@ size_t file::_write(const char * buf, uint64_t offset, uint64_t length) throw(Ex
 	if (ret == -1)
 	{
 		#ifdef FS_DEBUG
-			printf("Fail: %s\n", sys_errlist[errno]);
+		LOG(INFO) << "Fail: " << sys_errlist[errno];
 		#endif
 		throw SyscallException();
 	}
@@ -141,12 +145,12 @@ size_t file::_write(const char * buf, uint64_t offset, uint64_t length) throw(Ex
 	if (ret == -1)
 	{
 		#ifdef FS_DEBUG
-			printf("Fail: %s\n", sys_errlist[errno]);
+		LOG(INFO) << "Fail: " << sys_errlist[errno];
 		#endif
 		throw SyscallException();
 	}
 	#ifdef FS_DEBUG
-		printf("OK\n");
+		LOG(INFO) << "OK";
 	#endif
 	return ret;
 }
@@ -176,7 +180,7 @@ size_t file::_read(char * buf, uint64_t offset, uint64_t length) throw(Exception
 void file::_close()
 {
 	close(m_fd);
-	//printf("file closed id=%d\n", m_id);
+	LOG(INFO) << "file closed "<< m_fn.c_str();
 	m_fd = -1;
 }
 

@@ -22,6 +22,7 @@
 #include <boost/enable_shared_from_this.hpp>
 #include "../exceptions/exceptions.h"
 #include "../err/err_code.h"
+#include <glog/logging.h>
 
 namespace dinosaur {
 namespace network
@@ -125,13 +126,13 @@ public:
 	{
 		memset(&m_peer, 0, sizeof(sockaddr_in));
 #ifdef BITTORRENT_DEBUG
-	printf("Socket constructor %X\n", this);
+	LOG(INFO) << "Socket constructor " << this;
 #endif
 	}
 	~socket_()
 	{
 #ifdef BITTORRENT_DEBUG
-		printf("Socket destructed %X %d %s %s\n", this, m_socket, m_domain.c_str(), inet_ntoa(m_peer.sin_addr));
+		LOG(INFO) << "Socket destructed "<< this << " " << m_socket << " " << m_domain.c_str() << " " << inet_ntoa(m_peer.sin_addr);
 #endif
 		close(m_socket);
 	}
@@ -142,7 +143,7 @@ public:
 	}
 	void print_ip()
 	{
-		printf("%s\n", inet_ntoa(m_peer.sin_addr));
+		LOG(INFO) << inet_ntoa(m_peer.sin_addr);
 	}
 #endif
 	int get_errno()
@@ -221,7 +222,7 @@ public:
 			return 0;
 		return sock->m_send_buffer.length - sock->m_send_buffer.pos;
 	}
-#ifdef BITTORRENT_DEBUG
+/*#ifdef BITTORRENT_DEBUG
 	int test_view_socks()
 	{
 		for(socket_set_iter iter = m_sockets.begin(); iter != m_sockets.end(); ++iter)
@@ -248,7 +249,7 @@ public:
 		}
 		return 0;
 	}
-#endif
+#endif*/
 	int clock()  throw (SyscallException);
 	void notify();
 };

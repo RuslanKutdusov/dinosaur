@@ -60,7 +60,6 @@ public:
 	virtual ~Metafile();
 	void save2file(const std::string & filepath);
 	void save2file(const char * filepath);
-	void dump();
 };
 typedef boost::shared_ptr<Metafile> MetafilePtr;
 

@@ -35,6 +35,7 @@
 #include "metafile.h"
 #include "torrent_types.h"
 #include "../types.h"
+#include <glog/logging.h>
 
 namespace dinosaur {
 namespace torrent {

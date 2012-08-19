@@ -25,6 +25,7 @@
 #include <vector>
 #include <string>
 #include <boost/shared_ptr.hpp>
+#include <glog/logging.h>
 
 namespace dinosaur {
 
@@ -105,6 +106,7 @@ public:
 	{
 		try
 		{
+			google::InitGoogleLogging("dinosaur");
 			ptr.reset(new Dinosaur());
 			fail_torrents = ptr->m_fails_torrents;
 			pthread_mutex_lock(&ptr->m_mutex);

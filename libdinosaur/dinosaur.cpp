@@ -86,7 +86,7 @@ void Dinosaur::init_listen_socket()
 Dinosaur::~Dinosaur() {
 	// TODO Auto-generated destructor stub
 #ifdef BITTORRENT_DEBUG
-	printf("Dinosaur destructor\n");
+	LOG(INFO) << "Dinosaur destructor";
 #endif
 	pthread_mutex_lock(&m_mutex);
 	for(torrent_map_iter iter = m_torrents.begin(); iter != m_torrents.end(); ++iter)
@@ -100,9 +100,6 @@ Dinosaur::~Dinosaur() {
 		usleep(100000);
 		if (time(NULL) - release_start > MAX_RELEASE_TIME)
 		{
-#ifdef BITTORRENT_DEBUG
-			printf("MAX_RELEASE_TIME\n");
-#endif
 			break;
 		}
 	}
@@ -115,7 +112,7 @@ Dinosaur::~Dinosaur() {
 	}
 	m_torrents.clear();
 #ifdef BITTORRENT_DEBUG
-	printf("Dinosaur destroyed\n");
+	LOG(INFO) << "Dinosaur destroyed";
 #endif
 }
 
@@ -553,9 +550,6 @@ int Dinosaur::event_sock_ready2read(network::Socket sock)
 
 int Dinosaur::event_sock_closed(network::Socket sock)
 {
-#ifdef BITTORRENT_DEBUG
-	printf("LISTEN_SOCKET closed\n");
-#endif
 	if (sock != m_sock)
 		m_nm.Socket_delete(sock);
 	return 0;
@@ -573,9 +567,6 @@ int Dinosaur::event_sock_connected(network::Socket sock)
 
 int Dinosaur::event_sock_accepted(network::Socket sock, network::Socket accepted_sock)
 {
-#ifdef BITTORRENT_DEBUG
-	printf("LISTEN_SOCKET accepted\n");
-#endif
 	m_nm.Socket_set_assoc(accepted_sock, shared_from_this());
 	return 0;
 }
@@ -603,7 +594,7 @@ void * Dinosaur::thread(void * arg)
 		catch(SyscallException & e)
 		{
 #ifdef BITTORRENT_DEBUG
-			printf("NetworkManager::clock throws exception: %s\n", e.get_errno_str());
+			LOG(INFO) << "NetworkManager::clock throws exception: " << e.get_errno_str();
 #endif
 		}
 		pthread_mutex_lock(&bt->m_mutex);
@@ -613,7 +604,7 @@ void * Dinosaur::thread(void * arg)
 		}
 		catch (Exception & e) {
 #ifdef BITTORRENT_DEBUG
-			printf("NetworkManager::notify throws exception: %s\n", exception_errcode2str(e).c_str());
+			LOG(INFO) <<  "NetworkManager::notify throws exception: " << exception_errcode2str(e).c_str();
 #endif
 		}
 		bt->m_fm.notify();
