@@ -7,7 +7,7 @@
 #pragma once
 #include <stdio.h>
 #include <stdint.h>
-#include <time.h>
+#include <sys/time.h>
 #include <string.h>
 #include <queue>
 #include <list>
