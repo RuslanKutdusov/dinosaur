@@ -167,9 +167,6 @@ void Metafile::init(const char * metafile_path)
 	if (buf == NULL)
 		throw SyscallException();
 	m_metafile = bencode::decode(buf, m_metafile_len, false);
-#ifdef BITTORRENT_DEBUG
-	bencode::dump(m_metafile);
-#endif
 	free(buf);
 	if (!m_metafile)
 		throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
@@ -420,28 +417,6 @@ void Metafile::save2file(const char * filepath)
 	}
 	close(fd);
 	delete[] bencoded_metafile;
-}
-
-void Metafile::dump()
-{
-	std::cout<<"ANNOUNCES:"<<std::endl;
-	for(std::vector<std::string>::iterator iter = announces.begin(); iter != announces.end(); ++iter)
-	{
-		std::cout<<"	"<<*iter<<std::endl;
-	}
-	std::cout<<"COMMENT: "<<comment<<std::endl;
-	std::cout<<"CREATED BY: "<<created_by<<std::endl;
-	std::cout<<"CREATION DATA: "<<creation_date<<std::endl;
-	std::cout<<"PRIVATE: "<<private_<<std::endl;
-	std::cout<<"LENGHT: "<<length<<std::endl;
-	std::cout<<"FILES:"<<std::endl;
-	for(std::vector<info::file_stat>::iterator iter = files.begin(); iter != files.end(); ++iter)
-	{
-		std::cout<<"	"<<iter->path<<"	"<<iter->length<<std::endl;
-	}
-	std::cout<<"PIECE LENGHT: "<<piece_length<<std::endl;
-	std::cout<<"PIECE COUNT: "<<piece_count<<std::endl;
-	std::cout<<"INFOHASH: "<<info_hash_hex<<std::endl;
 }
 
 } /* namespace torrent */

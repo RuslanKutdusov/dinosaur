@@ -14,7 +14,7 @@ TorrentBase::TorrentBase(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs
 	//:network::sock_event(), fs::file_event()
 {
 #ifdef BITTORRENT_DEBUG
-	printf("Torrent default constructor\n");
+	LOG(INFO) << "Torrent default constructor";
 #endif
 	if (nm == NULL || g_cfg == NULL || fm == NULL || bc == NULL)
 		throw Exception(Exception::ERR_CODE_UNDEF);
@@ -114,17 +114,17 @@ void TorrentBase::init(const Metafile & metafile, const std::string & work_direc
 TorrentBase::~TorrentBase()
 {
 #ifdef BITTORRENT_DEBUG
-	printf("Torrent destructor\n");
+	LOG(INFO) << "Torrent destructor";
 #endif
 #ifdef BITTORRENT_DEBUG
-	printf("Torrent destroyed\n");
+	LOG(INFO) << "Torrent destroyed";
 #endif
 }
 
 void TorrentBase::prepare2release()
 {
 #ifdef BITTORRENT_DEBUG
-	printf("Releasing torrent %s %s\n", m_metafile.name.c_str(), m_metafile.info_hash_hex);
+	LOG(INFO) << "Releasing torrent " <<  m_metafile.name.c_str() << " " << m_metafile.info_hash_hex;
 #endif
 	m_state = TORRENT_STATE_INIT_RELEASING;
 }
@@ -242,7 +242,7 @@ void TorrentBase::add_leecher(network::Socket & sock)
 	{
 		std::string key;
 		get_peer_key(&sock->m_peer, key);
-		//printf("add incoming peer %s\n", key.c_str());
+		//LOG(INFO) << "add incoming peer %s\n", key.c_str());
 		if ((m_leechers.count(key) == 0 || m_leechers[key] == NULL) && m_leechers.size() < m_g_cfg->get_max_active_leechers())
 		{
 			PeerPtr peer(new Peer());
@@ -428,11 +428,11 @@ void TorrentBase::set_failure(const torrent_failure & tf)
 	m_failure_desc = tf;
 	m_state = TORRENT_STATE_FAILURE;
 #ifdef BITTORRENT_DEBUG
-	printf("Torrent %s FAILURE\n", m_metafile.name.c_str());
-	printf("Where: %d\n", m_failure_desc.where);
-	printf("errno: %s\n", sys_errlist[m_failure_desc.errno_]);
-	printf("exc_err: %s\n", exception_errcode2str(m_failure_desc.exception_errcode).c_str());
-	printf("desc: %s\n", m_failure_desc.description.c_str());
+	LOG(INFO) << "Torrent " << m_metafile.name.c_str() << " FAILURE";
+	LOG(INFO) << "Where: " << m_failure_desc.where;
+	LOG(INFO) << "errno: " << sys_errlist[m_failure_desc.errno_];
+	LOG(INFO) << "exc_err: " <<  exception_errcode2str(m_failure_desc.exception_errcode).c_str();
+	LOG(INFO) << "desc: " <<  m_failure_desc.description.c_str();
 #endif
 }
 
@@ -459,7 +459,7 @@ int TorrentBase::clock()
 	if (m_state == TORRENT_STATE_FAILURE)
 	{
 		#ifdef BITTORRENT_DEBUG
-		printf("Stopping due failure\n");
+		LOG(INFO) << "Stopping due failure";
 		#endif
 		stop();
 		m_work = TORRENT_WORK_FAILURE;
@@ -476,9 +476,9 @@ int TorrentBase::clock()
 			else
 			{
 				m_active_seeders.push_back(seed);
-#ifdef BITTORRENT_DEBUG
-				printf("Pushing seed %s to active seeders\n", seed->get_ip_str().c_str());
-#endif
+				#ifdef BITTORRENT_DEBUG
+				LOG(INFO) << "Pushing seed " << seed->get_ip_str().c_str() << " to active seeders\n";
+				#endif
 			}
 		}
 		if (!m_active_seeders.empty())
@@ -499,7 +499,7 @@ int TorrentBase::clock()
 				m_active_seeders.erase(seed_iter);
 				m_waiting_seeders.push_back(seed);
 				#ifdef BITTORRENT_DEBUG
-								printf("Pushing seed %s to waiting seeders\n", seed->get_ip_str().c_str());
+				LOG(INFO) << "Pushing seed " << seed->get_ip_str().c_str() << " to waitig seeders\n";
 				#endif
 			}
 			else
@@ -518,7 +518,7 @@ int TorrentBase::clock()
 					m_downloadable_pieces.push_back(piece_index);
 					m_piece_manager->pop_piece2download();
 					#ifdef BITTORRENT_DEBUG
-					printf("Piece %u now is downloadable\n", piece_index);
+					LOG(INFO) << "Piece " << piece_index << " now is downloadable\n";
 					#endif
 				}
 				if (m_downloadable_pieces.size() > 0)
@@ -535,7 +535,7 @@ int TorrentBase::clock()
 						}
 						m_piece_manager->set_piece_taken_from(piece_index, seed->get_ip_str());
 						#ifdef BITTORRENT_DEBUG
-						printf("Piece %u is requested from seed %s\n", piece_index, seed->get_ip_str().c_str());
+						LOG(INFO) << "Piece " << piece_index << " is requested from seed " <<  seed->get_ip_str().c_str();
 						#endif
 					}
 				}
@@ -553,8 +553,6 @@ int TorrentBase::clock()
 		for(peer_map_iter leecher_iter = m_leechers.begin(), leecher_iter2 = leecher_iter; leecher_iter != m_leechers.end(); leecher_iter = leecher_iter2)
 		{
 			++leecher_iter2;
-			if (leecher_iter->second == NULL ||leecher_iter->first.c_str() == NULL)
-				printf("Leech clock %s\n", leecher_iter->first.c_str());
 			PeerPtr leecher = leecher_iter->second;
 			leecher->clock();
 			if (leecher->is_sleep())

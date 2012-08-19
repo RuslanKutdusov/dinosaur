@@ -12,7 +12,7 @@ namespace fs {
 FileManager::FileManager()
 {
 #ifdef BITTORRENT_DEBUG
-	printf("FileManager default constructor\n");
+	LOG(INFO) << "FileManager default constructor";
 #endif
 	m_write_thread = 0;
 }
@@ -63,7 +63,7 @@ void FileManager::Init(cfg::Glob_cfg * cfg) throw (Exception)
 
 FileManager::~FileManager() {
 #ifdef BITTORRENT_DEBUG
-	printf("FileManager destructor\n");
+	LOG(INFO) << "FileManager destructor";
 #endif
 	if (m_write_thread != 0)
 	{
@@ -77,7 +77,7 @@ FileManager::~FileManager() {
 		(*iter)->m_assoc.reset();
 	}
 #ifdef BITTORRENT_DEBUG
-	printf("FileManager destroyed\n");
+	LOG(INFO) << "FileManager destroyed";
 #endif
 }
 
@@ -93,7 +93,7 @@ int FileManager::File_add(const char * fn, uint64_t length, bool should_exists, 
 	pthread_mutex_lock(&m_mutex);
 	m_files.insert(file_);
 	pthread_mutex_unlock(&m_mutex);
-	//printf("File added id=%d\n", f->m_id);
+	//LOG(INFO) << "File added id=%d\n", f->m_id);
 	return ERR_NO_ERROR;
 }
 
@@ -151,7 +151,9 @@ void FileManager::prepare_file(File & file) throw (Exception, SyscallException)
 void FileManager::File_write(File & file, const char * buf, uint32_t length, uint64_t offset, const BLOCK_ID & block_id) throw (Exception, SyscallException)
 {
 	#ifdef FS_DEBUG
-		printf("Write to file %s offset=%llu length=%u\n", file->m_fn.c_str(),  offset, length);
+	LOG(INFO) << "Write to file " <<  file->m_fn.c_str()
+					  << " offset=" << offset
+					  << " length=" << length;
 	#endif
 	pthread_mutex_lock(&m_mutex);
 	try
@@ -159,14 +161,14 @@ void FileManager::File_write(File & file, const char * buf, uint32_t length, uin
 		if (buf == NULL || file == NULL)
 		{
 			#ifdef FS_DEBUG
-				printf("Fail: buf = NULL or file = NULL\n");
+				LOG(INFO) << "Fail: buf = NULL or file = NULL";
 			#endif
 			throw Exception(Exception::ERR_CODE_NULL_REF);
 		}
 		if (length == 0 && offset > 0)
 		{
 			#ifdef FS_DEBUG
-				printf("Fail: length = 0 and offset > 0\n");
+				LOG(INFO) << "Fail: length = 0 and offset > 0";
 			#endif
 			throw Exception(Exception::ERR_CODE_FILE_WRITE_OFFSET_OVERFLOW);
 		}
@@ -180,20 +182,20 @@ void FileManager::File_write(File & file, const char * buf, uint32_t length, uin
 			m_write_event.push_back(we);
 			we.file.reset();
 			#ifdef FS_DEBUG
-				printf("OK\n");
+				LOG(INFO) << "OK";
 			#endif
 		}
 		if (offset >= file->m_length)
 		{
 			#ifdef FS_DEBUG
-				printf("Fail: offset overflow\n");
+				LOG(INFO) << "Fail: offset overflow";
 			#endif
 			throw Exception(Exception::ERR_CODE_FILE_WRITE_OFFSET_OVERFLOW);
 		}
 
 		m_write_cache.push(file, buf, length, offset, block_id);
 		#ifdef FS_DEBUG
-				printf("OK\n");
+				LOG(INFO) << "OK";
 		#endif
 		pthread_mutex_unlock(&m_mutex);
 	}
@@ -368,7 +370,7 @@ void * FileManager::cache_thread(void * arg)
 		FileManager * fm = (FileManager*)arg;
 		while(!fm->m_thread_stop)
 		{
-			//printf("cache_thread loop\n");
+			//LOG(INFO) << "cache_thread loop";
 			pthread_mutex_lock(&fm->m_mutex);
 			if (!fm->m_write_cache.empty())
 			{
