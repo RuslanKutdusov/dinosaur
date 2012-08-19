@@ -122,10 +122,10 @@ JNIEXPORT jobject JNICALL Java_dinosaur_Dinosaur_get_1torrent_1info_1file_1stat
 /*
  * Class:     dinosaur_Dinosaur
  * Method:    get_torrent_info_file_dyn
- * Signature: (Ljava/lang/String;)Ldinosaur/info/file_dyn;
+ * Signature: (Ljava/lang/String;I)Ldinosaur/info/file_dyn;
  */
 JNIEXPORT jobject JNICALL Java_dinosaur_Dinosaur_get_1torrent_1info_1file_1dyn
-  (JNIEnv *, jobject, jstring);
+  (JNIEnv *, jobject, jstring, jint);
 
 /*
  * Class:     dinosaur_Dinosaur

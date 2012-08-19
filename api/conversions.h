@@ -27,6 +27,7 @@ jobject Create_file_stat(JNIEnv * env, jclass clazz, jmethodID ID, const dinosau
 jobjectArray Create_file_stats(JNIEnv * env, const dinosaur::info::files_stat & files_stat);
 
 jobjectArray Create_strings(JNIEnv * env, const std::vector<std::string> & strings);
+jobjectArray Create_strings(JNIEnv * env, const std::list<std::string> & strings);
 
 jobject Create_Metafile(JNIEnv * env, dinosaur::torrent::MetafilePtr & metafile);
 
@@ -47,7 +48,7 @@ jobject Create_tracker(JNIEnv * env, const dinosaur::info::tracker & t);
 jobject Create_tracker(JNIEnv * env, jclass clazz, jmethodID ID, const dinosaur::info::tracker & t);
 jobjectArray Create_trackers(JNIEnv * env, const dinosaur::info::trackers & ts);
 
-jobject Create_socket_status(JNIEnv * env, dinosaur::socket_status & ss);
+jobject Create_socket_status(JNIEnv * env, const dinosaur::socket_status & ss);
 
 
 

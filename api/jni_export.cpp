@@ -92,7 +92,7 @@ jstring Java_dinosaur_Dinosaur_AddTorrent
 void Java_dinosaur_Dinosaur_StartTorrent
   (JNIEnv * env, jobject jobj, jstring jhash)
 {
-	if (dino == NULL || meta == NULL)
+	if (dino == NULL)
 	{
 		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
 		ThrowException(env, e);
@@ -112,7 +112,7 @@ void Java_dinosaur_Dinosaur_StartTorrent
 void Java_dinosaur_Dinosaur_StopTorrent
 	(JNIEnv * env, jobject jobj, jstring jhash)
 {
-	if (dino == NULL || meta == NULL)
+	if (dino == NULL)
 	{
 		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
 		ThrowException(env, e);
@@ -132,7 +132,7 @@ void Java_dinosaur_Dinosaur_StopTorrent
 void Java_dinosaur_Dinosaur_PauseTorrent
 	(JNIEnv * env, jobject jobj, jstring jhash)
 {
-	if (dino == NULL || meta == NULL)
+	if (dino == NULL)
 	{
 		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
 		ThrowException(env, e);
@@ -152,7 +152,7 @@ void Java_dinosaur_Dinosaur_PauseTorrent
 void Java_dinosaur_Dinosaur_ContinueTorrent
 	(JNIEnv * env, jobject jobj, jstring jhash)
 {
-	if (dino == NULL || meta == NULL)
+	if (dino == NULL)
 	{
 		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
 		ThrowException(env, e);
@@ -172,7 +172,7 @@ void Java_dinosaur_Dinosaur_ContinueTorrent
 void Java_dinosaur_Dinosaur_CheckTorrent
 	(JNIEnv * env, jobject jobj, jstring jhash)
 {
-	if (dino == NULL || meta == NULL)
+	if (dino == NULL )
 	{
 		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
 		ThrowException(env, e);
@@ -192,7 +192,7 @@ void Java_dinosaur_Dinosaur_CheckTorrent
 void Java_dinosaur_Dinosaur_DeleteTorrent
 	(JNIEnv * env, jobject jobj, jstring jhash)
 {
-	if (dino == NULL || meta == NULL)
+	if (dino == NULL)
 	{
 		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
 		ThrowException(env, e);
@@ -202,6 +202,251 @@ void Java_dinosaur_Dinosaur_DeleteTorrent
 	try
 	{
 		dino->DeleteTorrent(hash);
+	}
+	catch(dinosaur::Exception & e)
+	{
+		ThrowException(env, e);
+	}
+}
+
+jobject Java_dinosaur_Dinosaur_get_1torrent_1info_1stat
+  (JNIEnv * env, jobject jobj, jstring jhash)
+{
+	if (dino == NULL)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
+		ThrowException(env, e);
+		return NULL;
+	}
+	std::string hash = env->GetStringUTFChars(jhash, NULL);
+	try
+	{
+		dinosaur::info::torrent_stat ts;
+		dino->get_torrent_info_stat(hash, ts);
+		return Create_torrent_stat(env, ts);
+	}
+	catch(dinosaur::Exception & e)
+	{
+		ThrowException(env, e);
+	}
+	return NULL;
+}
+
+jobject Java_dinosaur_Dinosaur_get_1torrent_1info_1dyn
+(JNIEnv * env, jobject jobj, jstring jhash)
+{
+	if (dino == NULL)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
+		ThrowException(env, e);
+		return NULL;
+	}
+	std::string hash = env->GetStringUTFChars(jhash, NULL);
+	try
+	{
+		dinosaur::info::torrent_dyn tn;
+		dino->get_torrent_info_dyn(hash, tn);
+		return Create_torrent_dyn(env, tn);
+	}
+	catch(dinosaur::Exception & e)
+	{
+		ThrowException(env, e);
+	}
+	return NULL;
+}
+
+jobjectArray Java_dinosaur_Dinosaur_get_1torrent_1info_1trackers
+(JNIEnv * env, jobject jobj, jstring jhash)
+{
+	if (dino == NULL)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
+		ThrowException(env, e);
+		return NULL;
+	}
+	std::string hash = env->GetStringUTFChars(jhash, NULL);
+	try
+	{
+		dinosaur::info::trackers ref;
+		dino->get_torrent_info_trackers(hash, ref);
+		return Create_trackers(env, ref);
+	}
+	catch(dinosaur::Exception & e)
+	{
+		ThrowException(env, e);
+	}
+	return NULL;
+}
+
+jobject Java_dinosaur_Dinosaur_get_1torrent_1info_1file_1stat
+(JNIEnv * env, jobject jobj, jstring jhash, jint jindex)
+{
+	if (dino == NULL)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
+		ThrowException(env, e);
+		return NULL;
+	}
+	std::string hash = env->GetStringUTFChars(jhash, NULL);
+	try
+	{
+		dinosaur::info::file_stat ref;
+		dino->get_torrent_info_file_stat(hash, (dinosaur::FILE_INDEX)jindex, ref);
+		return Create_file_stat(env, ref);
+	}
+	catch(dinosaur::Exception & e)
+	{
+		ThrowException(env, e);
+	}
+	return NULL;
+}
+
+jobject Java_dinosaur_Dinosaur_get_1torrent_1info_1file_1dyn
+(JNIEnv * env, jobject jobj, jstring jhash, jint jindex)
+{
+	if (dino == NULL)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
+		ThrowException(env, e);
+		return NULL;
+	}
+	std::string hash = env->GetStringUTFChars(jhash, NULL);
+	try
+	{
+		dinosaur::info::file_dyn ref;
+		dino->get_torrent_info_file_dyn(hash, (dinosaur::FILE_INDEX)jindex, ref);
+		return Create_file_dyn(env, ref);
+	}
+	catch(dinosaur::Exception & e)
+	{
+		ThrowException(env, e);
+	}
+	return NULL;
+}
+
+jobjectArray Java_dinosaur_Dinosaur_get_1torrent_1info_1seeders
+(JNIEnv * env, jobject jobj, jstring jhash)
+{
+	if (dino == NULL)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
+		ThrowException(env, e);
+		return NULL;
+	}
+	std::string hash = env->GetStringUTFChars(jhash, NULL);
+	try
+	{
+		dinosaur::info::peers ref;
+		dino->get_torrent_info_seeders(hash, ref);
+		return Create_peers(env, ref);
+	}
+	catch(dinosaur::Exception & e)
+	{
+		ThrowException(env, e);
+	}
+	return NULL;
+}
+
+jobjectArray Java_dinosaur_Dinosaur_get_1torrent_1info_1leechers
+(JNIEnv * env, jobject jobj, jstring jhash)
+{
+	if (dino == NULL)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
+		ThrowException(env, e);
+		return NULL;
+	}
+	std::string hash = env->GetStringUTFChars(jhash, NULL);
+	try
+	{
+		dinosaur::info::peers ref;
+		dino->get_torrent_info_leechers(hash, ref);
+		return Create_peers(env, ref);
+	}
+	catch(dinosaur::Exception & e)
+	{
+		ThrowException(env, e);
+	}
+	return NULL;
+}
+
+jobjectArray Java_dinosaur_Dinosaur_get_1torrent_1info_1downloadable_1pieces
+(JNIEnv * env, jobject jobj, jstring jhash)
+{
+	if (dino == NULL)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
+		ThrowException(env, e);
+		return NULL;
+	}
+	std::string hash = env->GetStringUTFChars(jhash, NULL);
+	try
+	{
+		dinosaur::info::downloadable_pieces ref;
+		dino->get_torrent_info_downloadable_pieces(hash, ref);
+		return Create_downloadable_pieces(env, ref);
+	}
+	catch(dinosaur::Exception & e)
+	{
+		ThrowException(env, e);
+	}
+	return NULL;
+}
+
+jobjectArray Java_dinosaur_Dinosaur_get_1TorrentList
+(JNIEnv * env, jobject jobj)
+{
+	if (dino == NULL)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
+		ThrowException(env, e);
+		return NULL;
+	}
+	try
+	{
+		std::list<std::string> ref;
+		dino->get_TorrentList(ref);
+		return Create_strings(env, ref);
+	}
+	catch(dinosaur::Exception & e)
+	{
+		ThrowException(env, e);
+	}
+	return NULL;
+}
+
+jobject Java_dinosaur_Dinosaur_get_1socket_1status
+(JNIEnv * env, jobject jobj)
+{
+	if (dino == NULL)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
+		ThrowException(env, e);
+		return NULL;
+	}
+	try
+	{
+		return Create_socket_status(env, dino->get_socket_status());
+	}
+	catch(dinosaur::Exception & e)
+	{
+		ThrowException(env, e);
+	}
+	return NULL;
+}
+
+void Java_dinosaur_Dinosaur_UpdateConfigs
+  (JNIEnv * env, jobject obj)
+{
+	if (dino == NULL)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
+		ThrowException(env, e);
+		return;
+	}
+	try
+	{
+		dino->UpdateConfigs();
 	}
 	catch(dinosaur::Exception & e)
 	{

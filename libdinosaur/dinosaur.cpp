@@ -398,6 +398,7 @@ void Dinosaur::get_torrent_info_trackers(const std::string & hash, info::tracker
 
 /*
  * Exception::ERR_CODE_TORRENT_NOT_EXISTS
+ * Exception::ERR_CODE_INVALID_FILE_INDEX
  */
 
 void Dinosaur::get_torrent_info_file_stat(const std::string & hash, FILE_INDEX index, info::file_stat & ref)
@@ -485,6 +486,10 @@ void Dinosaur::get_TorrentList(std::list<std::string> & ref)
 		ref.push_back((*iter).first);
 	pthread_mutex_unlock(&m_mutex);
 }
+
+/*
+* Exception::ERR_CODE_CAN_NOT_SAVE_CONFIG
+*/
 
 void Dinosaur::UpdateConfigs()
 {
