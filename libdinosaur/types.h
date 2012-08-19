@@ -103,8 +103,8 @@ namespace info
 	{
 		uint64_t 			downloaded;
 		uint64_t 			uploaded;
-		double 				rx_speed;
-		double 				tx_speed;
+		int 				rx_speed;
+		int 				tx_speed;
 		uint32_t			seeders;
 		uint32_t			total_seeders;
 		uint32_t			leechers;

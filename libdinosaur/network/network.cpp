@@ -17,9 +17,9 @@ ssize_t buffer_remain(struct buffer * buf)
 
 double get_time()
 {
-	timespec ts;
-	clock_gettime(CLOCK_REALTIME, &ts);
-	return (double)ts.tv_sec + (double)ts.tv_nsec / (double)POW10_9;
+	timeval tv;
+	gettimeofday(&tv, NULL);
+	return (double)tv.tv_sec + (double)tv.tv_usec / (double)POW10_6;
 }
 
 NetworkManager::NetworkManager()
@@ -679,26 +679,22 @@ void NetworkManager::Socket_get_assoc(Socket & sock, SocketAssociation::ptr & as
  * Exception::ERR_CODE_NULL_REF
  */
 
-double NetworkManager::Socket_get_rx_speed(Socket & sock) throw (Exception)
+int NetworkManager::Socket_get_rx_speed(Socket & sock) throw (Exception)
 {
 	if (sock == NULL)
 		throw Exception(Exception::ERR_CODE_NULL_REF);
-	double time = get_time();
-	double speed = (double)sock->m_rx / (time - sock->m_rx_last_time);
-	return speed;
+	return sock->m_rx / (get_time() - sock->m_rx_last_time);
 }
 
 /*
  * Exception::ERR_CODE_NULL_REF
  */
 
-double NetworkManager::Socket_get_tx_speed(Socket & sock) throw (Exception)
+int NetworkManager::Socket_get_tx_speed(Socket & sock) throw (Exception)
 {
 	if (sock == NULL)
 		throw Exception(Exception::ERR_CODE_NULL_REF);
-	double time = get_time();
-	double speed = (double)sock->m_tx / (time - sock->m_tx_last_time);
-	return speed;
+	return sock->m_tx / (get_time()- sock->m_tx_last_time);
 }
 
 /*

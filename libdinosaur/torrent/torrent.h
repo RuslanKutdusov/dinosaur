@@ -201,8 +201,8 @@ public:
 	int request(PIECE_INDEX piece_index, BLOCK_INDEX block_index);
 	int request(const BLOCK_ID & block_id);
 	bool get_requested_block(BLOCK_ID & block_id);
-	double get_rx_speed();
-	double get_tx_speed();
+	int get_rx_speed();
+	int get_tx_speed();
 	const std::string & get_ip_str();
 	int get_info(info::peer & ref);
 	void prepare2release();
@@ -382,8 +382,8 @@ protected:
 
 	uint64_t 						m_downloaded;
 	uint64_t 						m_uploaded;
-	double 							m_rx_speed;
-	double 							m_tx_speed;
+	int 							m_rx_speed;
+	int 							m_tx_speed;
 	TORRENT_STATE 					m_state;
 	TORRENT_WORK					m_work;
 

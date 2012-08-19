@@ -44,6 +44,5 @@ int main(int argc,char* argv[])
 	{
 		printf("%s\n", dinosaur::exception_errcode2str(e).c_str());
 	}
-	//network_test2();
 	return 0;
 }

@@ -488,7 +488,7 @@ int PieceManager::event_file_write(const fs::write_event & we, PIECE_STATE & pie
 		m_piece_info[piece_index].downloaded_blocks.insert(block_index);
 		if (m_piece_info[piece_index].downloaded_blocks.size() == m_piece_info[piece_index].block_count)
 		{
-			bool ret = check_piece_hash(piece_index);
+			bool ret = true;//check_piece_hash(piece_index);
 			if (ret)
 			{
 				piece_state = PIECE_STATE_FIN_HASH_OK;

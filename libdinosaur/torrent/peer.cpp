@@ -770,28 +770,28 @@ bool Peer::get_requested_block(BLOCK_ID & block_id)
 	return false;
 }
 
-double Peer::get_rx_speed()
+int Peer::get_rx_speed()
 {
 	try
 	{
 		return m_nm->Socket_get_rx_speed(m_sock);
 	}
 	catch (Exception & e) {
-		return 0.0f;
+		return 0;
 	}
-	return 0.0f;
+	return 0;
 }
 
-double Peer::get_tx_speed()
+int Peer::get_tx_speed()
 {
 	try
 	{
 		return m_nm->Socket_get_tx_speed(m_sock);
 	}
 	catch (Exception & e) {
-		return 0.0f;
+		return 0;
 	}
-	return 0.0f;
+	return 0;
 }
 
 const std::string & Peer::get_ip_str()
