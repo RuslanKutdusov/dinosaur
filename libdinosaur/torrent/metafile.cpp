@@ -361,7 +361,7 @@ void Metafile::calculate_info_hash(bencode::be_node * info, uint64_t metafile_le
 		throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
 	}
 	CSHA1 csha1;
-	csha1.Update((unsigned char*)bencoded_info,bencoded_info_len);
+	csha1.Update((unsigned char*)bencoded_info, bencoded_info_len);
 	csha1.Final();
 	csha1.ReportHash(info_hash_hex,CSHA1::REPORT_HEX);
 	csha1.GetHash(info_hash_bin);
