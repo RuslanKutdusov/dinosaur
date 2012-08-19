@@ -25,7 +25,6 @@
 #include <vector>
 #include <string>
 #include <boost/shared_ptr.hpp>
-#include <google/profiler.h>
 
 namespace dinosaur {
 

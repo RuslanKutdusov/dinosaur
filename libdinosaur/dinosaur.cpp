@@ -594,7 +594,6 @@ void * Dinosaur::thread(void * arg)
 {
 	int ret = 1;
 	Dinosaur * bt = (Dinosaur*)arg;
-	//ProfilerStart("prof.txt");
 	while(!bt->m_thread_stop)
 	{
 		try
@@ -627,7 +626,6 @@ void * Dinosaur::thread(void * arg)
 		pthread_mutex_unlock(&bt->m_mutex);
 		usleep(1000);
 	}
-	//ProfilerStop();
 	return (void*)ret;
 }
 
