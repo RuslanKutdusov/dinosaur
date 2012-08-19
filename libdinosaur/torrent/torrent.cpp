@@ -605,7 +605,6 @@ int TorrentBase::clock()
 		delete[] bitfield;
 		m_pieces2check.erase(iter);
 	}
-
 	return 0;
 }
 

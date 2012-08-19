@@ -15,6 +15,7 @@
 #include <string>
 #include <set>
 #include <time.h>
+#include <sys/time.h>
 #include <pthread.h>
 #include <pcre.h>
 #include <boost/shared_ptr.hpp>
@@ -32,6 +33,7 @@ double get_time();
 #define MAX_EPOLL_EVENT 200
 #define TIMEOUT 10
 #define POW10_9 1000000000
+#define POW10_6 1000000
 
 enum
 {
@@ -198,8 +200,8 @@ public:
 	void Socket_delete(Socket & sock);
 	void Socket_set_assoc(Socket & sock, const SocketAssociation::ptr & assoc) throw (Exception);
 	void Socket_get_assoc(Socket & sock, SocketAssociation::ptr & assoc) throw (Exception);
-	double Socket_get_rx_speed(Socket & sock) throw (Exception);
-	double Socket_get_tx_speed(Socket & sock) throw (Exception);
+	int Socket_get_rx_speed(Socket & sock) throw (Exception);
+	int Socket_get_tx_speed(Socket & sock) throw (Exception);
 	void Socket_get_addr(Socket & sock, sockaddr_in * addr) throw (Exception);
 	/*int get_sock_errno(Socket & sock)
 	{
