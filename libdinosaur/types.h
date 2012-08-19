@@ -148,8 +148,8 @@ namespace info
 		char 		ip[22];
 		uint64_t 	downloaded;
 		uint64_t 	uploaded;
-		double 		downSpeed;
-		double 		upSpeed;
+		int 		downSpeed;
+		int 		upSpeed;
 		double 		available;
 		uint32_t	blocks2request;
 		uint32_t	requested_blocks;
