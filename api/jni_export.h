@@ -26,7 +26,7 @@ JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_ReleaseLibrary
 /*
  * Class:     dinosaur_Dinosaur
  * Method:    OpenMetafile
- * Signature: (Ljava/lang/String;)V
+ * Signature: (Ljava/lang/String;)Ldinosaur/Metafile;
  */
 JNIEXPORT jobject JNICALL Java_dinosaur_Dinosaur_OpenMetafile
   (JNIEnv *, jobject, jstring);
@@ -86,6 +86,94 @@ JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_CheckTorrent
  */
 JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_DeleteTorrent
   (JNIEnv *, jobject, jstring);
+
+/*
+ * Class:     dinosaur_Dinosaur
+ * Method:    get_torrent_info_stat
+ * Signature: (Ljava/lang/String;)Ldinosaur/info/torrent_stat;
+ */
+JNIEXPORT jobject JNICALL Java_dinosaur_Dinosaur_get_1torrent_1info_1stat
+  (JNIEnv *, jobject, jstring);
+
+/*
+ * Class:     dinosaur_Dinosaur
+ * Method:    get_torrent_info_dyn
+ * Signature: (Ljava/lang/String;)Ldinosaur/info/torrent_dyn;
+ */
+JNIEXPORT jobject JNICALL Java_dinosaur_Dinosaur_get_1torrent_1info_1dyn
+  (JNIEnv *, jobject, jstring);
+
+/*
+ * Class:     dinosaur_Dinosaur
+ * Method:    get_torrent_info_trackers
+ * Signature: (Ljava/lang/String;)[Ldinosaur/info/tracker;
+ */
+JNIEXPORT jobjectArray JNICALL Java_dinosaur_Dinosaur_get_1torrent_1info_1trackers
+  (JNIEnv *, jobject, jstring);
+
+/*
+ * Class:     dinosaur_Dinosaur
+ * Method:    get_torrent_info_file_stat
+ * Signature: (Ljava/lang/String;I)Ldinosaur/info/file_stat;
+ */
+JNIEXPORT jobject JNICALL Java_dinosaur_Dinosaur_get_1torrent_1info_1file_1stat
+  (JNIEnv *, jobject, jstring, jint);
+
+/*
+ * Class:     dinosaur_Dinosaur
+ * Method:    get_torrent_info_file_dyn
+ * Signature: (Ljava/lang/String;)Ldinosaur/info/file_dyn;
+ */
+JNIEXPORT jobject JNICALL Java_dinosaur_Dinosaur_get_1torrent_1info_1file_1dyn
+  (JNIEnv *, jobject, jstring);
+
+/*
+ * Class:     dinosaur_Dinosaur
+ * Method:    get_torrent_info_seeders
+ * Signature: (Ljava/lang/String;)[Ldinosaur/info/peer;
+ */
+JNIEXPORT jobjectArray JNICALL Java_dinosaur_Dinosaur_get_1torrent_1info_1seeders
+  (JNIEnv *, jobject, jstring);
+
+/*
+ * Class:     dinosaur_Dinosaur
+ * Method:    get_torrent_info_leechers
+ * Signature: (Ljava/lang/String;)[Ldinosaur/info/peer;
+ */
+JNIEXPORT jobjectArray JNICALL Java_dinosaur_Dinosaur_get_1torrent_1info_1leechers
+  (JNIEnv *, jobject, jstring);
+
+/*
+ * Class:     dinosaur_Dinosaur
+ * Method:    get_torrent_info_downloadable_pieces
+ * Signature: (Ljava/lang/String;)[Ldinosaur/info/downloadable_piece;
+ */
+JNIEXPORT jobjectArray JNICALL Java_dinosaur_Dinosaur_get_1torrent_1info_1downloadable_1pieces
+  (JNIEnv *, jobject, jstring);
+
+/*
+ * Class:     dinosaur_Dinosaur
+ * Method:    get_TorrentList
+ * Signature: ()[Ljava/lang/String;
+ */
+JNIEXPORT jobjectArray JNICALL Java_dinosaur_Dinosaur_get_1TorrentList
+  (JNIEnv *, jobject);
+
+/*
+ * Class:     dinosaur_Dinosaur
+ * Method:    get_socket_status
+ * Signature: ()Ldinosaur/socket_status;
+ */
+JNIEXPORT jobject JNICALL Java_dinosaur_Dinosaur_get_1socket_1status
+  (JNIEnv *, jobject);
+
+/*
+ * Class:     dinosaur_Dinosaur
+ * Method:    UpdateConfigs
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_UpdateConfigs
+  (JNIEnv *, jobject);
 
 /*
  * Class:     dinosaur_Dinosaur

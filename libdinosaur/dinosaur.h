@@ -73,7 +73,7 @@ public:
 	void get_torrent_info_seeders(const std::string & hash, info::peers & ref);
 	void get_torrent_info_leechers(const std::string & hash, info::peers & ref);
 	void get_torrent_info_downloadable_pieces(const std::string & hash, info::downloadable_pieces & ref);
-	int get_TorrentList(std::list<std::string>  & ref);
+	void get_TorrentList(std::list<std::string>  & ref);
 	void UpdateConfigs();
 	int event_sock_ready2read(network::Socket sock);
 	int event_sock_closed(network::Socket sock);

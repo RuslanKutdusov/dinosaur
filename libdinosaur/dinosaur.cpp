@@ -477,14 +477,13 @@ void Dinosaur::get_torrent_info_downloadable_pieces(const std::string & hash, in
 }
 
 
-int Dinosaur::get_TorrentList(std::list<std::string> & ref)
+void Dinosaur::get_TorrentList(std::list<std::string> & ref)
 {
 	ref.clear();
 	pthread_mutex_lock(&m_mutex);
 	for (torrent_map_iter iter = m_torrents.begin(); iter != m_torrents.end(); ++iter)
 		ref.push_back((*iter).first);
 	pthread_mutex_unlock(&m_mutex);
-	return ERR_NO_ERROR;
 }
 
 void Dinosaur::UpdateConfigs()
