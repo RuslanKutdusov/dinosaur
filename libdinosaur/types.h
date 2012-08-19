@@ -8,9 +8,11 @@
 #ifndef TYPES_H_
 #define TYPES_H_
 
-#include "consts.h"
 #include <list>
 #include <vector>
+#include <stdint.h>
+#include "consts.h"
+#include "exceptions/exceptions.h"
 
 namespace dinosaur
 {
