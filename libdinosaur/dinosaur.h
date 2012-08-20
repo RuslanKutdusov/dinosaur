@@ -48,7 +48,6 @@ private:
 	pthread_t 						m_thread;
 	pthread_mutex_t					m_mutex;
 	bool 							m_thread_stop;
-	bool 							m_thread_pause;
 	torrent_failures				m_fails_torrents;//while creating Dinosaur
 	static void * thread(void * arg);
 	void bin2hex(unsigned char * bin, char * hex, int len);
