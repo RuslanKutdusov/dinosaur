@@ -51,6 +51,7 @@ Dinosaur::Dinosaur()
 	if (ret != 0)
 		throw SyscallException(ret);
 
+	m_thread_stop = false;
 	if (pthread_create(&m_thread, &attr, Dinosaur::thread, (void *)this))
 		throw Exception(Exception::ERR_CODE_DINOSAUR_INIT_ERROR);
 	pthread_attr_destroy(&attr);
@@ -584,7 +585,7 @@ int Dinosaur::event_sock_unresolved(network::Socket sock)
 void * Dinosaur::thread(void * arg)
 {
 	int ret = 1;
-	Dinosaur * bt = (Dinosaur*)arg;
+	Dinosaur * bt = static_cast<Dinosaur*>(arg);
 	while(!bt->m_thread_stop)
 	{
 		try

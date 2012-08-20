@@ -55,6 +55,7 @@ struct config
 		ar & max_active_seeders;
 		ar & max_active_leechers;
 		ar & send_have;
+		ar & listen_on;
 		ar & max_active_torrents;
 	}
 };
