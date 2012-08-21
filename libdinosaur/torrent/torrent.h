@@ -257,7 +257,7 @@ private:
 	uint32_list										m_tag_list;//хранит один элемент, на который будут ссылатся prio_iter у загруженных кусков
 	std::map<BLOCK_ID, uint32_t>					m_downloadable_blocks;
 	unsigned char *									m_piece_for_check_hash;
-	std::deque<std::set<PIECE_INDEX> >  m_file_contains_pieces;
+	std::deque<std::set<PIECE_INDEX> >  			m_file_contains_pieces;
 	void build_piece_info();
 	int push_piece2download(uint32_t piece_index);
 public:
@@ -276,6 +276,7 @@ public:
 	bool check_piece_hash(PIECE_INDEX piece_index);
 	int front_piece2download(PIECE_INDEX & piece_index);
 	void pop_piece2download();
+	bool queue_empty();
 	int set_piece_taken_from(PIECE_INDEX piece_index, const std::string & seed);
 	bool get_piece_taken_from(PIECE_INDEX piece_index, std::string & seed);
 	int clear_piece_taken_from(PIECE_INDEX piece_index);
@@ -301,7 +302,8 @@ public:
 		std::string						name;
 		bool 							download;
 		fs::File 						file_;
-		DOWNLOAD_PRIORITY	priority;
+		DOWNLOAD_PRIORITY				priority;
+		uint64_t						downloaded;
 	};
 private:
 	fs::FileManager * 				m_fm;
@@ -316,6 +318,10 @@ public:
 	int event_file_write(const fs::write_event & eo);
 	void set_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY prio);
 	void get_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY  & prio);
+	void update_file_downloaded(PIECE_INDEX piece);
+	void update_file_downloaded(FILE_INDEX file_index, uint64_t bytes);
+	void clear_file_downloaded();
+	void get_file_downloaded(FILE_INDEX file_index, uint64_t & bytes_count);
 	void ReleaseFiles();
 	~TorrentFile();
 	/*
@@ -504,6 +510,11 @@ public:
 	{
 		return m_state == TORRENT_STATE_RELEASING;
 	}
+	/*
+	 * Exception::ERR_CODE_INVALID_FILE_INDEX
+	 * Exception::ERR_CODE_FAIL_SET_FILE_PRIORITY
+	 * Exception::ERR_CODE_INVALID_OPERATION
+	 */
 	virtual void set_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY prio) = 0;
 	virtual const torrent_failure & get_failure_desc() = 0;
 };
@@ -541,6 +552,7 @@ public:
 	int save_block(PIECE_INDEX piece, BLOCK_OFFSET block_offset, uint32_t block_length, char * block);
 	int read_block(PIECE_INDEX piece, BLOCK_INDEX block_index, char * block, uint32_t & block_length);
 	int read_piece(PIECE_INDEX piece, unsigned char * dst);
+	void update_file_downloaded(FILE_INDEX file_index, uint64_t bytes);
 	virtual void set_failure(const torrent_failure & tf) = 0;
 	virtual int event_file_write(const fs::write_event & we) = 0;
 	virtual void add_seeders(uint32_t count, sockaddr_in * addrs) = 0;

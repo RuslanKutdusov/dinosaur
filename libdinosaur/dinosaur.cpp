@@ -478,6 +478,22 @@ void Dinosaur::get_torrent_info_downloadable_pieces(const std::string & hash, in
 	pthread_mutex_unlock(&m_mutex);
 }
 
+void Dinosaur::set_file_priority(const std::string & hash, FILE_INDEX file, DOWNLOAD_PRIORITY prio)
+{
+	if (m_torrents.count(hash) == 0)
+		throw Exception(Exception::ERR_CODE_TORRENT_NOT_EXISTS);
+	pthread_mutex_lock(&m_mutex);
+	try
+	{
+		m_torrents[hash]->set_file_priority(file, prio);
+		pthread_mutex_unlock(&m_mutex);
+	}
+	catch (Exception & e) {
+		pthread_mutex_unlock(&m_mutex);
+		throw Exception(e);
+	}
+}
+
 
 void Dinosaur::get_TorrentList(std::list<std::string> & ref)
 {
@@ -539,7 +555,7 @@ int Dinosaur::event_sock_ready2read(network::Socket sock)
 		torrent_map_iter iter = m_torrents.find(str_infohash);
 		if (iter == m_torrents.end() && m_torrents.count(str_infohash) == 0)
 		{
-			printf("Not torrent\n");
+			printf("Leech is missed\n");
 			m_nm.Socket_delete(sock);
 			return ERR_INTERNAL;
 		}
