@@ -87,45 +87,25 @@ void PieceManager::build_piece_info()
 	FILE_INDEX file_index = 0;
 	FILE_INDEX file_iter = 0;
 	uint64_t last_files_length = 0;
-	FILE_INDEX file_iter2 = 0;
-	uint64_t last_file_length2 = 0;
 	for (PIECE_INDEX piece_index = 0; piece_index < piece_count; piece_index++)
 	{
-		FILE_OFFSET offset = piece_index * piece_length_;//смещение до начала куска
+		FILE_OFFSET offset2piece_begin = piece_index * piece_length_;//смещение до начала куска
 		uint64_t piece_length = (piece_index == piece_count - 1) ? length - piece_length_ * piece_index : piece_length_; //размер последнего куска может быть меньше m_piece_length
-		FILE_OFFSET end_of_piece = offset + piece_length;
 
 		m_piece_info[piece_index].block_count = (uint32_t)ceil((double)piece_length / (double)BLOCK_LENGTH);
 		bool need2download = (!bit_in_bitfield(piece_index, piece_count, m_bitfield));
 
 
-		for(FILE_INDEX f = file_iter2; f < file_count; f++)
-		{
-			if (m_file_contains_pieces.size() <= f)
-				m_file_contains_pieces.resize(f + 1);
-			m_file_contains_pieces[f].insert(piece_index);
-
-			info::file_stat * finfo = m_torrent->get_file_info(f);
-			last_file_length2 += finfo->length;
-			if (last_file_length2 >= end_of_piece)
-			{
-				file_iter2 = f + 1;
-				if (last_file_length2 > end_of_piece)
-					m_file_contains_pieces[f].insert(piece_index + 1);
-				break;
-			}
-		}
-
 		for(BLOCK_INDEX block = 0; block < m_piece_info[piece_index].block_count; block++)
 		{
-			if (last_files_length <= offset)
+			if (last_files_length <= offset2piece_begin)
 			{
 				for(FILE_INDEX j = file_iter; j < file_count; j++)
 				{
 
 					info::file_stat * finfo = m_torrent->get_file_info(j);
 					last_files_length += finfo->length;//считает размер файлов, когда он станет больше смещения => кусок начинается в j-ом файле
-					if (last_files_length >= offset)
+					if (last_files_length >= offset2piece_begin)
 					{
 						file_index = j;
 						file_iter = j + 1;
@@ -140,15 +120,15 @@ void PieceManager::build_piece_info()
 			if (block == 0)
 			{
 				m_piece_info[piece_index].file_index = file_index;
-				m_piece_info[piece_index].offset = offset - file_offset;//смещение до начала куска внутри файла
+				m_piece_info[piece_index].offset = offset2piece_begin - file_offset;//смещение до начала куска внутри файла
 			}
 
 			std::pair<FILE_INDEX, FILE_OFFSET> block_info;
 			block_info.first  = file_index;
-			block_info.second = offset - file_offset;
+			block_info.second = offset2piece_begin - file_offset;
 			m_piece_info[piece_index].block_info.push_back(block_info);
 
-			offset += BLOCK_LENGTH;
+			offset2piece_begin += BLOCK_LENGTH;
 			if (need2download)
 				m_piece_info[piece_index].block2download.insert(block);
 		}
@@ -167,6 +147,26 @@ void PieceManager::build_piece_info()
 		{
 			m_torrent->inc_downloaded(piece_length);
 			m_piece_info[piece_index].prio_iter = m_tag_list.begin();
+		}
+
+		FILE_OFFSET offset = m_piece_info[piece_index].offset;
+		FILE_INDEX fi = m_piece_info[piece_index].file_index;
+		uint32_t pos = 0;
+
+		while(pos < piece_length)
+		{
+			uint64_t remain = m_torrent->get_file_info(fi)->length - offset;
+			if (fi >= m_file_contains_pieces.size())
+				m_file_contains_pieces.resize(fi + 1);
+			m_file_contains_pieces[fi].insert(piece_index);
+			uint64_t bytes = piece_length - pos > remain ? remain : piece_length - pos;
+			if (!need2download)
+				m_torrent->update_file_downloaded(fi, bytes);
+
+			fi++;
+
+			pos += bytes;
+			offset = 0;
 		}
 	}
 }
@@ -250,6 +250,7 @@ void PieceManager::pop_piece2download()
 		uint32_t piece_index = m_download_queue.high_prio_pieces.front();
 		m_piece_info[piece_index].prio_iter = m_tag_list.begin();
 		m_download_queue.high_prio_pieces.pop_front();
+		return;
 
 	}
 	if (!m_download_queue.normal_prio_pieces.empty())
@@ -257,6 +258,7 @@ void PieceManager::pop_piece2download()
 		uint32_t piece_index = m_download_queue.normal_prio_pieces.front();
 		m_piece_info[piece_index].prio_iter = m_tag_list.begin();
 		m_download_queue.normal_prio_pieces.pop_front();
+		return;
 
 	}
 	if (!m_download_queue.low_prio_pieces.empty())
@@ -264,8 +266,14 @@ void PieceManager::pop_piece2download()
 		uint32_t piece_index = m_download_queue.low_prio_pieces.front();
 		m_piece_info[piece_index].prio_iter = m_tag_list.begin();
 		m_download_queue.low_prio_pieces.pop_front();
+		return;
 
 	}
+}
+
+bool PieceManager::queue_empty()
+{
+	return m_download_queue.high_prio_pieces.empty() && m_download_queue.normal_prio_pieces.empty() && m_download_queue.low_prio_pieces.empty();
 }
 
 int PieceManager::push_piece2download(PIECE_INDEX piece_index)

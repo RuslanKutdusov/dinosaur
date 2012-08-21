@@ -463,7 +463,12 @@ int Tracker::prepare2release()
 	LOG(INFO) << "Tracker " << m_announce.c_str() << " prepare2release";
 #endif
 	if (m_state == TRACKER_STATE_FAILURE)
+	{
+		#ifdef BITTORRENT_DEBUG
+			LOG(INFO) << "Tracker is fail " << m_announce.c_str() << " prepare2release";
+		#endif
 		return ERR_INTERNAL;
+	}
 	if (send_stopped() != ERR_NO_ERROR)
 	{
 		delete_socket();

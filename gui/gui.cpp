@@ -11,10 +11,15 @@ GtkWidget *window;
 GtkDialog* open_dialog;
 GtkFileChooserWidget * open_dialog_dir_chooser;
 GtkTreeView* torrent_view;
+GtkTreeView* file_view;
+GtkRadioButton* high_button;
+GtkRadioButton* normal_button;
+GtkRadioButton* low_button;
 GtkListStore* torrent_list;
 GtkListStore* tracker_list;
 GtkListStore* peer_list;
 GtkListStore* dp_list;
+GtkTreeStore* file_tree;
 GtkLabel* label_hash;
 GtkLabel* label_length;
 GtkLabel* label_dir;
@@ -74,6 +79,16 @@ enum
 	DP_LIST_COLS
 };
 
+enum
+{
+	FILE_TREE_PATH,
+	FILE_TREE_LENGTH,
+	FILE_TREE_PROGRESS,
+	FILE_TREE_PRIORITY,
+	FILE_TREE_INDEX,
+	FILE_LIST_COLS
+};
+
 void int_bytes2str(uint64_t i, char * str, bool speed = false)
 {
 	char c[3];
@@ -97,6 +112,22 @@ void int_bytes2str(uint64_t i, char * str, bool speed = false)
 	}
 	float gb = i / 1073741824.0f;
 	sprintf(str, "%.2f GB%s", gb, c);
+}
+
+void priority(dinosaur::DOWNLOAD_PRIORITY prio, std::string & str_prio)
+{
+	switch(prio)
+	{
+	case(dinosaur::DOWNLOAD_PRIORITY_LOW):
+	str_prio = "Low";
+			break;
+	case(dinosaur::DOWNLOAD_PRIORITY_NORMAL):
+	str_prio = "Normal";
+			break;
+	case(dinosaur::DOWNLOAD_PRIORITY_HIGH):
+	str_prio = "High";
+			break;
+	}
 }
 
 void messagebox(const char * message)
@@ -441,6 +472,8 @@ extern "C" void  on_torrent_view_cursor_changed(GtkWidget *object, gpointer user
 						TRACKER_LIST_COL_SEEDERS,(gint)(*i).seeders,
 							  -1);
 			}
+
+			set_file_tree(hash, stat.files_count);
 		}
 		catch (dinosaur::Exception & e) {
 			printf("%s\n", dinosaur::exception_errcode2str(e).c_str());
@@ -450,6 +483,107 @@ extern "C" void  on_torrent_view_cursor_changed(GtkWidget *object, gpointer user
 	{
 		gtk_list_store_clear(tracker_list);
 	}
+}
+
+extern "C" void on_file_view_cursor_changed(GtkWidget *object, gpointer user_data)
+{
+	GtkTreeSelection *selection;
+	GtkTreeModel     *model;
+	GtkTreeIter       selected_iter;
+	selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(file_view));
+	if (gtk_tree_selection_get_selected(selection, &model, &selected_iter))
+	{
+		uint64_t index;
+		gtk_tree_model_get (model, &selected_iter, FILE_TREE_INDEX, &index, -1);
+
+		selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(torrent_view));
+		if (gtk_tree_selection_get_selected(selection, &model, &selected_iter))
+		{
+			gchar *g_hash;
+			gtk_tree_model_get (model, &selected_iter, TORRENT_LIST_COL_HASH, &g_hash, -1);
+			std::string hash = g_hash;
+			g_free(g_hash);
+
+			try
+			{
+				dinosaur::info::file_dyn dyn;
+				bt->get_torrent_info_file_dyn(hash, index, dyn);
+				switch (dyn.priority) {
+					case dinosaur::DOWNLOAD_PRIORITY_HIGH:
+						if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(high_button)))
+							gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(high_button), true);
+						break;
+					case dinosaur::DOWNLOAD_PRIORITY_NORMAL:
+						if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(normal_button)))
+							gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(normal_button), true);
+						break;
+					case dinosaur::DOWNLOAD_PRIORITY_LOW:
+						if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(low_button)))
+							gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(low_button), true);
+						break;
+					default:
+						break;
+				}
+			}
+			catch (dinosaur::Exception & e) {
+				messagebox(dinosaur::exception_errcode2str(e));
+			}
+		}
+
+	}
+}
+
+void change_file_priority(dinosaur::DOWNLOAD_PRIORITY prio)
+{
+	printf("change\n");
+	GtkTreeSelection *selection;
+	GtkTreeModel     *model;
+	GtkTreeIter       selected_iter;
+	selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(file_view));
+	if (gtk_tree_selection_get_selected(selection, &model, &selected_iter))
+	{
+		uint64_t index;
+		gtk_tree_model_get (model, &selected_iter, FILE_TREE_INDEX, &index, -1);
+
+		selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(torrent_view));
+		if (gtk_tree_selection_get_selected(selection, &model, &selected_iter))
+		{
+			gchar *g_hash;
+			gtk_tree_model_get (model, &selected_iter, TORRENT_LIST_COL_HASH, &g_hash, -1);
+			std::string hash = g_hash;
+			g_free(g_hash);
+
+			try
+			{
+				bt->set_file_priority(hash, index, prio);
+			}
+			catch (dinosaur::Exception & e) {
+				messagebox(dinosaur::exception_errcode2str(e));
+			}
+		}
+
+	}
+}
+
+extern "C" void on_radiobutton1_toggled (GtkRadioButton *but,  gpointer        user_data)
+{
+	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(but)))
+		return;
+	change_file_priority(dinosaur::DOWNLOAD_PRIORITY_HIGH);
+}
+
+extern "C" void on_radiobutton2_toggled (GtkRadioButton *but,  gpointer        user_data)
+{
+	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(but)))
+		return;
+	change_file_priority(dinosaur::DOWNLOAD_PRIORITY_NORMAL);
+}
+
+extern "C" void on_radiobutton3_toggled (GtkRadioButton *but,  gpointer        user_data)
+{
+	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(but)))
+		return;
+	change_file_priority(dinosaur::DOWNLOAD_PRIORITY_LOW);
 }
 
 gboolean foreach_torrent_list (GtkTreeModel *model,
@@ -607,6 +741,78 @@ gboolean foreach_tracker_list (GtkTreeModel *model,
 	return FALSE;
 }
 
+void set_file_tree(const std::string  & hash, uint64_t files_count)
+{
+	gtk_tree_store_clear(file_tree);
+
+	try
+	{
+		for(dinosaur::FILE_INDEX i = 0; i < files_count; i++)
+		{
+			dinosaur::info::file_stat stat;
+			dinosaur::info::file_dyn  dyn;
+
+			bt->get_torrent_info_file_stat(hash, i, stat);
+			bt->get_torrent_info_file_dyn(hash, i, dyn);
+
+			char length[256];
+			int_bytes2str(stat.length, length);
+
+			int progress = stat.length == 0 ? 0 : (dyn.downloaded * 100) / stat.length;
+			std::string prio;
+			priority(dyn.priority, prio);
+
+			GtkTreeIter  iter;
+			gtk_tree_store_append(file_tree, &iter, NULL);
+
+
+			gtk_tree_store_set(file_tree, &iter,
+								FILE_TREE_PATH, stat.path.c_str(),
+								FILE_TREE_LENGTH, length,
+								FILE_TREE_PROGRESS, progress,
+								FILE_TREE_PRIORITY, prio.c_str(),
+								FILE_TREE_INDEX, i,
+								-1);
+
+		}
+	}
+	catch (dinosaur::Exception & e) {
+		gtk_tree_store_clear(file_tree);
+	}
+}
+
+gboolean foreach_file_tree (GtkTreeModel *model,
+                GtkTreePath  *path,
+                GtkTreeIter  *iter,
+                gpointer      user_data)
+{
+	std::string hash = (char*)user_data;
+	dinosaur::FILE_INDEX index;
+	gtk_tree_model_get (model, iter, FILE_TREE_INDEX, &index,-1);
+	try
+	{
+		dinosaur::info::file_stat stat;
+		dinosaur::info::file_dyn  dyn;
+
+		bt->get_torrent_info_file_stat(hash, index, stat);
+		bt->get_torrent_info_file_dyn(hash, index, dyn);
+
+		int progress = stat.length == 0 ? 0 : (dyn.downloaded * 100) / stat.length;
+		std::string prio;
+		priority(dyn.priority, prio);
+
+		gtk_tree_store_set(file_tree, iter,
+										FILE_TREE_PROGRESS, progress,
+										FILE_TREE_PRIORITY, prio.c_str(),
+										-1);
+
+	}
+	catch (dinosaur::Exception & e) {
+		gtk_tree_store_clear(file_tree);
+	}
+	return FALSE;
+}
+
 gboolean on_timer(gpointer data)
 {
 	//return FALSE;
@@ -623,6 +829,7 @@ gboolean on_timer(gpointer data)
 		std::string hash = g_hash;
 
 		gtk_tree_model_foreach(GTK_TREE_MODEL(tracker_list), foreach_tracker_list, g_hash);
+		gtk_tree_model_foreach(GTK_TREE_MODEL(file_tree), foreach_file_tree, g_hash);
 
 		g_free(g_hash);
 
@@ -717,18 +924,7 @@ gboolean on_timer(gpointer data)
 				sprintf(downloaded_blocks, "%u", (*i).downloaded_blocks);
 
 				std::string prio;
-				switch((*i).priority)
-				{
-				case(dinosaur::DOWNLOAD_PRIORITY_LOW):
-						prio = "Low";
-						break;
-				case(dinosaur::DOWNLOAD_PRIORITY_NORMAL):
-						prio = "Normal";
-						break;
-				case(dinosaur::DOWNLOAD_PRIORITY_HIGH):
-						prio = "High";
-						break;
-				}
+				priority((*i).priority, prio);
 
 				gtk_list_store_set (dp_list, &iter,
 									DP_LIST_COL_INDEX, index,
@@ -747,6 +943,7 @@ gboolean on_timer(gpointer data)
 		gtk_list_store_clear(tracker_list);
 		gtk_list_store_clear(peer_list);
 		gtk_list_store_clear(dp_list);
+		gtk_tree_store_clear(file_tree);
 	}
 	return TRUE;
 }
@@ -877,6 +1074,41 @@ void init_gui()
 
 	statusbar = GTK_STATUSBAR(gtk_builder_get_object (builder, "statusbar"));
 	if (!statusbar)
+	{
+			/* что-то не так, наверное, ошиблись в имени */
+			g_critical ("Ошибка при получении виджета диалога");
+	}
+
+	file_tree = GTK_TREE_STORE(gtk_builder_get_object (builder, "file_tree"));
+	if (!file_tree)
+	{
+			/* что-то не так, наверное, ошиблись в имени */
+			g_critical ("Ошибка при получении виджета диалога");
+	}
+
+	file_view = GTK_TREE_VIEW(gtk_builder_get_object (builder, "file_view"));
+	if (!file_view)
+	{
+			/* что-то не так, наверное, ошиблись в имени */
+			g_critical ("Ошибка при получении виджета диалога");
+	}
+
+	high_button = GTK_RADIO_BUTTON(gtk_builder_get_object (builder, "radiobutton1"));
+	if (!high_button)
+	{
+			/* что-то не так, наверное, ошиблись в имени */
+			g_critical ("Ошибка при получении виджета диалога");
+	}
+
+	normal_button = GTK_RADIO_BUTTON(gtk_builder_get_object (builder, "radiobutton2"));
+	if (!normal_button)
+	{
+			/* что-то не так, наверное, ошиблись в имени */
+			g_critical ("Ошибка при получении виджета диалога");
+	}
+
+	low_button = GTK_RADIO_BUTTON(gtk_builder_get_object (builder, "radiobutton3"));
+	if (!low_button)
 	{
 			/* что-то не так, наверное, ошиблись в имени */
 			g_critical ("Ошибка при получении виджета диалога");

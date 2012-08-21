@@ -114,10 +114,10 @@ void TorrentBase::init(const Metafile & metafile, const std::string & work_direc
 TorrentBase::~TorrentBase()
 {
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "Torrent destructor";
+	LOG(INFO) << "Torrent destructor " <<  m_metafile.name.c_str() << " " << m_metafile.info_hash_hex;
 #endif
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "Torrent destroyed";
+	LOG(INFO) << "Torrent destroyed " <<  m_metafile.name.c_str() << " " << m_metafile.info_hash_hex;
 #endif
 }
 
@@ -136,10 +136,15 @@ void TorrentBase::forced_releasing()
 
 void TorrentBase::releasing()
 {
-	for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
+	for(tracker_map_iter iter = m_trackers.begin(), iter2 = iter;
+					iter != m_trackers.end(); iter = iter2)
 	{
+		++iter2;
 		if (m_state == TORRENT_STATE_INIT_FORCED_RELEASING)
+		{
 			(*iter).second->forced_releasing();
+			m_trackers.erase(iter);
+		}
 		else
 			if ((*iter).second->prepare2release() != ERR_NO_ERROR)
 				m_trackers.erase(iter);
@@ -415,6 +420,7 @@ void TorrentBase::check()
 	m_piece_manager->reset();
 	m_pieces2check.clear();
 	m_downloadable_pieces.clear();
+	m_torrent_file->clear_file_downloaded();
 	for(uint32_t i = 0; i < m_metafile.piece_count; i++)
 	{
 		m_pieces2check.push_back(i);
@@ -448,8 +454,10 @@ int TorrentBase::clock()
 		m_state = TORRENT_STATE_RELEASING;
 	}
 	if (m_state == TORRENT_STATE_RELEASING)
-		for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
+		for(tracker_map_iter iter = m_trackers.begin(), iter2 = iter;
+				iter != m_trackers.end(); iter = iter2)
 		{
+			++iter2;
 			bool release_tracker_instance;
 			(*iter).second->clock(release_tracker_instance);
 			if (release_tracker_instance)
@@ -543,6 +551,15 @@ int TorrentBase::clock()
 			}
 		}
 
+		if (m_piece_manager->queue_empty() && !is_downloaded())
+		{
+			torrent_failure tf;
+			tf.where = TORRENT_FAILURE_DOWNLOADING;
+			tf.errno_ = 0;
+			tf.exception_errcode = Exception::ERR_CODE_UNDEF;
+			set_failure(tf);
+		}
+
 		for(peer_list_iter seed_iter = m_active_seeders.begin(); seed_iter != m_active_seeders.end(); ++seed_iter)
 		{
 			PeerPtr seed = *seed_iter;
@@ -595,7 +612,8 @@ int TorrentBase::clock()
 			return ERR_NO_ERROR;
 		}
 		std::list<uint32_t>::iterator iter = m_pieces2check.begin();
-		m_piece_manager->check_piece_hash(*iter);
+		if (m_piece_manager->check_piece_hash(*iter))
+			m_torrent_file->update_file_downloaded(*iter);
 		BITFIELD bitfield = new unsigned char[m_piece_manager->get_bitfield_length()];
 		m_piece_manager->copy_bitfield(bitfield);
 		StateSerializator s(m_state_file_name);
@@ -624,18 +642,25 @@ int TorrentBase::event_file_write(const fs::write_event & we)
 	if (piece_state == PIECE_STATE_FIN_HASH_OK)
 	{
 		m_downloadable_pieces.remove(piece_index);
+
 		StateSerializator s(m_state_file_name);
 		BITFIELD bitfield = new unsigned char[m_piece_manager->get_bitfield_length()];
 		m_piece_manager->copy_bitfield(bitfield);
 		s.serialize(m_uploaded, m_download_directory, bitfield,m_piece_manager->get_bitfield_length(), m_start_time);
 		delete[] bitfield;
+
 		m_piece_manager->clear_piece_taken_from(piece_index);
+
 		m_work = m_downloaded == m_metafile.length ? TORRENT_WORK_UPLOADING : TORRENT_WORK_DOWNLOADING;
 		if (m_state == TORRENT_STATE_STARTED && m_downloaded == m_metafile.length)
 			for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
 				(*iter).second->send_completed();
+
 		if (m_g_cfg->get_send_have())
 			m_have_list.push_back(piece_index);
+
+		m_torrent_file->update_file_downloaded(piece_index);
+
 		return ERR_NO_ERROR;
 	}
 	if (piece_state == PIECE_STATE_FIN_HASH_BAD)
@@ -711,7 +736,7 @@ void TorrentBase::get_info_file_dyn(FILE_INDEX index, info::file_dyn & ref)
 	if (index >= m_metafile.files.size())
 		throw Exception(Exception::ERR_CODE_INVALID_FILE_INDEX);
 	m_torrent_file->get_file_priority(index, ref.priority);
-	ref.downloaded = 0;
+	m_torrent_file->get_file_downloaded(index, ref.downloaded);
 }
 
 void TorrentBase::get_info_seeders(info::peers & ref)
@@ -757,13 +782,22 @@ int TorrentBase::erase_state()
 	return ERR_NO_ERROR;
 }
 
+/*
+ * Exception::ERR_CODE_INVALID_FILE_INDEX
+ * Exception::ERR_CODE_FAIL_SET_FILE_PRIORITY
+ * Exception::ERR_CODE_INVALID_OPERATION
+ */
+
 void TorrentBase::set_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY prio)
 {
+	if (m_state == TORRENT_STATE_CHECKING)
+		throw Exception(Exception::ERR_CODE_INVALID_OPERATION);
 	if (file >= m_metafile.files.size())
 		throw Exception(Exception::ERR_CODE_INVALID_FILE_INDEX);
 	DOWNLOAD_PRIORITY old_prio;
 	m_torrent_file->get_file_priority(file, old_prio);
-
+	if (old_prio == prio)
+		return;
 	m_torrent_file->set_file_priority(file, prio);
 	if (m_piece_manager->set_file_priority(file, prio) != ERR_NO_ERROR)
 	{

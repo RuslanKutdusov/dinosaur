@@ -164,5 +164,10 @@ int TorrentInterfaceInternal::read_piece(uint32_t piece, unsigned char * dst)
 	return m_torrent_file->read_piece(piece, dst);
 }
 
+void TorrentInterfaceInternal::update_file_downloaded(FILE_INDEX file_index, uint64_t bytes)
+{
+	m_torrent_file->update_file_downloaded(file_index, bytes);
+}
+
 }
 }
