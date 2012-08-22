@@ -381,9 +381,19 @@ int PieceManager::get_piece_priority(PIECE_INDEX piece_index, DOWNLOAD_PRIORITY 
 int PieceManager::set_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY prio)
 {
 	std::map<PIECE_INDEX, DOWNLOAD_PRIORITY> old_prios;
-	for(std::set<PIECE_INDEX>::iterator iter = m_file_contains_pieces[file].begin(); iter != m_file_contains_pieces[file].end(); ++iter)
+	std::set<PIECE_INDEX>::iterator begin = m_file_contains_pieces[file].begin();
+	std::set<PIECE_INDEX>::iterator end = m_file_contains_pieces[file].end();
+	for(std::set<PIECE_INDEX>::iterator iter = begin; iter != end; ++iter)
 	{
 		PIECE_INDEX piece_index = *iter;
+
+		if (m_piece_info[piece_index].prio >= prio)
+		{
+			std::set<PIECE_INDEX>::iterator iter2 = iter;
+			++iter2;
+			if ((iter == begin || iter2 == end))
+				continue;
+		}
 		old_prios[piece_index] = m_piece_info[piece_index].prio;
 		int ret = set_piece_priority(piece_index, prio);
 		if (ret == ERR_INTERNAL || ret == ERR_BAD_ARG)

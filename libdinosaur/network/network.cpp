@@ -409,7 +409,7 @@ void NetworkManager::ListenSocket_add(uint16_t port, const std::string & ip, con
 int NetworkManager::clock()  throw (SyscallException)
 {
 	struct epoll_event events[MAX_EPOLL_EVENT];
-	int nfds = epoll_wait(m_epoll_fd, events, MAX_EPOLL_EVENT, 80);
+	int nfds = epoll_wait(m_epoll_fd, events, MAX_EPOLL_EVENT, 10);
 	if (nfds == -1)
 	{
 		throw SyscallException();

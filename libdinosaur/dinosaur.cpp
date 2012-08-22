@@ -526,6 +526,11 @@ void Dinosaur::UpdateConfigs()
 
 int Dinosaur::event_sock_ready2read(network::Socket sock)
 {
+#ifdef BITTORRENT_DEBUG
+	sockaddr_in addr;
+	m_nm.Socket_get_addr(sock, &addr);
+	std::string ip = inet_ntoa(&addr.sin_addr));
+#endif
 	try
 	{
 		if (m_nm.Socket_datalen(sock) < HANDSHAKE_LENGHT)
@@ -537,13 +542,19 @@ int Dinosaur::event_sock_ready2read(network::Socket sock)
 		m_nm.Socket_recv(sock, handshake, HANDSHAKE_LENGHT);
 		if (handshake[0] != '\x13')
 		{
-			printf("Not handshake\n");
+			#ifdef BITTORRENT_DEBUG
+				LOG(INFO) << "Leecher " << ip << " sended not handshake";
+			#endif
 			m_nm.Socket_delete(sock);
 			return ERR_INTERNAL;
 		}
 		if (memcmp(&handshake[1], "BitTorrent protocol", 19) != 0)
 		{
-			printf("Not bt\n");
+			#ifdef BITTORRENT_DEBUG
+				sockaddr_in addr;
+				m_nm.Socket_get_addr(sock, &addr);
+				LOG(INFO) << "Leecher " << ip << " works with unsupported Bittorrent protocol";
+			#endif
 			m_nm.Socket_delete(sock);
 			return ERR_INTERNAL;
 		}
@@ -555,7 +566,10 @@ int Dinosaur::event_sock_ready2read(network::Socket sock)
 		torrent_map_iter iter = m_torrents.find(str_infohash);
 		if (iter == m_torrents.end() && m_torrents.count(str_infohash) == 0)
 		{
-			printf("Leech is missed\n");
+			#ifdef BITTORRENT_DEBUG
+				m_nm.Socket_get_addr(sock, &addr);
+				LOG(INFO) << "Leecher " << ip << " wants to work with missed torrent";
+			#endif
 			m_nm.Socket_delete(sock);
 			return ERR_INTERNAL;
 		}
@@ -563,7 +577,9 @@ int Dinosaur::event_sock_ready2read(network::Socket sock)
 		return 0;
 	}
 	catch (Exception & e) {
-		printf("Rejected\n");
+			#ifdef BITTORRENT_DEBUG
+				LOG(INFO) << "Leecher " << ip << " rejected";
+			#endif
 		m_nm.Socket_delete(sock);
 		return ERR_INTERNAL;
 	}
@@ -588,6 +604,11 @@ int Dinosaur::event_sock_connected(network::Socket sock)
 
 int Dinosaur::event_sock_accepted(network::Socket sock, network::Socket accepted_sock)
 {
+#ifdef BITTORRENT_DEBUG
+	sockaddr_in addr;
+	m_nm.Socket_get_addr(sock, &addr);
+	LOG(INFO) << "Leecher connected " << inet_ntoa(&addr.sin_addr));
+#endif
 	m_nm.Socket_set_assoc(accepted_sock, shared_from_this());
 	return 0;
 }

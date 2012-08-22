@@ -529,7 +529,7 @@ int TorrentBase::clock()
 					LOG(INFO) << "Piece " << piece_index << " now is downloadable\n";
 					#endif
 				}
-				if (m_downloadable_pieces.size() > 0)
+				if (!m_downloadable_pieces.empty())
 				{
 					uint32_t piece_index  = m_downloadable_pieces.front();
 					m_downloadable_pieces.pop_front();
@@ -551,7 +551,7 @@ int TorrentBase::clock()
 			}
 		}
 
-		if (m_piece_manager->queue_empty() && !is_downloaded())
+		if (m_piece_manager->queue_empty() && m_downloadable_pieces.empty() && !is_downloaded())
 		{
 			torrent_failure tf;
 			tf.where = TORRENT_FAILURE_DOWNLOADING;
@@ -599,7 +599,7 @@ int TorrentBase::clock()
 		}
 
 		if (m_rx_speed > 0)
-			m_remain_time = m_metafile.length - m_downloaded / m_rx_speed;
+			m_remain_time = (m_metafile.length - m_downloaded) / m_rx_speed;
 		else
 			m_remain_time = 0;
 	}
