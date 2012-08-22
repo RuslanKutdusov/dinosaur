@@ -11,21 +11,21 @@ public class torrent_dyn {
 	};
 	public long 		downloaded;
 	public long 		uploaded;
-	public double 		rx_speed;
-	public double 		tx_speed;
-	public int			seeders;
-	public int			total_seeders;
-	public int			leechers;
-	public int 			progress;
+	public long 		rx_speed;
+	public long 		tx_speed;
+	public long			seeders;
+	public long			total_seeders;
+	public long			leechers;
+	public long 		progress;
 	public TORRENT_WORK	work;
-	public int			remain_time;
+	public long			remain_time;
 	public float		ratio;
 	public torrent_dyn()
 	{
 		
 	}
-	public torrent_dyn(long downloaded, long uploaded, double rx_speed, double tx_speed, int seeders,
-						int total_seeders, int leechers, int progress, int work, int remain_time,
+	public torrent_dyn(long downloaded, long uploaded, long rx_speed, long tx_speed, long seeders,
+			long total_seeders, long leechers, long progress, int work, long remain_time,
 						float ratio)
 	{
 		this.downloaded = downloaded;

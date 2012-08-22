@@ -3,15 +3,15 @@ package dinosaur.info;
 import dinosaur.DOWNLOAD_PRIORITY;
 
 public class downloadable_piece {
-	public int 					index;
-	public int					block2download;
-	public int					downloaded_blocks;
+	public long 				index;
+	public long					block2download;
+	public long					downloaded_blocks;
 	public DOWNLOAD_PRIORITY 	priority;
 	public downloadable_piece()
 	{
 		
 	}
-	public downloadable_piece(int index, int block2download, int downloaded_blocks, int priority)
+	public downloadable_piece(long index, long block2download, long downloaded_blocks, int priority)
 	{
 		this.index = index;
 		this.block2download = block2download;

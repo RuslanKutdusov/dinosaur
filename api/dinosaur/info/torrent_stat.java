@@ -9,17 +9,17 @@ public class torrent_stat {
 	public long 		private_;
 	public long 		length;
 	public long 		piece_length;
-	public int 			piece_count;
+	public long 		piece_count;
 	public String 		info_hash_hex;
-	public int			start_time;
+	public long			start_time;
 	public long			files_count;
 	public torrent_stat()
 	{
 		
 	}
 	public torrent_stat(String name, String comment, String created_by, String download_directory,
-						long creation_date, long private_, long length, long piece_length, int piece_count,
-						String infohash_hex, int start_time, long files_count)
+						long creation_date, long private_, long length, long piece_length, long piece_count,
+						String infohash_hex, long start_time, long files_count)
 	{
 		this.name = name;
 		this.comment = comment;

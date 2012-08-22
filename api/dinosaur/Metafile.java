@@ -12,14 +12,14 @@ public class Metafile {
 	public file_stat[] 	files;
 	public String 		name;
 	public long 		piece_length;
-	public int 			piece_count;
+	public long			piece_count;
 	public String 		infohash;
 	public Metafile() {
 		// TODO Auto-generated constructor stub
 	}
 	public Metafile(String[] announces, String comment, String created_by, long creation_date,
 					long private_, long length, file_stat[] files, String name, long piece_length,
-					int piece_count, String infohash)
+					long piece_count, String infohash)
 	{
 		this.announces = announces;
 		this.comment = comment;

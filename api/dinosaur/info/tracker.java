@@ -17,12 +17,13 @@ public class tracker {
 	public String			failure_mes;
 	public long 			seeders;
 	public long 			leechers;
-	public int 				update_in;
+	public long				update_in;
 	public tracker()
 	{
 		
 	}
-	public tracker(String announce, int status, String failure_mes, long seeders, long leechers, int update_in)
+	public tracker(String announce, int status, String failure_mes, long seeders, 
+					long leechers, long update_in)
 	{
 		this.announce = announce;
 		this.status = TRACKER_STATUS.values()[status];

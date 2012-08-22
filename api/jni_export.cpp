@@ -8,6 +8,9 @@
 #include "jni_export.h"
 #include "conversions.h"
 
+#define UINT16_MAX 65535
+#define UINT32_MAX 4294967295
+
 dinosaur::DinosaurPtr dino;
 dinosaur::torrent::MetafilePtr meta;
 
@@ -32,7 +35,8 @@ jobjectArray Java_dinosaur_Dinosaur_InitLibrary
 void Java_dinosaur_Dinosaur_ReleaseLibrary
 	(JNIEnv * env, jobject jobj)
 {
-	dinosaur::Dinosaur::DeleteDinosaur(dino);
+	if (dino != NULL)
+		dinosaur::Dinosaur::DeleteDinosaur(dino);
 }
 
 jobject Java_dinosaur_Dinosaur_OpenMetafile
@@ -46,7 +50,10 @@ jobject Java_dinosaur_Dinosaur_OpenMetafile
 	}
 	try
 	{
-		std::string metafile_path = env->GetStringUTFChars(jmetafile_path, NULL);
+		const char * cmetafile_path = env->GetStringUTFChars(jmetafile_path, NULL);
+		std::string metafile_path = cmetafile_path;
+		env->ReleaseStringUTFChars( jmetafile_path, cmetafile_path);
+
 		meta.reset(new dinosaur::torrent::Metafile(metafile_path));
 		return Create_Metafile(env, meta);
 	}
@@ -67,7 +74,10 @@ jstring Java_dinosaur_Dinosaur_AddTorrent
 		ThrowException(env, e);
 		return NULL;
 	}
-	std::string save_directory = env->GetStringUTFChars(jsave_directory, NULL);
+	const char * csave_directory = env->GetStringUTFChars(jsave_directory, NULL);
+	std::string save_directory = csave_directory;
+	env->ReleaseStringUTFChars( jsave_directory, csave_directory);
+
 	std::string hash;
 	try
 	{
@@ -98,7 +108,9 @@ void Java_dinosaur_Dinosaur_StartTorrent
 		ThrowException(env, e);
 		return;
 	}
-	std::string hash = env->GetStringUTFChars(jhash, NULL);
+	const char * chash = env->GetStringUTFChars(jhash, NULL);
+	std::string hash = chash;
+	env->ReleaseStringUTFChars( jhash, chash);
 	try
 	{
 		dino->StartTorrent(hash);
@@ -118,7 +130,9 @@ void Java_dinosaur_Dinosaur_StopTorrent
 		ThrowException(env, e);
 		return;
 	}
-	std::string hash = env->GetStringUTFChars(jhash, NULL);
+	const char * chash = env->GetStringUTFChars(jhash, NULL);
+	std::string hash = chash;
+	env->ReleaseStringUTFChars( jhash, chash);
 	try
 	{
 		dino->StopTorrent(hash);
@@ -138,7 +152,9 @@ void Java_dinosaur_Dinosaur_PauseTorrent
 		ThrowException(env, e);
 		return;
 	}
-	std::string hash = env->GetStringUTFChars(jhash, NULL);
+	const char * chash = env->GetStringUTFChars(jhash, NULL);
+	std::string hash = chash;
+	env->ReleaseStringUTFChars( jhash, chash);
 	try
 	{
 		dino->PauseTorrent(hash);
@@ -158,7 +174,9 @@ void Java_dinosaur_Dinosaur_ContinueTorrent
 		ThrowException(env, e);
 		return;
 	}
-	std::string hash = env->GetStringUTFChars(jhash, NULL);
+	const char * chash = env->GetStringUTFChars(jhash, NULL);
+	std::string hash = chash;
+	env->ReleaseStringUTFChars( jhash, chash);
 	try
 	{
 		dino->ContinueTorrent(hash);
@@ -178,7 +196,9 @@ void Java_dinosaur_Dinosaur_CheckTorrent
 		ThrowException(env, e);
 		return;
 	}
-	std::string hash = env->GetStringUTFChars(jhash, NULL);
+	const char * chash = env->GetStringUTFChars(jhash, NULL);
+	std::string hash = chash;
+	env->ReleaseStringUTFChars( jhash, chash);
 	try
 	{
 		dino->CheckTorrent(hash);
@@ -198,7 +218,9 @@ void Java_dinosaur_Dinosaur_DeleteTorrent
 		ThrowException(env, e);
 		return;
 	}
-	std::string hash = env->GetStringUTFChars(jhash, NULL);
+	const char * chash = env->GetStringUTFChars(jhash, NULL);
+	std::string hash = chash;
+	env->ReleaseStringUTFChars( jhash, chash);
 	try
 	{
 		dino->DeleteTorrent(hash);
@@ -218,7 +240,9 @@ jobject Java_dinosaur_Dinosaur_get_1torrent_1info_1stat
 		ThrowException(env, e);
 		return NULL;
 	}
-	std::string hash = env->GetStringUTFChars(jhash, NULL);
+	const char * chash = env->GetStringUTFChars(jhash, NULL);
+	std::string hash = chash;
+	env->ReleaseStringUTFChars( jhash, chash);
 	try
 	{
 		dinosaur::info::torrent_stat ts;
@@ -241,7 +265,9 @@ jobject Java_dinosaur_Dinosaur_get_1torrent_1info_1dyn
 		ThrowException(env, e);
 		return NULL;
 	}
-	std::string hash = env->GetStringUTFChars(jhash, NULL);
+	const char * chash = env->GetStringUTFChars(jhash, NULL);
+	std::string hash = chash;
+	env->ReleaseStringUTFChars( jhash, chash);
 	try
 	{
 		dinosaur::info::torrent_dyn tn;
@@ -264,7 +290,9 @@ jobjectArray Java_dinosaur_Dinosaur_get_1torrent_1info_1trackers
 		ThrowException(env, e);
 		return NULL;
 	}
-	std::string hash = env->GetStringUTFChars(jhash, NULL);
+	const char * chash = env->GetStringUTFChars(jhash, NULL);
+	std::string hash = chash;
+	env->ReleaseStringUTFChars( jhash, chash);
 	try
 	{
 		dinosaur::info::trackers ref;
@@ -287,7 +315,9 @@ jobject Java_dinosaur_Dinosaur_get_1torrent_1info_1file_1stat
 		ThrowException(env, e);
 		return NULL;
 	}
-	std::string hash = env->GetStringUTFChars(jhash, NULL);
+	const char * chash = env->GetStringUTFChars(jhash, NULL);
+	std::string hash = chash;
+	env->ReleaseStringUTFChars( jhash, chash);
 	try
 	{
 		dinosaur::info::file_stat ref;
@@ -333,7 +363,9 @@ jobjectArray Java_dinosaur_Dinosaur_get_1torrent_1info_1seeders
 		ThrowException(env, e);
 		return NULL;
 	}
-	std::string hash = env->GetStringUTFChars(jhash, NULL);
+	const char * chash = env->GetStringUTFChars(jhash, NULL);
+	std::string hash = chash;
+	env->ReleaseStringUTFChars( jhash, chash);
 	try
 	{
 		dinosaur::info::peers ref;
@@ -356,7 +388,9 @@ jobjectArray Java_dinosaur_Dinosaur_get_1torrent_1info_1leechers
 		ThrowException(env, e);
 		return NULL;
 	}
-	std::string hash = env->GetStringUTFChars(jhash, NULL);
+	const char * chash = env->GetStringUTFChars(jhash, NULL);
+	std::string hash = chash;
+	env->ReleaseStringUTFChars( jhash, chash);
 	try
 	{
 		dinosaur::info::peers ref;
@@ -379,7 +413,9 @@ jobjectArray Java_dinosaur_Dinosaur_get_1torrent_1info_1downloadable_1pieces
 		ThrowException(env, e);
 		return NULL;
 	}
-	std::string hash = env->GetStringUTFChars(jhash, NULL);
+	const char * chash = env->GetStringUTFChars(jhash, NULL);
+	std::string hash = chash;
+	env->ReleaseStringUTFChars( jhash, chash);
 	try
 	{
 		dinosaur::info::downloadable_pieces ref;
@@ -424,15 +460,7 @@ jobject Java_dinosaur_Dinosaur_get_1socket_1status
 		ThrowException(env, e);
 		return NULL;
 	}
-	try
-	{
-		return Create_socket_status(env, dino->get_socket_status());
-	}
-	catch(dinosaur::Exception & e)
-	{
-		ThrowException(env, e);
-	}
-	return NULL;
+	return Create_socket_status(env, dino->get_socket_status());
 }
 
 void Java_dinosaur_Dinosaur_UpdateConfigs
@@ -454,6 +482,220 @@ void Java_dinosaur_Dinosaur_UpdateConfigs
 	}
 }
 
+jobject Java_dinosaur_Dinosaur_get_1configs
+(JNIEnv * env, jobject obj)
+{
+	if (dino == NULL)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
+		ThrowException(env, e);
+		return NULL;
+	}
+	return Create_configs(env, dino);
+}
+
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1download_1directory
+  (JNIEnv * env, jobject jobj, jstring jdir)
+{
+	if (dino == NULL || jdir == NULL)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
+		ThrowException(env, e);
+		return;
+	}
+	const char * cdir = env->GetStringUTFChars(jdir, NULL);
+	std::string dir = cdir;
+	env->ReleaseStringUTFChars( jdir, cdir);
+	try
+	{
+		dino->Config.set_download_directory(dir);
+	}
+	catch (dinosaur::Exception & e) {
+		ThrowException(env, e);
+	}
+	catch (dinosaur::SyscallException & e) {
+		ThrowSyscallException(env, e);
+	}
+}
+
+void Java_dinosaur_Dinosaur_set_1config_1port
+  (JNIEnv * env, jobject obj, jlong v)
+{
+	if (dino == NULL)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
+		ThrowException(env, e);
+		return;
+	}
+	if (v < 0 || v > UINT16_MAX)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_INVALID_PORT);
+		ThrowException(env, e);
+		return;
+	}
+	dino->Config.set_port(v);
+}
+
+
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1write_1cache_1size
+(JNIEnv * env, jobject obj, jlong v)
+{
+	if (dino == NULL)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
+		ThrowException(env, e);
+		return;
+	}
+	if (v <= 0 || v > UINT16_MAX)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_INVALID_W_CACHE_SIZE);
+		ThrowException(env, e);
+		return;
+	}
+	dino->Config.set_write_cache_size(v);
+}
+
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1read_1cache_1size
+(JNIEnv * env, jobject obj, jlong v)
+{
+	if (dino == NULL)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
+		ThrowException(env, e);
+		return;
+	}
+	if (v <= 0 || v > UINT16_MAX)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_INVALID_R_CACHE_SIZE);
+		ThrowException(env, e);
+		return;
+	}
+	dino->Config.set_read_cache_size(v);
+}
+
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1tracker_1numwant
+(JNIEnv * env, jobject obj, jlong v)
+{
+	if (dino == NULL)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
+		ThrowException(env, e);
+		return;
+	}
+	if (v < 0 || v > UINT32_MAX)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_INVALID_TRACKER_NUM_WANT);
+		ThrowException(env, e);
+		return;
+	}
+	dino->Config.set_tracker_numwant(v);
+}
+
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1tracker_1default_1interval
+(JNIEnv * env, jobject obj, jlong v)
+{
+	if (dino == NULL)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
+		ThrowException(env, e);
+		return;
+	}
+	if (v <= 0)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_INVALID_TRACKER_DEF_INTERVAL);
+		ThrowException(env, e);
+		return;
+	}
+	dino->Config.set_tracker_default_interval(v);
+}
+
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1max_1active_1seeders
+(JNIEnv * env, jobject obj, jlong v)
+{
+	if (dino == NULL)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
+		ThrowException(env, e);
+		return;
+	}
+	if (v <= 0 || v > UINT32_MAX)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_INVALID_MAX_ACTIVE_SEEDS);
+		ThrowException(env, e);
+		return;
+	}
+	dino->Config.set_max_active_seeders(v);
+}
+
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1max_1active_1leechers
+(JNIEnv * env, jobject obj, jlong v)
+{
+	if (dino == NULL)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
+		ThrowException(env, e);
+		return;
+	}
+	if (v <= 0 || v > UINT32_MAX)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_INVALID_MAX_ACTIVE_LEECHS);
+		ThrowException(env, e);
+		return;
+	}
+	dino->Config.set_max_active_leechers(v);
+}
+
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1send_1have
+(JNIEnv * env, jobject obj, jboolean v)
+{
+	if (dino == NULL)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
+		ThrowException(env, e);
+		return;
+	}
+	dino->Config.set_send_have(v);
+}
+
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1listen_1on
+(JNIEnv * env, jobject obj, jstring v)
+{
+	if (dino == NULL || v == NULL)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
+		ThrowException(env, e);
+		return;
+	}
+	const char * cv = env->GetStringUTFChars(v, NULL);
+	try
+	{
+		dino->Config.set_listen_on(cv);
+	}
+	catch (dinosaur::Exception  & e) {
+		env->ReleaseStringUTFChars( v, cv);
+		ThrowException(env, e);
+		return;
+	}
+	env->ReleaseStringUTFChars( v, cv);
+}
+
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1max_1active_1torrents
+(JNIEnv * env, jobject obj, jlong v)
+{
+	if (dino == NULL)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_NULL_REF);
+		ThrowException(env, e);
+		return;
+	}
+	if (v <= 0 || v > UINT16_MAX)
+	{
+		dinosaur::Exception e(dinosaur::Exception::ERR_CODE_INVALID_MAX_ACTIVE_TORRENTS);
+		ThrowException(env, e);
+		return;
+	}
+	dino->Config.set_max_active_torrents(v);
+}
 
 jobject Java_dinosaur_Dinosaur_test
 (JNIEnv * env, jobject jobj)
@@ -486,3 +728,40 @@ jobjectArray Java_dinosaur_Dinosaur_test2
 	}
 	return Create_torrent_failures(env, tfs);
 }
+
+/*
+ * Class:     dinosaur_Dinosaur
+ * Method:    test_short
+ * Signature: ()S
+ */
+jshort Java_dinosaur_Dinosaur_test_1short
+  (JNIEnv *, jobject)
+{
+	uint16_t a = 45356;
+	return a;
+}
+
+/*
+ * Class:     dinosaur_Dinosaur
+ * Method:    test_int
+ * Signature: ()I
+ */
+jint Java_dinosaur_Dinosaur_test_1int
+  (JNIEnv *, jobject)
+{
+	uint32_t a = 3000000000;
+	return a;
+}
+
+/*
+ * Class:     dinosaur_Dinosaur
+ * Method:    test_long
+ * Signature: ()J
+ */
+jlong Java_dinosaur_Dinosaur_test_1long
+  (JNIEnv *, jobject)
+{
+	uint64_t a = 5000000000;
+	return a;
+}
+

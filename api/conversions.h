@@ -50,6 +50,8 @@ jobjectArray Create_trackers(JNIEnv * env, const dinosaur::info::trackers & ts);
 
 jobject Create_socket_status(JNIEnv * env, const dinosaur::socket_status & ss);
 
+jobject Create_configs(JNIEnv * env, const dinosaur::DinosaurPtr & ptr);
+
 
 
 #endif /* CONVERSIONS_H_ */
