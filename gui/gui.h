@@ -26,6 +26,7 @@ bool cfg_opened();
 void update_statusbar();
 void messagebox(const char * message);
 void messagebox(const std::string & message);
+void set_file_tree(const std::string  & hash, uint64_t files_count);
 extern "C" void on_window1_show (GtkWidget *object, gpointer user_data);
 
 extern dinosaur::DinosaurPtr bt;

@@ -74,7 +74,7 @@ size_t TorrentInterfaceInternal::get_bitfield_length()
 	return m_piece_manager->get_bitfield_length();
 }
 
-Metafile::file_info * TorrentInterfaceInternal::get_file_info(FILE_INDEX file_index)
+info::file_stat * TorrentInterfaceInternal::get_file_info(FILE_INDEX file_index)
 {
 	return file_index >= (FILE_INDEX)m_metafile.files.size() ? NULL : &m_metafile.files[file_index];
 }
@@ -162,6 +162,11 @@ int TorrentInterfaceInternal::read_block(uint32_t piece, uint32_t block_index, c
 int TorrentInterfaceInternal::read_piece(uint32_t piece, unsigned char * dst)
 {
 	return m_torrent_file->read_piece(piece, dst);
+}
+
+void TorrentInterfaceInternal::update_file_downloaded(FILE_INDEX file_index, uint64_t bytes)
+{
+	m_torrent_file->update_file_downloaded(file_index, bytes);
 }
 
 }

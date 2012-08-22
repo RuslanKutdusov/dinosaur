@@ -13,7 +13,7 @@ namespace fs
 cache::cache()
 {
 #ifdef BITTORRENT_DEBUG
-	printf("cache default constructor\n");
+	LOG(INFO) << "cache default constructor";
 #endif
 	m_cache_head = NULL;
 	m_back = NULL;
@@ -38,8 +38,8 @@ void cache::init_cache(uint16_t size) throw (Exception)
 	{
 		m_cache_head = new _queue;
 	#ifdef FS_DEBUG
-		printf("cache initializing...\n");
-		printf("cache_head=%X\n", m_cache_head);
+		LOG(INFO) << "cache initializing...";
+		LOG(INFO) << "cache_head=" << m_cache_head;
 	#endif
 		memset(m_cache_head, 0, sizeof(_queue));
 		m_cache_head->last = m_cache_head;
@@ -55,13 +55,18 @@ void cache::init_cache(uint16_t size) throw (Exception)
 			m_cache_head->last = q;
 			last = q;
 	#ifdef FS_DEBUG
-			printf("cache element %u=%X, last=%X, next=%X\n", i, q, q->last, q->next);
+			LOG(INFO) << "cache element "
+					<< i <<"=" << q
+					<< " last=" << q->last
+					<< " next=" << q->next;
 	#endif
 		}
 		m_back = m_cache_head;
 	#ifdef FS_DEBUG
-		printf("cache_head last=%X, cache_head next=%X\n", m_cache_head->last, m_cache_head->next);
-		printf("front=%X, back=%X\n", m_front, m_back);
+		LOG(INFO) << "cache_head last= " << m_cache_head->last
+				  << " cache_head next=" << m_cache_head->next;
+		LOG(INFO) << "front=" << m_front
+				  << " back=" << m_back;
 	#endif
 	}
 	catch (std::bad_alloc & e) {
@@ -77,7 +82,7 @@ void cache::init_cache(uint16_t size) throw (Exception)
 cache::~cache()
 {
 #ifdef BITTORRENT_DEBUG
-	printf("cache destructor\n");
+	LOG(INFO) << "cache destructor";
 #endif
 	if (m_cache_head != NULL)
 	{
@@ -91,7 +96,7 @@ cache::~cache()
 		}
 	}
 #ifdef BITTORRENT_DEBUG
-	printf("cache destructed\n");
+	LOG(INFO) << "cache destructed";
 #endif
 }
 
@@ -99,17 +104,19 @@ cache::~cache()
 const write_cache_element * const  cache::front() const
 {
 #ifdef FS_DEBUG
-	printf("cache::front front=%X, back=%X count=%u\n", m_front, m_back, m_count);
+	LOG(INFO) << "cache::front front="<< m_front
+			  << " back=" << m_back
+			  << " count="<< m_count;
 #endif
 	if (m_count == 0)
 	{
 #ifdef FS_DEBUG
-		printf("cache is empty\n");
+		LOG(INFO) << "cache is empty";
 #endif
 		return NULL;
 	}
 #ifdef FS_DEBUG
-	printf("front ok\n");
+	LOG(INFO) << "front ok";
 #endif
 	return &m_front->ce;
 }
@@ -117,12 +124,14 @@ const write_cache_element * const  cache::front() const
 void cache::pop()
 {
 #ifdef FS_DEBUG
-	printf("cache pop front=%X, back=%X count=%u\n", m_front, m_back, m_count);
+	LOG(INFO) << "cache::pop front="<< m_front
+			  << " back=" << m_back
+			  << " count="<< m_count;
 #endif
 	if (m_count == 0)
 	{
 #ifdef FS_DEBUG
-		printf("cache is empty\n");
+		LOG(INFO) << "cache is empty";
 #endif
 		return;
 	}
@@ -130,7 +139,9 @@ void cache::pop()
 	m_front = m_front->next;
 	m_count--;
 #ifdef FS_DEBUG
-	printf("pop ok front=%X, back=%X count=%u\n", m_front, m_back, m_count);
+	LOG(INFO) << "cache::pop ok front="<< m_front
+				  << " back=" << m_back
+				  << " count="<< m_count;
 #endif
 }
 
@@ -142,19 +153,23 @@ void cache::pop()
 void cache::push(const File & file, const char * buf, uint32_t length, uint64_t offset, const BLOCK_ID & id) throw (Exception)
 {
 #ifdef FS_DEBUG
-	printf("cache push file=%s length=%u offset=%llu piece=%u block=%u\n", file->fn().c_str(), length, offset, id.first, id.second);
+	LOG(INFO) << "cache push file=" << file->fn().c_str()
+			<< " length=" << length
+			<< " offset=" <<offset
+			<< " piece=" << id.first
+			<< " block=" << id.second;
 #endif
 	if (m_count >= m_size)
 	{
 #ifdef FS_DEBUG
-		printf("NO AVAILABLE MEMORY IN CACHE front=%X, back=%X count=%u\n", m_front, m_back, m_count);
+		LOG(INFO) << "NO AVAILABLE MEMORY IN CACHE front=" << m_front << " back=" << m_back << " count=" << m_count;
 #endif
 		throw Exception(Exception::ERR_CODE_CACHE_FULL);
 	}
 	if (length > BLOCK_LENGTH || length == 0)
 	{
 #ifdef FS_DEBUG
-		printf("Invalid length\n");
+		LOG(INFO) << "Invalid length";
 #endif
 		throw Exception(Exception::ERR_CODE_BLOCK_TOO_BIG);
 	}
@@ -166,7 +181,7 @@ void cache::push(const File & file, const char * buf, uint32_t length, uint64_t 
 	m_back->ce.offset = offset;
 	memcpy(m_back->ce.block, buf, length);
 #ifdef FS_DEBUG
-	printf("pushed in %X, back=%X front=%X count=%u\n", m_back, m_back->next, m_front, m_count + 1);
+	LOG(INFO) << "pushed in "<< m_back << " back=" << m_back->next << " front=" << m_front << " count=" << m_count + 1;
 #endif
 	m_back = m_back->next;
 	m_count++;

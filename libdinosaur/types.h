@@ -8,8 +8,11 @@
 #ifndef TYPES_H_
 #define TYPES_H_
 
-#include "consts.h"
 #include <list>
+#include <vector>
+#include <stdint.h>
+#include "consts.h"
+#include "exceptions/exceptions.h"
 
 namespace dinosaur
 {
@@ -17,7 +20,7 @@ namespace dinosaur
 typedef unsigned char 		SHA1_HASH[SHA1_LENGTH];
 typedef char 				SHA1_HASH_HEX[SHA1_HEX_LENGTH];
 typedef unsigned char * 	BITFIELD;
-typedef uint32_t			FILE_INDEX;
+typedef uint64_t			FILE_INDEX;
 typedef uint32_t 			BLOCK_INDEX;
 typedef uint32_t 			PIECE_INDEX;
 typedef uint32_t 			BLOCK_OFFSET;
@@ -62,11 +65,12 @@ enum TRACKER_STATUS
 
 enum TORRENT_FAILURE
 {
-	TORRENT_FAILURE_INITIALIZATION,
+	TORRENT_FAILURE_INIT_TORRENT,
 	TORRENT_FAILURE_WRITE_FILE,
 	TORRENT_FAILURE_READ_FILE,
 	TORRENT_FAILURE_GET_BLOCK_CACHE,
-	TORRENT_FAILURE_PUT_BLOCK_CACHE
+	TORRENT_FAILURE_PUT_BLOCK_CACHE,
+	TORRENT_FAILURE_DOWNLOADING
 };
 
 struct torrent_failure
@@ -76,6 +80,8 @@ struct torrent_failure
 	TORRENT_FAILURE			where;
 	std::string				description;
 };
+
+typedef std::list<torrent_failure> torrent_failures;
 
 namespace info
 {
@@ -93,14 +99,15 @@ namespace info
 		uint32_t 			piece_count;
 		SHA1_HASH_HEX 		info_hash_hex;
 		time_t				start_time;
+		uint64_t			files_count;
 	};
 
 	struct torrent_dyn
 	{
 		uint64_t 			downloaded;
 		uint64_t 			uploaded;
-		double 				rx_speed;
-		double 				tx_speed;
+		int 				rx_speed;
+		int 				tx_speed;
 		uint32_t			seeders;
 		uint32_t			total_seeders;
 		uint32_t			leechers;
@@ -135,15 +142,15 @@ namespace info
 		uint64_t			downloaded;
 	};
 
-	typedef std::list<file_stat> files;
+	typedef std::vector<file_stat> files_stat;
 
 	struct peer
 	{
 		char 		ip[22];
 		uint64_t 	downloaded;
 		uint64_t 	uploaded;
-		double 		downSpeed;
-		double 		upSpeed;
+		int 		downSpeed;
+		int 		upSpeed;
 		double 		available;
 		uint32_t	blocks2request;
 		uint32_t	requested_blocks;

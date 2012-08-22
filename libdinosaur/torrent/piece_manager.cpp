@@ -87,45 +87,25 @@ void PieceManager::build_piece_info()
 	FILE_INDEX file_index = 0;
 	FILE_INDEX file_iter = 0;
 	uint64_t last_files_length = 0;
-	FILE_INDEX file_iter2 = 0;
-	uint64_t last_file_length2 = 0;
 	for (PIECE_INDEX piece_index = 0; piece_index < piece_count; piece_index++)
 	{
-		FILE_OFFSET offset = piece_index * piece_length_;//смещение до начала куска
+		FILE_OFFSET offset2piece_begin = piece_index * piece_length_;//смещение до начала куска
 		uint64_t piece_length = (piece_index == piece_count - 1) ? length - piece_length_ * piece_index : piece_length_; //размер последнего куска может быть меньше m_piece_length
-		FILE_OFFSET end_of_piece = offset + piece_length;
 
 		m_piece_info[piece_index].block_count = (uint32_t)ceil((double)piece_length / (double)BLOCK_LENGTH);
 		bool need2download = (!bit_in_bitfield(piece_index, piece_count, m_bitfield));
 
 
-		for(FILE_INDEX f = file_iter2; f < file_count; f++)
-		{
-			if (m_file_contains_pieces.size() <= f)
-				m_file_contains_pieces.resize(f + 1);
-			m_file_contains_pieces[f].insert(piece_index);
-
-			Metafile::file_info * finfo = m_torrent->get_file_info(f);
-			last_file_length2 += finfo->length;
-			if (last_file_length2 >= end_of_piece)
-			{
-				file_iter2 = f + 1;
-				if (last_file_length2 > end_of_piece)
-					m_file_contains_pieces[f].insert(piece_index + 1);
-				break;
-			}
-		}
-
 		for(BLOCK_INDEX block = 0; block < m_piece_info[piece_index].block_count; block++)
 		{
-			if (last_files_length <= offset)
+			if (last_files_length <= offset2piece_begin)
 			{
 				for(FILE_INDEX j = file_iter; j < file_count; j++)
 				{
 
-					Metafile::file_info * finfo = m_torrent->get_file_info(j);
+					info::file_stat * finfo = m_torrent->get_file_info(j);
 					last_files_length += finfo->length;//считает размер файлов, когда он станет больше смещения => кусок начинается в j-ом файле
-					if (last_files_length >= offset)
+					if (last_files_length >= offset2piece_begin)
 					{
 						file_index = j;
 						file_iter = j + 1;
@@ -135,23 +115,20 @@ void PieceManager::build_piece_info()
 			}
 
 
-			Metafile::file_info * finfo = m_torrent->get_file_info(file_index);
+			info::file_stat * finfo = m_torrent->get_file_info(file_index);
 			FILE_OFFSET file_offset = last_files_length - finfo->length;//смещение до file_index файла
 			if (block == 0)
 			{
 				m_piece_info[piece_index].file_index = file_index;
-				m_piece_info[piece_index].offset = offset - file_offset;//смещение до начала куска внутри файла
+				m_piece_info[piece_index].offset = offset2piece_begin - file_offset;//смещение до начала куска внутри файла
 			}
 
 			std::pair<FILE_INDEX, FILE_OFFSET> block_info;
 			block_info.first  = file_index;
-			block_info.second = offset - file_offset;
+			block_info.second = offset2piece_begin - file_offset;
 			m_piece_info[piece_index].block_info.push_back(block_info);
 
-			#ifdef BITTORRENT_DEBUG
-				//printf("PIECE %u Block %u file %u offset %llu\n", piece_index, block, m_piece_info[piece_index].block_info[block].first, m_piece_info[piece_index].block_info[block].second);
-			#endif
-			offset += BLOCK_LENGTH;
+			offset2piece_begin += BLOCK_LENGTH;
 			if (need2download)
 				m_piece_info[piece_index].block2download.insert(block);
 		}
@@ -171,16 +148,27 @@ void PieceManager::build_piece_info()
 			m_torrent->inc_downloaded(piece_length);
 			m_piece_info[piece_index].prio_iter = m_tag_list.begin();
 		}
+
+		FILE_OFFSET offset = m_piece_info[piece_index].offset;
+		FILE_INDEX fi = m_piece_info[piece_index].file_index;
+		uint32_t pos = 0;
+
+		while(pos < piece_length)
+		{
+			uint64_t remain = m_torrent->get_file_info(fi)->length - offset;
+			if (fi >= m_file_contains_pieces.size())
+				m_file_contains_pieces.resize(fi + 1);
+			m_file_contains_pieces[fi].insert(piece_index);
+			uint64_t bytes = piece_length - pos > remain ? remain : piece_length - pos;
+			if (!need2download)
+				m_torrent->update_file_downloaded(fi, bytes);
+
+			fi++;
+
+			pos += bytes;
+			offset = 0;
+		}
 	}
-/*#ifdef BITTORRENT_DEBUG
-	for(size_t i = 0; i < m_file_contains_pieces.size(); i++)
-	{
-		printf("File %u contains: ", i);
-		for(std::set<PIECE_INDEX>::iterator iter = m_file_contains_pieces[i].begin(); iter != m_file_contains_pieces[i].end(); ++iter)
-			printf("%u", *iter);
-		printf("\n");
-	}
-#endif*/
 }
 
 void PieceManager::get_blocks_count_in_piece(PIECE_INDEX piece_index, uint32_t & blocks_count)
@@ -262,6 +250,7 @@ void PieceManager::pop_piece2download()
 		uint32_t piece_index = m_download_queue.high_prio_pieces.front();
 		m_piece_info[piece_index].prio_iter = m_tag_list.begin();
 		m_download_queue.high_prio_pieces.pop_front();
+		return;
 
 	}
 	if (!m_download_queue.normal_prio_pieces.empty())
@@ -269,6 +258,7 @@ void PieceManager::pop_piece2download()
 		uint32_t piece_index = m_download_queue.normal_prio_pieces.front();
 		m_piece_info[piece_index].prio_iter = m_tag_list.begin();
 		m_download_queue.normal_prio_pieces.pop_front();
+		return;
 
 	}
 	if (!m_download_queue.low_prio_pieces.empty())
@@ -276,8 +266,14 @@ void PieceManager::pop_piece2download()
 		uint32_t piece_index = m_download_queue.low_prio_pieces.front();
 		m_piece_info[piece_index].prio_iter = m_tag_list.begin();
 		m_download_queue.low_prio_pieces.pop_front();
+		return;
 
 	}
+}
+
+bool PieceManager::queue_empty()
+{
+	return m_download_queue.high_prio_pieces.empty() && m_download_queue.normal_prio_pieces.empty() && m_download_queue.low_prio_pieces.empty();
 }
 
 int PieceManager::push_piece2download(PIECE_INDEX piece_index)
@@ -385,9 +381,19 @@ int PieceManager::get_piece_priority(PIECE_INDEX piece_index, DOWNLOAD_PRIORITY 
 int PieceManager::set_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY prio)
 {
 	std::map<PIECE_INDEX, DOWNLOAD_PRIORITY> old_prios;
-	for(std::set<PIECE_INDEX>::iterator iter = m_file_contains_pieces[file].begin(); iter != m_file_contains_pieces[file].end(); ++iter)
+	std::set<PIECE_INDEX>::iterator begin = m_file_contains_pieces[file].begin();
+	std::set<PIECE_INDEX>::iterator end = m_file_contains_pieces[file].end();
+	for(std::set<PIECE_INDEX>::iterator iter = begin; iter != end; ++iter)
 	{
 		PIECE_INDEX piece_index = *iter;
+
+		if (m_piece_info[piece_index].prio >= prio)
+		{
+			std::set<PIECE_INDEX>::iterator iter2 = iter;
+			++iter2;
+			if ((iter == begin || iter2 == end))
+				continue;
+		}
 		old_prios[piece_index] = m_piece_info[piece_index].prio;
 		int ret = set_piece_priority(piece_index, prio);
 		if (ret == ERR_INTERNAL || ret == ERR_BAD_ARG)
@@ -463,9 +469,6 @@ int PieceManager::event_file_write(const fs::write_event & we, PIECE_STATE & pie
 	uint32_t block_length = 0;
 	piece_state = PIECE_STATE_NOT_FIN;
 	get_piece_block_from_block_id(we.block_id, piece_index, block_index);
-#ifdef BITTORRENT_DEBUG
-	//printf("event_file_write piece=%u block=%u writted=%d\n", piece_index, block_index, we->writted);
-#endif
 	if (we.writted < 0)
 	{
 		m_downloadable_blocks.erase(we.block_id);
@@ -498,7 +501,7 @@ int PieceManager::event_file_write(const fs::write_event & we, PIECE_STATE & pie
 				piece_state = PIECE_STATE_FIN_HASH_BAD;
 			}
 #ifdef BITTORRENT_DEBUG
-			printf("PIECE DONE %u ret=%d\n", piece_index, (int)ret);
+			LOG(INFO) << "PIECE DONE " << piece_index << " ret=" << ret;
 #endif
 		}
 	}

@@ -25,6 +25,7 @@
 #include <vector>
 #include <string>
 #include <boost/shared_ptr.hpp>
+#include <glog/logging.h>
 
 namespace dinosaur {
 
@@ -47,7 +48,7 @@ private:
 	pthread_t 						m_thread;
 	pthread_mutex_t					m_mutex;
 	bool 							m_thread_stop;
-	bool 							m_thread_pause;
+	torrent_failures				m_fails_torrents;//while creating Dinosaur
 	static void * thread(void * arg);
 	void bin2hex(unsigned char * bin, char * hex, int len);
 	int load_our_torrents();
@@ -66,12 +67,13 @@ public:
 	void get_torrent_info_stat(const std::string & hash, info::torrent_stat & ref);
 	void get_torrent_info_dyn(const std::string & hash, info::torrent_dyn & ref);
 	void get_torrent_info_trackers(const std::string & hash, info::trackers & ref);
-	void get_torrent_info_files(const std::string & hash, info::files & ref);
+	void get_torrent_info_file_stat(const std::string & hash, FILE_INDEX index, info::file_stat & ref);
 	void get_torrent_info_file_dyn(const std::string & hash, FILE_INDEX index, info::file_dyn & ref);
 	void get_torrent_info_seeders(const std::string & hash, info::peers & ref);
 	void get_torrent_info_leechers(const std::string & hash, info::peers & ref);
 	void get_torrent_info_downloadable_pieces(const std::string & hash, info::downloadable_pieces & ref);
-	int get_TorrentList(std::list<std::string>  & ref);
+	void set_file_priority(const std::string & hash, FILE_INDEX file, DOWNLOAD_PRIORITY prio);
+	void get_TorrentList(std::list<std::string>  & ref);
 	void UpdateConfigs();
 	int event_sock_ready2read(network::Socket sock);
 	int event_sock_closed(network::Socket sock);
@@ -97,16 +99,21 @@ public:
 		m_sock_status.listen = false;
 	}
 	~Dinosaur();
-	static void CreateDinosaur(DinosaurPtr & ptr)
+	/*
+	 * SyscallException
+	 */
+	static void CreateDinosaur(DinosaurPtr & ptr, torrent_failures & fail_torrents )
 	{
 		try
 		{
+			google::InitGoogleLogging("dinosaur");
 			ptr.reset(new Dinosaur());
+			fail_torrents = ptr->m_fails_torrents;
 			pthread_mutex_lock(&ptr->m_mutex);
 			ptr->init_listen_socket();
 			pthread_mutex_unlock(&ptr->m_mutex);
 		}
-		catch (Exception & e)
+		catch (SyscallException & e)
 		{
 			ptr.reset();
 			throw e;

@@ -55,6 +55,7 @@ struct config
 		ar & max_active_seeders;
 		ar & max_active_leechers;
 		ar & send_have;
+		ar & listen_on;
 		ar & max_active_torrents;
 	}
 };
@@ -305,6 +306,11 @@ public:
 	/*
 	 * Exception::ERR_CODE_INVALID_CONFIG_VALUE
 	 */
+	void set_listen_on(const char * ip)
+	{
+		if (inet_pton(AF_INET, ip, &cfg.listen_on) <= 0)
+			throw Exception(Exception::ERR_CODE_INVALID_LISTEN_ON);
+	}
 	void set_listen_on(IP_CHAR ip)
 	{
 		if (inet_pton(AF_INET, ip, &cfg.listen_on) <= 0)

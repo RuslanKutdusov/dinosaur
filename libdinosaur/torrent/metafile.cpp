@@ -167,9 +167,6 @@ void Metafile::init(const char * metafile_path)
 	if (buf == NULL)
 		throw SyscallException();
 	m_metafile = bencode::decode(buf, m_metafile_len, false);
-#ifdef BITTORRENT_DEBUG
-	bencode::dump(m_metafile);
-#endif
 	free(buf);
 	if (!m_metafile)
 		throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
@@ -259,7 +256,7 @@ void Metafile::get_files_info(bencode::be_node * info)
 			throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
 		files.resize(1);
 		files[0].length = length;
-		files[0].name = name;
+		files[0].path = name;
 	}
 	else
 	{//определяем кол-во файлов
@@ -282,13 +279,14 @@ void Metafile::get_files_info(bencode::be_node * info)
 
 			dir_tree.reset();
 			int path_list_size = bencode::get_list_size(path_node);
+			files[i].index = i;
 			for(int j = 0; j < path_list_size; j++)
 			{
 				bencode::be_str * str;
 				if (bencode::get_str(path_node, j, &str) == -1)
 					throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
 				char * name = bencode::str2c_str(str);
-				files[i].name += name;
+				files[i].path += name;
 				if (j < path_list_size - 1)
 				{
 					try
@@ -299,7 +297,7 @@ void Metafile::get_files_info(bencode::be_node * info)
 					{
 						throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
 					}
-					files[i].name += '/';
+					files[i].path += '/';
 				}
 				delete[] name;
 
@@ -360,7 +358,7 @@ void Metafile::calculate_info_hash(bencode::be_node * info, uint64_t metafile_le
 		throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
 	}
 	CSHA1 csha1;
-	csha1.Update((unsigned char*)bencoded_info,bencoded_info_len);
+	csha1.Update((unsigned char*)bencoded_info, bencoded_info_len);
 	csha1.Final();
 	csha1.ReportHash(info_hash_hex,CSHA1::REPORT_HEX);
 	csha1.GetHash(info_hash_bin);
@@ -370,7 +368,7 @@ void Metafile::calculate_info_hash(bencode::be_node * info, uint64_t metafile_le
 /*
  * Exception::ERR_CODE_NULL_REF
  * Exception::ERR_CODE_UNDEF
- * Exception::ERR_CODE_BENCODE_PARSE_ERROR
+ * Exception::ERR_CODE_BENCODE_ENCODE_ERROR
  * SyscallException
  */
 
@@ -382,7 +380,7 @@ void Metafile::save2file(const std::string & filepath)
 /*
  * Exception::ERR_CODE_NULL_REF
  * Exception::ERR_CODE_UNDEF
- * Exception::ERR_CODE_BENCODE_PARSE_ERROR
+ * Exception::ERR_CODE_BENCODE_ENCODE_ERROR
  * SyscallException
  */
 
@@ -401,7 +399,7 @@ void Metafile::save2file(const char * filepath)
 	if (bencode::encode(m_metafile, &bencoded_metafile, m_metafile_len, &bencoded_metafile_len) != ERR_NO_ERROR)
 	{
 		delete[] bencoded_metafile;
-		throw Exception(Exception::ERR_CODE_BENCODE_PARSE_ERROR);
+		throw Exception(Exception::ERR_CODE_BENCODE_ENCODE_ERROR);
 	}
 	int fd = open(filepath, O_RDWR | O_CREAT, S_IRWXU);
 	if (fd == -1)
@@ -419,28 +417,6 @@ void Metafile::save2file(const char * filepath)
 	}
 	close(fd);
 	delete[] bencoded_metafile;
-}
-
-void Metafile::dump()
-{
-	std::cout<<"ANNOUNCES:"<<std::endl;
-	for(std::vector<std::string>::iterator iter = announces.begin(); iter != announces.end(); ++iter)
-	{
-		std::cout<<"	"<<*iter<<std::endl;
-	}
-	std::cout<<"COMMENT: "<<comment<<std::endl;
-	std::cout<<"CREATED BY: "<<created_by<<std::endl;
-	std::cout<<"CREATION DATA: "<<creation_date<<std::endl;
-	std::cout<<"PRIVATE: "<<private_<<std::endl;
-	std::cout<<"LENGHT: "<<length<<std::endl;
-	std::cout<<"FILES:"<<std::endl;
-	for(std::vector<file_info>::iterator iter = files.begin(); iter != files.end(); ++iter)
-	{
-		std::cout<<"	"<<iter->name<<"	"<<iter->length<<std::endl;
-	}
-	std::cout<<"PIECE LENGHT: "<<piece_length<<std::endl;
-	std::cout<<"PIECE COUNT: "<<piece_count<<std::endl;
-	std::cout<<"INFOHASH: "<<info_hash_hex<<std::endl;
 }
 
 } /* namespace torrent */

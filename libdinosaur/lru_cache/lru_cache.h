@@ -7,7 +7,7 @@
 #pragma once
 #include <stdio.h>
 #include <stdint.h>
-#include <time.h>
+#include <sys/time.h>
 #include <string.h>
 #include <queue>
 #include <list>
@@ -66,9 +66,9 @@ LRU_Cache<cache_key, cache_element>::~LRU_Cache() {
 template <class cache_key, class cache_element>
 uint64_t LRU_Cache<cache_key, cache_element>::get_time()
 {
-	timespec ts;
-	clock_gettime(CLOCK_REALTIME, &ts);
-	return ((uint64_t)ts.tv_sec << 32) + ts.tv_nsec;
+	timeval tv;
+	gettimeofday(&tv, NULL);
+	return ((uint64_t)tv.tv_sec << 32) + tv.tv_usec;
 }
 
 /*

@@ -13,7 +13,7 @@ namespace torrent
 TorrentFile::TorrentFile(const TorrentInterfaceInternalPtr & t)
 {
 #ifdef BITTORRENT_DEBUG
-	printf("TorrentFile default constructor\n");
+	LOG(INFO) << "TorrentFile default constructor";
 #endif
 	m_torrent = t;
 	m_fm = t->get_fm();
@@ -43,12 +43,13 @@ void TorrentFile::init(const std::string & path, bool files_should_exists, uint3
 	files_exists = 0;
 	for(uint32_t i = 0; i < files_count; i++)
 	{
-		Metafile::file_info * fi = m_torrent->get_file_info(i);
+		info::file_stat * fi = m_torrent->get_file_info(i);
 		file f;
 		f.length = fi->length;
-		f.name = i_path + fi->name;
+		f.name = i_path + fi->path;
 		f.download = true;
 		f.priority = DOWNLOAD_PRIORITY_NORMAL;
+		f.downloaded = 0;
 		try
 		{
 			if (m_fm->File_exists(f.name, f.length))
@@ -80,10 +81,10 @@ void TorrentFile::init(const std::string & path, bool files_should_exists, uint3
 TorrentFile::~TorrentFile()
 {
 #ifdef BITTORRENT_DEBUG
-	printf("TorrentFile destructor\n");
+	LOG(INFO) << "TorrentFile destructor";
 #endif
 #ifdef BITTORRENT_DEBUG
-	printf("TorrentFile destroyed\n");
+	LOG(INFO) << "TorrentFile destroyed";
 #endif
 }
 
@@ -235,7 +236,7 @@ int TorrentFile::read_block(PIECE_INDEX piece, BLOCK_INDEX block_index, char * b
 
 int TorrentFile::read_piece(PIECE_INDEX piece_index, unsigned char * dst)
 {
-	//printf("read piece %u\n", piece_index);
+	//LOG(INFO) << "read piece %u\n", piece_index);
 	FILE_OFFSET offset;
 	FILE_INDEX file_index;
 	uint32_t piece_length;
@@ -308,6 +309,49 @@ void TorrentFile::set_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY prio)
 void TorrentFile::get_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY & prio)
 {
 	prio = m_files[file].priority;
+}
+
+void TorrentFile::update_file_downloaded(PIECE_INDEX piece)
+{
+	FILE_OFFSET offset;
+	FILE_INDEX file_index;
+	uint32_t piece_length;
+	uint32_t pos = 0;
+
+	m_torrent->get_piece_offset(piece, offset);
+	m_torrent->get_file_index_by_piece(piece, file_index);
+	m_torrent->get_piece_length(piece, piece_length);
+
+
+	while(pos < piece_length)
+	{
+		uint64_t remain = m_files[file_index].length - offset;
+
+		uint64_t bytes = piece_length - pos > remain ? remain : piece_length - pos;
+
+		m_files[file_index++].downloaded += bytes;
+
+		pos += bytes;
+		offset = 0;
+	}
+}
+
+void TorrentFile::update_file_downloaded(FILE_INDEX file_index, uint64_t bytes)
+{
+	m_files[file_index].downloaded += bytes;
+}
+
+void TorrentFile::clear_file_downloaded()
+{
+	for(FILE_INDEX i = 0; i < m_files.size(); i++)
+	{
+		m_files[i].downloaded = 0;
+	}
+}
+
+void TorrentFile::get_file_downloaded(FILE_INDEX file_index, uint64_t & bytes_count)
+{
+	bytes_count = m_files[file_index].downloaded;
 }
 
 }

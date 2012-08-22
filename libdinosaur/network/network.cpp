@@ -17,15 +17,15 @@ ssize_t buffer_remain(struct buffer * buf)
 
 double get_time()
 {
-	timespec ts;
-	clock_gettime(CLOCK_REALTIME, &ts);
-	return (double)ts.tv_sec + (double)ts.tv_nsec / (double)POW10_9;
+	timeval tv;
+	gettimeofday(&tv, NULL);
+	return (double)tv.tv_sec + (double)tv.tv_usec / (double)POW10_6;
 }
 
 NetworkManager::NetworkManager()
 {
 #ifdef BITTORRENT_DEBUG
-	printf("NetworkManager default constructor\n");
+	LOG(INFO) << "NetworkManager default constructor";
 #endif
 	m_thread = 0;
 	m_thread_stop = false;
@@ -59,7 +59,7 @@ void NetworkManager::Init() throw (SyscallException)
 NetworkManager::~NetworkManager()
 {
 #ifdef BITTORRENT_DEBUG
-	printf("NetworkManager destructor\n");
+	LOG(INFO) << "NetworkManager destructor";
 #endif
 	if (m_thread != 0)
 	{
@@ -83,7 +83,7 @@ NetworkManager::~NetworkManager()
 	m_timeout_sockets.clear();
 	m_unresolved_sockets.clear();
 #ifdef BITTORRENT_DEBUG
-	printf("NetworkManager destroyed\n");
+	LOG(INFO) << "NetworkManager destroyed";
 #endif
 }
 
@@ -128,7 +128,7 @@ void NetworkManager::Socket_add(const char * ip, uint16_t port, const SocketAsso
 void NetworkManager::Socket_add_domain(const char *domain_name, uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception)
 {
 #ifdef BITTORRENT_DEBUG
-	printf("Adding socket %s\n", domain_name);
+	LOG(INFO) << "Adding socket " << domain_name;
 #endif
 	sock.reset(new socket_());
 	if (sock == NULL)
@@ -148,7 +148,7 @@ void NetworkManager::Socket_add_domain(const char *domain_name, uint16_t port, c
 	m_sockets.insert(sock);
 	pthread_mutex_unlock(&m_mutex_sockets);
 #ifdef BITTORRENT_DEBUG
-	printf("Socket is added %s\n", domain_name);
+	LOG(INFO) << "Socket is added " << domain_name;
 #endif
 }
 
@@ -170,7 +170,7 @@ void NetworkManager::Socket_add_domain(std::string & domain_name, uint16_t port,
 void NetworkManager::Socket_add(struct sockaddr_in * addr, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException)
 {
 #ifdef BITTORRENT_DEBUG
-	printf("Adding socket %s\n",  inet_ntoa(addr->sin_addr));
+	LOG(INFO) << "Adding socket " <<  inet_ntoa(addr->sin_addr);
 #endif
 	sock.reset(new socket_());
 	if (sock == NULL)
@@ -220,7 +220,7 @@ end:
 	m_sockets.insert(sock);
 	pthread_mutex_unlock(&m_mutex_sockets);
 #ifdef BITTORRENT_DEBUG
-	printf("Socket is added %d %s\n", sock->m_socket, inet_ntoa(sock->m_peer.sin_addr));
+	LOG(INFO) << "Socket is added " <<  sock->m_socket << " " << inet_ntoa(sock->m_peer.sin_addr);
 #endif
 }
 
@@ -409,7 +409,7 @@ void NetworkManager::ListenSocket_add(uint16_t port, const std::string & ip, con
 int NetworkManager::clock()  throw (SyscallException)
 {
 	struct epoll_event events[MAX_EPOLL_EVENT];
-	int nfds = epoll_wait(m_epoll_fd, events, MAX_EPOLL_EVENT, 80);
+	int nfds = epoll_wait(m_epoll_fd, events, MAX_EPOLL_EVENT, 10);
 	if (nfds == -1)
 	{
 		throw SyscallException();
@@ -646,8 +646,7 @@ void NetworkManager::Socket_delete(Socket & sock)
 	m_timeout_sockets.erase(sock);
 	m_unresolved_sockets.erase(sock);
 	m_listening_sockets.erase(sock);
-	if (close(sock->m_socket) == -1)
-		printf("ERRNO %X %d %s\n", sock.get(), sock->m_socket, sys_errlist[errno]);
+	close(sock->m_socket);
 	sock->m_need2delete = true;
 	sock.reset();
 	pthread_mutex_unlock(&m_mutex_sockets);
@@ -680,26 +679,22 @@ void NetworkManager::Socket_get_assoc(Socket & sock, SocketAssociation::ptr & as
  * Exception::ERR_CODE_NULL_REF
  */
 
-double NetworkManager::Socket_get_rx_speed(Socket & sock) throw (Exception)
+int NetworkManager::Socket_get_rx_speed(Socket & sock) throw (Exception)
 {
 	if (sock == NULL)
 		throw Exception(Exception::ERR_CODE_NULL_REF);
-	double time = get_time();
-	double speed = (double)sock->m_rx / (time - sock->m_rx_last_time);
-	return speed;
+	return sock->m_rx / (get_time() - sock->m_rx_last_time);
 }
 
 /*
  * Exception::ERR_CODE_NULL_REF
  */
 
-double NetworkManager::Socket_get_tx_speed(Socket & sock) throw (Exception)
+int NetworkManager::Socket_get_tx_speed(Socket & sock) throw (Exception)
 {
 	if (sock == NULL)
 		throw Exception(Exception::ERR_CODE_NULL_REF);
-	double time = get_time();
-	double speed = (double)sock->m_tx / (time - sock->m_tx_last_time);
-	return speed;
+	return sock->m_tx / (get_time()- sock->m_tx_last_time);
 }
 
 /*
@@ -993,7 +988,7 @@ void * NetworkManager::timeout_thread(void * arg)
 	std::list<Socket> sock2resolve;
 	while(!nm->m_thread_stop)
 	{
-		//printf("timeout_thread loop\n");
+		//LOG(INFO) << "timeout_thread loop";
 		pthread_mutex_lock(&nm->m_mutex_sockets);
 		for(socket_set_iter iter = nm->m_sockets.begin(); iter != nm->m_sockets.end(); ++iter)
 		{
@@ -1043,7 +1038,7 @@ void * NetworkManager::timeout_thread(void * arg)
 			catch (...)
 			{
 #ifdef BITTORRENT_DEBUG
-	printf("DomainNameResolver is can not resolve %s\n", sock->m_domain.c_str());
+	LOG(INFO) << "DomainNameResolver is can not resolve "<< sock->m_domain.c_str();
 #endif
 				pthread_mutex_lock(&nm->m_mutex_sockets);
 				if (!sock->m_need2delete)
