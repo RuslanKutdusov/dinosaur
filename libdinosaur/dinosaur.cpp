@@ -529,7 +529,7 @@ int Dinosaur::event_sock_ready2read(network::Socket sock)
 #ifdef BITTORRENT_DEBUG
 	sockaddr_in addr;
 	m_nm.Socket_get_addr(sock, &addr);
-	std::string ip = inet_ntoa(&addr.sin_addr));
+	std::string ip = inet_ntoa(addr.sin_addr);
 #endif
 	try
 	{
@@ -551,8 +551,6 @@ int Dinosaur::event_sock_ready2read(network::Socket sock)
 		if (memcmp(&handshake[1], "BitTorrent protocol", 19) != 0)
 		{
 			#ifdef BITTORRENT_DEBUG
-				sockaddr_in addr;
-				m_nm.Socket_get_addr(sock, &addr);
 				LOG(INFO) << "Leecher " << ip << " works with unsupported Bittorrent protocol";
 			#endif
 			m_nm.Socket_delete(sock);
@@ -567,7 +565,6 @@ int Dinosaur::event_sock_ready2read(network::Socket sock)
 		if (iter == m_torrents.end() && m_torrents.count(str_infohash) == 0)
 		{
 			#ifdef BITTORRENT_DEBUG
-				m_nm.Socket_get_addr(sock, &addr);
 				LOG(INFO) << "Leecher " << ip << " wants to work with missed torrent";
 			#endif
 			m_nm.Socket_delete(sock);
@@ -607,7 +604,7 @@ int Dinosaur::event_sock_accepted(network::Socket sock, network::Socket accepted
 #ifdef BITTORRENT_DEBUG
 	sockaddr_in addr;
 	m_nm.Socket_get_addr(sock, &addr);
-	LOG(INFO) << "Leecher connected " << inet_ntoa(&addr.sin_addr));
+	LOG(INFO) << "Leecher connected " << inet_ntoa(addr.sin_addr);
 #endif
 	m_nm.Socket_set_assoc(accepted_sock, shared_from_this());
 	return 0;
