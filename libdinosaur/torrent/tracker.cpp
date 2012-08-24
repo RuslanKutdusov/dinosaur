@@ -325,7 +325,8 @@ int Tracker::event_sock_connected(network::Socket sock)
 	{
 		if (m_state == TRACKER_STATE_FAILURE)
 			return ERR_NO_ERROR;
-		m_addr = new sockaddr_in;
+		if (m_addr == NULL)
+			m_addr = new sockaddr_in;
 		m_nm->Socket_get_addr(sock, m_addr);
 		send_request(m_event_after_connect);
 	}

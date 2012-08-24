@@ -30,6 +30,7 @@ private:
 		unsigned char * bitfield;
 		size_t 			bitfield_len;
 		time_t 			start_time;
+		int				state;
 		friend class boost::serialization::access;
 		template<class Archive>
 		void serialize(Archive & ar, const unsigned int version)
@@ -39,6 +40,7 @@ private:
 			for(size_t i = 0; i < bitfield_len; i++)
 				ar & bitfield[i];
 			ar & start_time;
+			ar & state;
 		}
 		serializable()
 		{
@@ -62,7 +64,7 @@ private:
 			bitfield = new unsigned char[bitfield_len];
 			memset(bitfield, 0, bitfield_len);
 		}
-		void set_data(uint64_t _uploaded, const std::string & _download_directory, unsigned char * _bitfield, size_t _bitfield_len, time_t _start_time)
+		void set_data(uint64_t _uploaded, const std::string & _download_directory, unsigned char * _bitfield, size_t _bitfield_len, time_t _start_time, int _state)
 		{
 			uploaded = _uploaded;
 			download_directory = _download_directory;
@@ -74,6 +76,7 @@ private:
 			}
 			memcpy(bitfield, _bitfield, bitfield_len);
 			start_time = _start_time;
+			state = _state;
 		}
 	};
 	serializable s;
@@ -84,14 +87,14 @@ public:
 		state_filename = _state_filename;
 	}
 	~StateSerializator(){}
-	int serialize(uint64_t _uploaded, const std::string & _download_directory, unsigned char * _bitfield, size_t _bitfield_len, time_t _start_time)
+	int serialize(uint64_t _uploaded, const std::string & _download_directory, unsigned char * _bitfield, size_t _bitfield_len, time_t _start_time, int _state)
 	{
 		try
 		{
 			std::ofstream ofs(state_filename.c_str());
 			if (ofs.fail())
 				return -1;
-			s.set_data(_uploaded, _download_directory, _bitfield, _bitfield_len, _start_time);
+			s.set_data(_uploaded, _download_directory, _bitfield, _bitfield_len, _start_time, _state);
 			{
 				boost::archive::text_oarchive oa(ofs);
 				oa << s;
@@ -102,7 +105,7 @@ public:
 			return -1;
 		}
 	}
-	int deserialize(uint64_t & _uploaded, std::string & _download_directory, unsigned char * _bitfield, size_t _bitfield_len, time_t & _start_time)
+	int deserialize(uint64_t & _uploaded, std::string & _download_directory, unsigned char * _bitfield, size_t _bitfield_len, time_t & _start_time, int & _state)
 	{
 		try
 		{
@@ -117,6 +120,7 @@ public:
 			_uploaded = s.uploaded;
 			_download_directory = s.download_directory;
 			_start_time = s.start_time;
+			_state = s.state;
 			memcpy(_bitfield, s.bitfield, _bitfield_len);
 			return 0;
 		}

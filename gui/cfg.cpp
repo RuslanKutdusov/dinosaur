@@ -19,6 +19,7 @@ GtkEntry * max_leechs;
 GtkCheckButton * send_have;
 GtkEntry * listen_on;
 GtkEntry * max_torrents;
+GtkEntry * fin_ratio;
 
 bool cfg_opened()
 {
@@ -147,6 +148,15 @@ void show_cfg_dialog()
 	sprintf(chars, "%u", bt->Config.get_max_active_torrents());
 	gtk_entry_set_text(max_torrents, chars);
 
+	fin_ratio = GTK_ENTRY (gtk_builder_get_object (builder, "fin_ratio"));
+	if (!max_torrents)
+	{
+			/* что-то не так, наверное, ошиблись в имени */
+			g_critical ("Ошибка при получении виджета окна");
+	}
+	sprintf(chars, "%.3f", bt->Config.get_fin_ratio());
+	gtk_entry_set_text(fin_ratio, chars);
+
 	GtkButton * cfg_ok = GTK_BUTTON (gtk_builder_get_object (builder, "cfg_ok"));
 	if (!cfg_ok)
 	{
@@ -224,6 +234,12 @@ extern "C" void on_cfg_ok_clicked (GtkWidget *object, gpointer user_data)
 		else
 			bt->Config.set_max_active_torrents(uint16);
 
+		float f;
+		if (sscanf((const char *)gtk_entry_get_text(fin_ratio), "%f", &f) == 0)
+			messagebox("Invalid final ratio");
+		else
+			bt->Config.set_fin_ratio(f);
+
 			bt->UpdateConfigs();
 	}
 	catch(dinosaur::Exception & e)
@@ -240,5 +256,9 @@ extern "C" void on_cfg_ok_clicked (GtkWidget *object, gpointer user_data)
 	update_statusbar();
 }
 
+extern "C" void on_cfg_destroy(GtkWidget *object, gpointer user_data)
+{
+	cfg_window = NULL;
+}
 
 

@@ -24,6 +24,7 @@
 #include <map>
 #include <vector>
 #include <string>
+#include <list>
 #include <boost/shared_ptr.hpp>
 #include <glog/logging.h>
 
@@ -36,7 +37,18 @@ class Dinosaur : public network::SocketAssociation {
 public:
 
 private:
-	typedef std::map<std::string, torrent::TorrentInterfaceBasePtr> torrent_map;
+	typedef std::list<std::string> string_list;
+	struct torrent_queue
+	{
+		string_list 				active;
+		string_list 				in_queue;
+	};
+	struct torrent_map_element
+	{
+		std::list<std::string>::iterator where_is;
+		torrent::TorrentInterfaceBasePtr ptr;
+	};
+	typedef std::map<std::string, torrent_map_element> torrent_map;
 	typedef torrent_map::iterator torrent_map_iter;
 	network::NetworkManager 		m_nm;
 	fs::FileManager 				m_fm;
@@ -44,6 +56,7 @@ private:
 	network::Socket 				m_sock;
 	socket_status					m_sock_status;
 	torrent_map 					m_torrents;
+	string_list					m_torrent_queue;
 	std::string 					m_directory;
 	pthread_t 						m_thread;
 	pthread_mutex_t					m_mutex;
@@ -55,11 +68,11 @@ private:
 	void init_torrent(const torrent::Metafile & metafile, const std::string & download_directory, std::string & hash);
 	Dinosaur();
 	void init_listen_socket();
+	void StartTorrent(const std::string & hash);
+	void StopTorrent(const std::string & hash);
 public:
 	cfg::Glob_cfg Config;
 	void AddTorrent(torrent::Metafile & metafile, const std::string & download_directory, std::string & hash);
-	void StartTorrent(const std::string & hash);
-	void StopTorrent(const std::string & hash);
 	void PauseTorrent(const std::string & hash);
 	void ContinueTorrent(const std::string & hash);
 	void CheckTorrent(const std::string & hash);

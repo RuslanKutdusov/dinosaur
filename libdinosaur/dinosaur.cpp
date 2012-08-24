@@ -178,13 +178,15 @@ void Dinosaur::init_torrent(const torrent::Metafile & metafile, const std::strin
 	}
 	torrent::TorrentInterfaceBase::CreateTorrent(&m_nm, &Config, &m_fm, &m_bc, metafile, m_directory, download_directory, torrent);
 	m_torrents[infohash_str] = torrent;
+	m_torrent_queue.push_back(infohash_str);
 	pthread_mutex_unlock(&m_mutex);
 	hash = infohash_str;
 }
 
 /*
  * Exception::ERR_CODE_UNDEF
- * Exception::ERR_CODE_TORRENT_EXISTS
+ * Exception::ERR_CODE_NOT_TORRENT_EXISTS
+ * Exception::ERR_CODE_INVALID_OPERATION
  * Exception::ERR_CODE_NULL_REF
  * Exception::ERR_CODE_BENCODE_ENCODE_ERROR
  * Exception::ERR_CODE_STATE_FILE_ERROR
@@ -208,6 +210,8 @@ void Dinosaur::AddTorrent(torrent::Metafile & metafile, const std::string & down
 		throw Exception(Exception::ERR_CODE_STATE_FILE_ERROR);
 	fout<<metafile.info_hash_hex<<".torrent"<<std::endl;
 	fout.close();
+
+	StartTorrent(hash);
 }
 
 /*
@@ -222,7 +226,7 @@ void Dinosaur::StartTorrent(const std::string & hash)
 	pthread_mutex_lock(&m_mutex);
 	try
 	{
-		m_torrents[hash]->start();
+		//m_torrents[hash]->start();
 		pthread_mutex_unlock(&m_mutex);
 	}
 	catch (Exception & e) {
@@ -243,7 +247,7 @@ void Dinosaur::StopTorrent(const std::string & hash)
 	pthread_mutex_lock(&m_mutex);
 	try
 	{
-		m_torrents[hash]->stop();
+		//m_torrents[hash]->stop();
 		pthread_mutex_unlock(&m_mutex);
 	}
 	catch (Exception & e) {
@@ -499,8 +503,7 @@ void Dinosaur::get_TorrentList(std::list<std::string> & ref)
 {
 	ref.clear();
 	pthread_mutex_lock(&m_mutex);
-	for (torrent_map_iter iter = m_torrents.begin(); iter != m_torrents.end(); ++iter)
-		ref.push_back((*iter).first);
+	ref = m_torrent_queue;
 	pthread_mutex_unlock(&m_mutex);
 }
 
@@ -529,7 +532,7 @@ int Dinosaur::event_sock_ready2read(network::Socket sock)
 #ifdef BITTORRENT_DEBUG
 	sockaddr_in addr;
 	m_nm.Socket_get_addr(sock, &addr);
-	std::string ip = inet_ntoa(&addr.sin_addr));
+	std::string ip = inet_ntoa(addr.sin_addr);
 #endif
 	try
 	{
@@ -551,8 +554,6 @@ int Dinosaur::event_sock_ready2read(network::Socket sock)
 		if (memcmp(&handshake[1], "BitTorrent protocol", 19) != 0)
 		{
 			#ifdef BITTORRENT_DEBUG
-				sockaddr_in addr;
-				m_nm.Socket_get_addr(sock, &addr);
 				LOG(INFO) << "Leecher " << ip << " works with unsupported Bittorrent protocol";
 			#endif
 			m_nm.Socket_delete(sock);
@@ -567,7 +568,6 @@ int Dinosaur::event_sock_ready2read(network::Socket sock)
 		if (iter == m_torrents.end() && m_torrents.count(str_infohash) == 0)
 		{
 			#ifdef BITTORRENT_DEBUG
-				m_nm.Socket_get_addr(sock, &addr);
 				LOG(INFO) << "Leecher " << ip << " wants to work with missed torrent";
 			#endif
 			m_nm.Socket_delete(sock);
@@ -607,7 +607,7 @@ int Dinosaur::event_sock_accepted(network::Socket sock, network::Socket accepted
 #ifdef BITTORRENT_DEBUG
 	sockaddr_in addr;
 	m_nm.Socket_get_addr(sock, &addr);
-	LOG(INFO) << "Leecher connected " << inet_ntoa(&addr.sin_addr));
+	LOG(INFO) << "Leecher connected " << inet_ntoa(addr.sin_addr);
 #endif
 	m_nm.Socket_set_assoc(accepted_sock, shared_from_this());
 	return 0;

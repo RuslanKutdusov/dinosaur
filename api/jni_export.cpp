@@ -113,7 +113,7 @@ void Java_dinosaur_Dinosaur_StartTorrent
 	env->ReleaseStringUTFChars( jhash, chash);
 	try
 	{
-		dino->StartTorrent(hash);
+		//dino->StartTorrent(hash);
 	}
 	catch(dinosaur::Exception & e)
 	{
@@ -135,7 +135,7 @@ void Java_dinosaur_Dinosaur_StopTorrent
 	env->ReleaseStringUTFChars( jhash, chash);
 	try
 	{
-		dino->StopTorrent(hash);
+		//dino->StopTorrent(hash);
 	}
 	catch(dinosaur::Exception & e)
 	{

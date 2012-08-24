@@ -357,13 +357,14 @@ protected:
 	{
 		TORRENT_STATE_NONE,
 		TORRENT_STATE_STARTED,
-		TORRENT_STATE_STOPPED,
 		TORRENT_STATE_PAUSED,
 		TORRENT_STATE_CHECKING,
 		TORRENT_STATE_INIT_RELEASING,
 		TORRENT_STATE_INIT_FORCED_RELEASING,
 		TORRENT_STATE_RELEASING,
-		TORRENT_STATE_FAILURE
+		TORRENT_STATE_SET_FAILURE,
+		TORRENT_STATE_FAILURE,
+		TORRENT_STATE_DONE
 	};
 protected:
 	network::NetworkManager * 		m_nm;
@@ -399,11 +400,11 @@ protected:
 	time_t							m_start_time;
 	time_t							m_remain_time;
 
+	float							m_ratio;
+
 	virtual void add_seeders(uint32_t count, sockaddr_in * addrs);
 	virtual void add_seeder(sockaddr_in * addr) ;
 	virtual void add_leecher(network::Socket & sock) ;
-	virtual void start();
-	virtual void stop();
 	virtual void pause();
 	virtual void continue_();
 	virtual void check();
@@ -427,6 +428,7 @@ protected:
 	virtual const torrent_failure & get_failure_desc();
 	TorrentBase(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc);
 	void init(const Metafile & metafile, const std::string & work_directory, const std::string & download_directory);
+	void save_state();
 	static void CreateTorrent(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc,
 				const Metafile & metafile, const std::string & work_directory, const std::string & download_directory, TorrentBasePtr & ptr)
 	{
@@ -467,14 +469,6 @@ public:
 	 * Exception::ERR_CODE_LEECHER_REJECTED
 	 */
 	virtual void add_leecher(network::Socket & sock) throw (Exception) = 0;
-	/*
-	 * Exception::ERR_CODE_INVALID_OPERATION
-	 */
-	virtual void start() = 0;
-	/*
-	 * Exception::ERR_CODE_INVALID_OPERATION
-	 */
-	virtual void stop() = 0;
 	/*
 	 * Exception::ERR_CODE_INVALID_OPERATION
 	 */
