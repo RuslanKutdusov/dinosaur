@@ -312,7 +312,7 @@ jobject Create_socket_status(JNIEnv * env, const dinosaur::socket_status & ss)
 jobject Create_configs(JNIEnv * env, const dinosaur::DinosaurPtr & ptr)
 {
 	jclass clazz = env->FindClass("dinosaur/Configs");
-	jmethodID ID = env->GetMethodID(clazz, "<init>", "(Ljava/lang/String;JJJJJJJZLjava/lang/String;J)V");
+	jmethodID ID = env->GetMethodID(clazz, "<init>", "(Ljava/lang/String;JJJJJJJZLjava/lang/String;JF)V");
 	dinosaur::IP_CHAR ip;
 	ptr->Config.get_listen_on(ip);
 	return env->NewObject(clazz, ID, env->NewStringUTF(ptr->Config.get_download_directory().c_str()),
@@ -325,7 +325,8 @@ jobject Create_configs(JNIEnv * env, const dinosaur::DinosaurPtr & ptr)
 									(jlong)ptr->Config.get_max_active_leechers(),
 									ptr->Config.get_send_have(),
 									env->NewStringUTF(ip),
-									(jlong)ptr->Config.get_max_active_torrents());
+									(jlong)ptr->Config.get_max_active_torrents(),
+									(jfloat)ptr->Config.get_fin_ratio());
 }
 
 
