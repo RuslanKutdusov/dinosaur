@@ -33,26 +33,18 @@ JNIEXPORT jobject JNICALL Java_dinosaur_Dinosaur_OpenMetafile
 
 /*
  * Class:     dinosaur_Dinosaur
+ * Method:    CloseMetafile
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_CloseMetafile
+  (JNIEnv *, jobject);
+
+/*
+ * Class:     dinosaur_Dinosaur
  * Method:    AddTorrent
  * Signature: (Ljava/lang/String;)Ljava/lang/String;
  */
 JNIEXPORT jstring JNICALL Java_dinosaur_Dinosaur_AddTorrent
-  (JNIEnv *, jobject, jstring);
-
-/*
- * Class:     dinosaur_Dinosaur
- * Method:    StartTorrent
- * Signature: (Ljava/lang/String;)V
- */
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_StartTorrent
-  (JNIEnv *, jobject, jstring);
-
-/*
- * Class:     dinosaur_Dinosaur
- * Method:    StopTorrent
- * Signature: (Ljava/lang/String;)V
- */
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_StopTorrent
   (JNIEnv *, jobject, jstring);
 
 /*
@@ -153,6 +145,14 @@ JNIEXPORT jobjectArray JNICALL Java_dinosaur_Dinosaur_get_1torrent_1info_1downlo
 
 /*
  * Class:     dinosaur_Dinosaur
+ * Method:    get_torrent_failure_desc
+ * Signature: (Ljava/lang/String;)Ldinosaur/torrent_failure;
+ */
+JNIEXPORT jobject JNICALL Java_dinosaur_Dinosaur_get_1torrent_1failure_1desc
+  (JNIEnv *, jobject, jstring);
+
+/*
+ * Class:     dinosaur_Dinosaur
  * Method:    set_file_priority
  * Signature: (Ljava/lang/String;JI)V
  */
@@ -165,6 +165,22 @@ JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1file_1priority
  * Signature: ()[Ljava/lang/String;
  */
 JNIEXPORT jobjectArray JNICALL Java_dinosaur_Dinosaur_get_1TorrentList
+  (JNIEnv *, jobject);
+
+/*
+ * Class:     dinosaur_Dinosaur
+ * Method:    get_active_torrents
+ * Signature: ()[Ljava/lang/String;
+ */
+JNIEXPORT jobjectArray JNICALL Java_dinosaur_Dinosaur_get_1active_1torrents
+  (JNIEnv *, jobject);
+
+/*
+ * Class:     dinosaur_Dinosaur
+ * Method:    get_torrents_in_queue
+ * Signature: ()[Ljava/lang/String;
+ */
+JNIEXPORT jobjectArray JNICALL Java_dinosaur_Dinosaur_get_1torrents_1in_1queue
   (JNIEnv *, jobject);
 
 /*
@@ -281,43 +297,11 @@ JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1max_1active_1torrents
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    test
- * Signature: ()Ldinosaur/torrent_failure;
+ * Method:    set_config_fin_ratio
+ * Signature: (F)V
  */
-JNIEXPORT jobject JNICALL Java_dinosaur_Dinosaur_test
-  (JNIEnv *, jobject);
-
-/*
- * Class:     dinosaur_Dinosaur
- * Method:    test2
- * Signature: ()[Ldinosaur/torrent_failure;
- */
-JNIEXPORT jobjectArray JNICALL Java_dinosaur_Dinosaur_test2
-  (JNIEnv *, jobject);
-
-/*
- * Class:     dinosaur_Dinosaur
- * Method:    test_short
- * Signature: ()S
- */
-JNIEXPORT jshort JNICALL Java_dinosaur_Dinosaur_test_1short
-  (JNIEnv *, jobject);
-
-/*
- * Class:     dinosaur_Dinosaur
- * Method:    test_int
- * Signature: ()I
- */
-JNIEXPORT jint JNICALL Java_dinosaur_Dinosaur_test_1int
-  (JNIEnv *, jobject);
-
-/*
- * Class:     dinosaur_Dinosaur
- * Method:    test_long
- * Signature: ()J
- */
-JNIEXPORT jlong JNICALL Java_dinosaur_Dinosaur_test_1long
-  (JNIEnv *, jobject);
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1fin_1ratio
+  (JNIEnv *, jobject, jfloat);
 
 #ifdef __cplusplus
 }

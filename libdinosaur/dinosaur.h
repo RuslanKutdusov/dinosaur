@@ -24,8 +24,12 @@
 #include <map>
 #include <vector>
 #include <string>
+#include <list>
 #include <boost/shared_ptr.hpp>
 #include <glog/logging.h>
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/serialization/list.hpp>
 
 namespace dinosaur {
 
@@ -33,10 +37,35 @@ class Dinosaur;
 typedef boost::shared_ptr<Dinosaur> DinosaurPtr;
 
 class Dinosaur : public network::SocketAssociation {
-public:
-
 private:
-	typedef std::map<std::string, torrent::TorrentInterfaceBasePtr> torrent_map;
+	struct torrent_info
+	{
+		std::string 				metafile_path;
+		bool						in_queue;
+		bool						paused_by_user;
+		friend class boost::serialization::access;
+	private:
+		template<class Archive>
+		void serialize(Archive & ar, const unsigned int version)
+		{
+			ar & metafile_path;
+			ar & in_queue;
+			ar & paused_by_user;
+		}
+	};
+private:
+	typedef std::list<std::string> string_list;
+	struct torrent_queue
+	{
+		string_list 				active;
+		string_list 				in_queue;
+	};
+	struct torrent_map_element
+	{
+		bool paused_by_user;
+		torrent::TorrentInterfaceBasePtr ptr;
+	};
+	typedef std::map<std::string, torrent_map_element> torrent_map;
 	typedef torrent_map::iterator torrent_map_iter;
 	network::NetworkManager 		m_nm;
 	fs::FileManager 				m_fm;
@@ -44,6 +73,7 @@ private:
 	network::Socket 				m_sock;
 	socket_status					m_sock_status;
 	torrent_map 					m_torrents;
+	torrent_queue					m_torrent_queue;
 	std::string 					m_directory;
 	pthread_t 						m_thread;
 	pthread_mutex_t					m_mutex;
@@ -51,15 +81,17 @@ private:
 	torrent_failures				m_fails_torrents;//while creating Dinosaur
 	static void * thread(void * arg);
 	void bin2hex(unsigned char * bin, char * hex, int len);
-	int load_our_torrents();
+	void load_our_torrents();
 	void init_torrent(const torrent::Metafile & metafile, const std::string & download_directory, std::string & hash);
 	Dinosaur();
 	void init_listen_socket();
+	std::list<torrent_info>			m_serializable;
+	friend class boost::serialization::access;
+	template<class Archive>
+	void serialize(Archive & ar, const unsigned int version);
 public:
 	cfg::Glob_cfg Config;
 	void AddTorrent(torrent::Metafile & metafile, const std::string & download_directory, std::string & hash);
-	void StartTorrent(const std::string & hash);
-	void StopTorrent(const std::string & hash);
 	void PauseTorrent(const std::string & hash);
 	void ContinueTorrent(const std::string & hash);
 	void CheckTorrent(const std::string & hash);
@@ -72,8 +104,11 @@ public:
 	void get_torrent_info_seeders(const std::string & hash, info::peers & ref);
 	void get_torrent_info_leechers(const std::string & hash, info::peers & ref);
 	void get_torrent_info_downloadable_pieces(const std::string & hash, info::downloadable_pieces & ref);
+	void get_torrent_failure_desc(const std::string & hash, torrent_failure & ref);
 	void set_file_priority(const std::string & hash, FILE_INDEX file, DOWNLOAD_PRIORITY prio);
 	void get_TorrentList(std::list<std::string>  & ref);
+	void get_active_torrents(std::list<std::string>  & ref);
+	void get_torrents_in_queue(std::list<std::string>  & ref);
 	void UpdateConfigs();
 	int event_sock_ready2read(network::Socket sock);
 	int event_sock_closed(network::Socket sock);

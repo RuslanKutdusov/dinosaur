@@ -299,7 +299,6 @@ extern "C" void on_open_dialog_button_ok_clicked (GtkWidget *object, gpointer us
 	try
 	{
 		bt->AddTorrent(*metafile, dir_str, hash);
-		bt->StartTorrent(hash);
 		g_free(dir);
 		gtk_object_destroy(GTK_OBJECT(open_dialog));
 		open_dialog = NULL;
@@ -383,6 +382,9 @@ extern "C" void on_window1_show (GtkWidget *object, gpointer user_data)
 					break;
 			case(dinosaur::TORRENT_WORK_FAILURE):
 					work = "Failure";
+					break;
+			case(dinosaur::TORRENT_WORK_DONE):
+					work = "Done";
 					break;
 			}
 
@@ -637,6 +639,9 @@ gboolean foreach_torrent_list (GtkTreeModel *model,
 				break;
 		case(dinosaur::TORRENT_WORK_FAILURE):
 				work = "Failure";
+				break;
+		case(dinosaur::TORRENT_WORK_DONE):
+				work = "Done";
 				break;
 		}
 

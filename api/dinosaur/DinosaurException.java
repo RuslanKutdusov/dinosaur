@@ -56,6 +56,7 @@ public class DinosaurException extends Throwable {
 		ERR_CODE_INVALID_MAX_ACTIVE_LEECHS,
 		ERR_CODE_INVALID_LISTEN_ON,
 		ERR_CODE_INVALID_MAX_ACTIVE_TORRENTS,
+		ERR_CODE_INVALID_FIN_RATIO
 	};
 	public ERR_CODES err_code;
 	public DinosaurException(int err_code)

@@ -42,6 +42,7 @@ struct config
 	bool 				send_have;
 	uint32_t 			listen_on;
 	uint16_t			max_active_torrents;
+	float				fin_ratio;
 	friend class boost::serialization::access;
 	template<class Archive>
 	void serialize(Archive & ar, const unsigned int version)
@@ -57,6 +58,7 @@ struct config
 		ar & send_have;
 		ar & listen_on;
 		ar & max_active_torrents;
+		ar & fin_ratio;
 	}
 };
 //BOOST_CLASS_VERSION(config, 1)
@@ -139,6 +141,7 @@ private:
 		cfg.send_have = true;
 		inet_pton(AF_INET, "0.0.0.0", &cfg.listen_on);
 		cfg.max_active_torrents = 5;
+		cfg.fin_ratio = 5.0f;
 		return 0;
 	}
 public:
@@ -218,6 +221,10 @@ public:
 	uint16_t get_max_active_torrents()
 	{
 		return cfg.max_active_torrents;
+	}
+	float get_fin_ratio()
+	{
+		return cfg.fin_ratio;
 	}
 
 
@@ -330,6 +337,15 @@ public:
 		if (v == 0)
 			throw Exception(Exception::ERR_CODE_INVALID_MAX_ACTIVE_TORRENTS);
 		cfg.max_active_torrents = v;
+	}
+	/*
+	 * Exception::ERR_CODE_INVALID_CONFIG_VALUE
+	 */
+	void set_fin_ratio(float v)
+	{
+		if (v < 0)
+			throw Exception(Exception::ERR_CODE_INVALID_FIN_RATIO);
+		cfg.fin_ratio = v;
 	}
 	~Glob_cfg(){}
 };

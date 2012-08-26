@@ -7,7 +7,9 @@ public class torrent_dyn {
 		TORRENT_WORK_UPLOADING,
 		TORRENT_WORK_CHECKING,
 		TORRENT_WORK_PAUSED,
-		TORRENT_WORK_FAILURE
+		TORRENT_WORK_FAILURE,
+		TORRENT_WORK_RELEASING,
+		TORRENT_WORK_DONE
 	};
 	public long 		downloaded;
 	public long 		uploaded;
