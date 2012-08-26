@@ -711,6 +711,12 @@ bool Peer::is_sleep()
 	return false;
 }
 
+void Peer::wake_up()
+{
+	if (m_state == PEER_STATE_SLEEP)
+		m_state = PEER_STATE_SEND_HANDSHAKE;
+}
+
 void Peer::goto_sleep()
 {
 	m_sleep_time = time(NULL);

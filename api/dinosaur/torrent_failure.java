@@ -3,6 +3,7 @@ package dinosaur;
 public class torrent_failure {
 	public enum TORRENT_FAILURE
 	{
+		TORRENT_FAILURE_NONE,
 		TORRENT_FAILURE_INIT_TORRENT,
 		TORRENT_FAILURE_WRITE_FILE,
 		TORRENT_FAILURE_READ_FILE,

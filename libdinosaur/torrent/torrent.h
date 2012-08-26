@@ -59,7 +59,6 @@ private:
 	enum TRACKER_STATE
 	{
 		TRACKER_STATE_NONE,
-		TRACKER_STATE_CONNECT,
 		TRACKER_STATE_WORK,
 		TRACKER_STATE_STOPPING,
 		TRACKER_STATE_FAILURE
@@ -198,6 +197,7 @@ public:
 	int clock();
 	void goto_sleep();
 	bool is_sleep();
+	void wake_up();
 	bool may_request();
 	int request(PIECE_INDEX piece_index, BLOCK_INDEX block_index);
 	int request(const BLOCK_ID & block_id);
@@ -355,7 +355,6 @@ class TorrentBase : public boost::enable_shared_from_this<TorrentBase>
 protected:
 	enum TORRENT_STATE
 	{
-		TORRENT_STATE_NONE,
 		TORRENT_STATE_STARTED,
 		TORRENT_STATE_PAUSED,
 		TORRENT_STATE_CHECKING,
@@ -408,6 +407,7 @@ protected:
 	virtual void pause();
 	virtual void continue_();
 	virtual void check();
+	//virtual void wait_in_queue();
 	virtual void set_failure(const torrent_failure & tf);
 	virtual bool is_downloaded();
 	virtual int event_file_write(const fs::write_event & we);
@@ -481,6 +481,7 @@ public:
 	 * Exception::ERR_CODE_INVALID_OPERATION
 	 */
 	virtual void check() = 0;
+	//virtual void wait_in_queue() = 0;
 	virtual bool is_downloaded() = 0;
 	virtual int clock() = 0;
 	virtual void get_info_stat(info::torrent_stat & ref) = 0;

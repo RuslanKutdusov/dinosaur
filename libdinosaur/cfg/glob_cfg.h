@@ -344,7 +344,7 @@ public:
 	void set_fin_ratio(float v)
 	{
 		if (v < 0)
-			throw Exception(Exception::ERR_CODE_INVALID_MAX_ACTIVE_TORRENTS);
+			throw Exception(Exception::ERR_CODE_INVALID_FIN_RATIO);
 		cfg.fin_ratio = v;
 	}
 	~Glob_cfg(){}
