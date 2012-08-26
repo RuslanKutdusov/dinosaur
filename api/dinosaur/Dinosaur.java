@@ -284,4 +284,8 @@ public class Dinosaur {
 	 * Exception::ERR_CODE_INVALID_FIN_RATIO			
 	 */
 	public native void set_config_fin_ratio(float v)  throws DinosaurException;
+	static
+	{
+		System.loadLibrary("dinosaur");  	
+	}
 }
