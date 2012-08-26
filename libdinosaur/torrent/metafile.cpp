@@ -115,6 +115,7 @@ Metafile & Metafile::operator = (const Metafile & metafile)
 
 /*
  * Exception::ERR_CODE_INVALID_METAFILE
+ * SyscallException
  */
 
 
@@ -134,6 +135,7 @@ Metafile::Metafile(const std::string & metafile_path)
 
 /*
  * Exception::ERR_CODE_INVALID_METAFILE
+ * SyscallException
  */
 
 Metafile::Metafile(const char * metafile_path)
@@ -159,6 +161,7 @@ Metafile::~Metafile() {
 
 /*
  * Exception::ERR_CODE_INVALID_METAFILE
+ * SyscallException
  */
 
 void Metafile::init(const char * metafile_path)

@@ -59,7 +59,6 @@ private:
 	enum TRACKER_STATE
 	{
 		TRACKER_STATE_NONE,
-		TRACKER_STATE_CONNECT,
 		TRACKER_STATE_WORK,
 		TRACKER_STATE_STOPPING,
 		TRACKER_STATE_FAILURE
@@ -198,6 +197,7 @@ public:
 	int clock();
 	void goto_sleep();
 	bool is_sleep();
+	void wake_up();
 	bool may_request();
 	int request(PIECE_INDEX piece_index, BLOCK_INDEX block_index);
 	int request(const BLOCK_ID & block_id);
@@ -355,15 +355,15 @@ class TorrentBase : public boost::enable_shared_from_this<TorrentBase>
 protected:
 	enum TORRENT_STATE
 	{
-		TORRENT_STATE_NONE,
 		TORRENT_STATE_STARTED,
-		TORRENT_STATE_STOPPED,
 		TORRENT_STATE_PAUSED,
 		TORRENT_STATE_CHECKING,
 		TORRENT_STATE_INIT_RELEASING,
 		TORRENT_STATE_INIT_FORCED_RELEASING,
 		TORRENT_STATE_RELEASING,
-		TORRENT_STATE_FAILURE
+		TORRENT_STATE_SET_FAILURE,
+		TORRENT_STATE_FAILURE,
+		TORRENT_STATE_DONE
 	};
 protected:
 	network::NetworkManager * 		m_nm;
@@ -399,14 +399,15 @@ protected:
 	time_t							m_start_time;
 	time_t							m_remain_time;
 
+	float							m_ratio;
+
 	virtual void add_seeders(uint32_t count, sockaddr_in * addrs);
 	virtual void add_seeder(sockaddr_in * addr) ;
 	virtual void add_leecher(network::Socket & sock) ;
-	virtual void start();
-	virtual void stop();
 	virtual void pause();
 	virtual void continue_();
 	virtual void check();
+	//virtual void wait_in_queue();
 	virtual void set_failure(const torrent_failure & tf);
 	virtual bool is_downloaded();
 	virtual int event_file_write(const fs::write_event & we);
@@ -427,6 +428,10 @@ protected:
 	virtual const torrent_failure & get_failure_desc();
 	TorrentBase(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc);
 	void init(const Metafile & metafile, const std::string & work_directory, const std::string & download_directory);
+	void save_state();
+	/*
+	 * Exception::ERR_CODE_UNDEF
+	 */
 	static void CreateTorrent(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc,
 				const Metafile & metafile, const std::string & work_directory, const std::string & download_directory, TorrentBasePtr & ptr)
 	{
@@ -448,6 +453,9 @@ public:
 class TorrentInterfaceBase : public TorrentBase
 {
 public:
+	/*
+	 * Exception::ERR_CODE_UNDEF
+	 */
 	static void CreateTorrent(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc,
 			const Metafile & metafile, const std::string & work_directory, const std::string & download_directory, TorrentInterfaceBasePtr & ptr)
 	{
@@ -470,14 +478,6 @@ public:
 	/*
 	 * Exception::ERR_CODE_INVALID_OPERATION
 	 */
-	virtual void start() = 0;
-	/*
-	 * Exception::ERR_CODE_INVALID_OPERATION
-	 */
-	virtual void stop() = 0;
-	/*
-	 * Exception::ERR_CODE_INVALID_OPERATION
-	 */
 	virtual void pause() = 0;
 	/*
 	 * Exception::ERR_CODE_INVALID_OPERATION
@@ -487,6 +487,7 @@ public:
 	 * Exception::ERR_CODE_INVALID_OPERATION
 	 */
 	virtual void check() = 0;
+	//virtual void wait_in_queue() = 0;
 	virtual bool is_downloaded() = 0;
 	virtual int clock() = 0;
 	virtual void get_info_stat(info::torrent_stat & ref) = 0;

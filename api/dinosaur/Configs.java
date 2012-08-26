@@ -12,12 +12,14 @@ public class Configs {
 	boolean			send_have;
 	String 			listen_on;
 	long 			max_active_torrents;
+	float			fin_ratio;
 	public Configs() {
 		// TODO Auto-generated constructor stub
 	}
 	public Configs(String download_directory, long port, long write_cache_size, long read_cache_size,
 					long tracker_def_interval, long tracker_numwant, long max_active_seeders, 
-					long max_active_leechers, boolean send_have, String listen_on, long max_active_torrents)
+					long max_active_leechers, boolean send_have, String listen_on, long max_active_torrents,
+					float fin_ratio)
 	{
 		this.download_directory = download_directory;
 		this.port = port;
@@ -30,5 +32,6 @@ public class Configs {
 		this.send_have =	send_have;
 		this.listen_on = listen_on;
 		this.max_active_torrents = max_active_torrents;
+		this.fin_ratio = fin_ratio;
 	}
 }

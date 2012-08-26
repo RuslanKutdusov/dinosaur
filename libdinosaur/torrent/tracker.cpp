@@ -75,15 +75,12 @@ Tracker::Tracker(const TorrentInterfaceInternalPtr & torrent, std::string & anno
 	m_peers_count = 0;
 	m_ready2release = false;
 	m_tracker_failure = "";
+	m_state = TRACKER_STATE_NONE;
+	hash2urlencode();
 	if (parse_announce() != ERR_NO_ERROR)
 	{
 		m_state = TRACKER_STATE_FAILURE;
 		m_status = TRACKER_STATUS_INVALID_ANNOUNCE;
-	}
-	else
-	{
-		m_state = TRACKER_STATE_CONNECT;
-		hash2urlencode();
 	}
 }
 
@@ -108,7 +105,6 @@ void Tracker::hash2urlencode()
 void Tracker::send_request(TRACKER_EVENT event )
 {
 	m_status = TRACKER_STATUS_UPDATING;
-	m_last_update = time(NULL);
 	std::string urn(m_params);
 	if (urn.find('?') < urn.length())
 		urn.append("&");
@@ -143,9 +139,6 @@ void Tracker::send_request(TRACKER_EVENT event )
 	}
 	else
 	{
-		m_downloaded = m_torrent->get_downloaded();
-		m_uploaded = m_torrent->get_uploaded();
-
 		urn.append("&downloaded=0&uploaded=0");
 	}
 
@@ -272,7 +265,6 @@ int Tracker::event_sock_ready2read(network::Socket sock)
 	}
 	catch (Exception & e)
 	{
-		m_last_update = time(NULL);
 		delete_socket();
 		m_status = TRACKER_STATUS_ERROR;
 		return ERR_INTERNAL;
@@ -296,7 +288,6 @@ int Tracker::event_sock_closed(network::Socket sock)
 	}
 	catch (Exception & e)
 	{
-		m_last_update = time(NULL);
 		delete_socket();
 		m_status = TRACKER_STATUS_ERROR;
 		return ERR_INTERNAL;
@@ -325,13 +316,13 @@ int Tracker::event_sock_connected(network::Socket sock)
 	{
 		if (m_state == TRACKER_STATE_FAILURE)
 			return ERR_NO_ERROR;
-		m_addr = new sockaddr_in;
+		if (m_addr == NULL)
+			m_addr = new sockaddr_in;
 		m_nm->Socket_get_addr(sock, m_addr);
 		send_request(m_event_after_connect);
 	}
 	catch (Exception & e)
 	{
-		m_last_update = time(NULL);
 		delete_socket();
 		m_status = TRACKER_STATUS_ERROR;
 		return ERR_INTERNAL;
@@ -354,7 +345,6 @@ int Tracker::event_sock_timeout(network::Socket sock)
 		if (m_state == TRACKER_STATE_FAILURE)
 			return ERR_NO_ERROR;
 		m_status = TRACKER_STATUS_TIMEOUT;
-		m_last_update = time(NULL);
 		if (m_nm->Socket_datalen(sock) > 0)
 			event_sock_ready2read(sock);
 		delete_socket();
@@ -362,7 +352,6 @@ int Tracker::event_sock_timeout(network::Socket sock)
 	}
 	catch (Exception & e)
 	{
-		m_last_update = time(NULL);
 		delete_socket();
 		m_status = TRACKER_STATUS_ERROR;
 		return ERR_INTERNAL;
@@ -376,7 +365,6 @@ int Tracker::event_sock_unresolved(network::Socket sock)
 	if (m_state == TRACKER_STATE_FAILURE)
 		return ERR_NO_ERROR;
 	m_status = TRACKER_STATUS_UNRESOLVED;
-	m_last_update = time(NULL);
 	delete_socket();
 	m_ready2release = (m_state == TRACKER_STATE_STOPPING);
 	return ERR_NO_ERROR;
@@ -428,19 +416,9 @@ int Tracker::clock(bool & release_me)
 	release_me = false;
 	if (m_state == TRACKER_STATE_FAILURE)
 		release_me = true;
-	if (m_state == TRACKER_STATE_CONNECT)
-	{
-		if (restore_socket() != ERR_NO_ERROR)
-			m_status = TRACKER_STATUS_ERROR;
-		m_event_after_connect = TRACKER_EVENT_STARTED;
-		m_state = TRACKER_STATE_WORK;
-		m_last_update = time(NULL);
-	}
 	if (m_state == TRACKER_STATE_WORK && (uint32_t)(time(NULL) - m_last_update) >= m_interval)
 	{
-		if (restore_socket() != ERR_NO_ERROR)
-			m_status = TRACKER_STATUS_ERROR;
-		m_event_after_connect = TRACKER_EVENT_NONE;
+		update();
 	}
 	if (m_state == TRACKER_STATE_STOPPING)
 		release_me = m_ready2release;
@@ -449,11 +427,13 @@ int Tracker::clock(bool & release_me)
 
 int Tracker::update()
 {
-	if (m_state == TRACKER_STATE_FAILURE)
+	if (m_state == TRACKER_STATE_FAILURE || m_state == TRACKER_STATE_STOPPING)
 		return ERR_NO_ERROR;
 	if (restore_socket() != ERR_NO_ERROR)
-		return ERR_INTERNAL;
+		m_status = TRACKER_STATUS_ERROR;
 	m_event_after_connect = TRACKER_EVENT_NONE;
+	m_state = TRACKER_STATE_WORK;
+	m_last_update = time(NULL);
 	return ERR_NO_ERROR;
 }
 
@@ -487,29 +467,37 @@ void Tracker::forced_releasing()
 
 int Tracker::send_completed()
 {
+	if (m_state == TRACKER_STATE_FAILURE || m_state == TRACKER_STATE_STOPPING)
+		return ERR_NO_ERROR;
 	if (restore_socket() != ERR_NO_ERROR)
-			return ERR_INTERNAL;
+		m_status = TRACKER_STATUS_ERROR;
 	m_event_after_connect = TRACKER_EVENT_COMPLETED;
+	m_state = TRACKER_STATE_WORK;
+	m_last_update = time(NULL);
 	return ERR_NO_ERROR;
 }
 
 int Tracker::send_stopped()
 {
-	if (m_state == TRACKER_STATE_FAILURE)
+	if (m_state == TRACKER_STATE_FAILURE || m_state == TRACKER_STATE_STOPPING)
 		return ERR_NO_ERROR;
 	if (restore_socket() != ERR_NO_ERROR)
-		return ERR_INTERNAL;
+		m_status = TRACKER_STATUS_ERROR;
 	m_event_after_connect = TRACKER_EVENT_STOPPED;
+	m_state = TRACKER_STATE_WORK;
+	m_last_update = time(NULL);
 	return ERR_NO_ERROR;
 }
 
 int Tracker::send_started()
 {
-	if (m_state == TRACKER_STATE_FAILURE)
+	if (m_state == TRACKER_STATE_FAILURE || m_state == TRACKER_STATE_STOPPING)
 		return ERR_NO_ERROR;
 	if (restore_socket() != ERR_NO_ERROR)
-			return ERR_INTERNAL;
+		m_status = TRACKER_STATUS_ERROR;
 	m_event_after_connect = TRACKER_EVENT_STARTED;
+	m_state = TRACKER_STATE_WORK;
+	m_last_update = time(NULL);
 	return ERR_NO_ERROR;
 }
 
@@ -519,10 +507,10 @@ int Tracker::get_info(info::tracker & ref)
 	ref.leechers = m_leechers;
 	ref.seeders = m_seeders == 0 ? m_peers_count : m_seeders;
 	ref.status = m_status;
-	if (m_state == TRACKER_STATE_FAILURE)
-		ref.update_in = 0;
-	else
+	if (m_state == TRACKER_STATE_WORK)
 		ref.update_in = (time_t)m_interval - time(NULL) + m_last_update;
+	else
+		ref.update_in = 0;
 	ref.failure_mes = m_tracker_failure;
 	return ERR_NO_ERROR;
 }

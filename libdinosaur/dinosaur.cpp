@@ -10,6 +10,7 @@
 namespace dinosaur {
 
 /*
+ * Exception::ERR_CODE_CAN_NOT_CREATE_THREAD
  * SyscallException
  */
 
@@ -53,7 +54,7 @@ Dinosaur::Dinosaur()
 
 	m_thread_stop = false;
 	if (pthread_create(&m_thread, &attr, Dinosaur::thread, (void *)this))
-		throw Exception(Exception::ERR_CODE_DINOSAUR_INIT_ERROR);
+		throw Exception(Exception::ERR_CODE_CAN_NOT_CREATE_THREAD);
 	pthread_attr_destroy(&attr);
 
 	load_our_torrents();
@@ -90,9 +91,48 @@ Dinosaur::~Dinosaur() {
 	LOG(INFO) << "Dinosaur destructor";
 #endif
 	pthread_mutex_lock(&m_mutex);
+	m_serializable.clear();
+	std::string state_file = m_directory;
+	state_file.append("our_torrents");
+	std::ofstream ofs(state_file.c_str());
+	if (!ofs.fail())
+	{
+		for(string_list::iterator iter = m_torrent_queue.active.begin(); iter != m_torrent_queue.active.end(); ++iter)
+		{
+			torrent_info ti;
+			ti.metafile_path = m_directory;
+			ti.metafile_path += *iter;
+			ti.metafile_path += ".torrent";
+			ti.in_queue = false;
+			ti.paused_by_user = m_torrents[*iter].paused_by_user;
+			m_serializable.push_back(ti);
+		}
+		for(string_list::iterator iter = m_torrent_queue.in_queue.begin(); iter != m_torrent_queue.in_queue.end(); ++iter)
+		{
+			torrent_info ti;
+			ti.metafile_path = m_directory;
+			ti.metafile_path += *iter;
+			ti.metafile_path += ".torrent";
+			ti.in_queue = true;
+			ti.paused_by_user = m_torrents[*iter].paused_by_user;
+			m_serializable.push_back(ti);
+		}
+
+		try
+		{
+			boost::archive::text_oarchive oa(ofs);
+			oa << *this;
+		}
+		catch(...)
+		{
+
+		}
+	}
+	ofs.close();
+
 	for(torrent_map_iter iter = m_torrents.begin(); iter != m_torrents.end(); ++iter)
 	{
-;		(*iter).second->prepare2release();
+		(*iter).second.ptr->prepare2release();
 	}
 	pthread_mutex_unlock(&m_mutex);
 	time_t release_start = time(NULL);
@@ -117,32 +157,51 @@ Dinosaur::~Dinosaur() {
 #endif
 }
 
-int Dinosaur::load_our_torrents()
+void Dinosaur::load_our_torrents()
 {
-	std::ifstream fin;
 	std::string state_file = m_directory;
 	state_file.append("our_torrents");
-	fin.open(state_file.c_str());
-	std::string fname;
-	std::string hash;
-	while(fin>>fname)
+	std::ifstream ifs(state_file.c_str());
+	if (ifs.fail())
+		return;
+	m_serializable.clear();
+	try
 	{
-		std::string full_path2torrent_file = m_directory + fname;
+		boost::archive::text_iarchive ia(ifs);
+		ia >> *this;
+	}
+	catch(...)
+	{
+
+	}
+	ifs.close();
+	for(std::list<torrent_info>::iterator iter = m_serializable.begin(); iter != m_serializable.end(); ++iter)
+	{
+		std::string hash;
+		std::string name;
 		try
 		{
-			init_torrent(full_path2torrent_file, Config.get_download_directory(), hash);
-			StartTorrent(hash);
+			torrent::Metafile meta(iter->metafile_path);
+			name = meta.name;
+			init_torrent(meta, Config.get_download_directory(), hash);
 		}
 		catch (Exception & e) {
 			torrent_failure tf;
 			tf.exception_errcode = e.get_errcode();
 			tf.errno_ = 0;
 			tf.where = TORRENT_FAILURE_INIT_TORRENT;
+			tf.description = name + " " + hash;
 			m_fails_torrents.push_back(tf);
+			continue;
 		}
+		pthread_mutex_lock(&m_mutex);
+		m_torrents[hash].paused_by_user = iter->paused_by_user;
+		if (iter->in_queue)
+			m_torrent_queue.in_queue.push_back(hash);
+		else
+			m_torrent_queue.active.push_back(hash);
+		pthread_mutex_unlock(&m_mutex);
 	}
-	fin.close();
-	return ERR_NO_ERROR;
 }
 
 void Dinosaur::bin2hex(unsigned char * bin, char * hex, int len)
@@ -165,91 +224,43 @@ void Dinosaur::bin2hex(unsigned char * bin, char * hex, int len)
 
 void Dinosaur::init_torrent(const torrent::Metafile & metafile, const std::string & download_directory, std::string & hash)
 {
-	hash = "";
 	torrent::TorrentInterfaceBasePtr torrent;
 
-	std::string infohash_str = metafile.info_hash_hex;
+	hash = metafile.info_hash_hex;
 
 	pthread_mutex_lock(&m_mutex);
-	if (m_torrents.count(infohash_str) !=0)
+	if (m_torrents.count(hash) !=0)
 	{
 		pthread_mutex_unlock(&m_mutex);
 		throw Exception(Exception::ERR_CODE_TORRENT_EXISTS);
 	}
-	torrent::TorrentInterfaceBase::CreateTorrent(&m_nm, &Config, &m_fm, &m_bc, metafile, m_directory, download_directory, torrent);
-	m_torrents[infohash_str] = torrent;
+	try
+	{
+		torrent::TorrentInterfaceBase::CreateTorrent(&m_nm, &Config, &m_fm, &m_bc, metafile, m_directory, download_directory, torrent);
+	}
+	catch(Exception & e)
+	{
+		pthread_mutex_unlock(&m_mutex);
+		throw Exception(e);
+	}
+	m_torrents[hash].ptr = torrent;
+	m_torrents[hash].paused_by_user = false;
 	pthread_mutex_unlock(&m_mutex);
-	hash = infohash_str;
 }
 
 /*
  * Exception::ERR_CODE_UNDEF
  * Exception::ERR_CODE_TORRENT_EXISTS
- * Exception::ERR_CODE_NULL_REF
- * Exception::ERR_CODE_BENCODE_ENCODE_ERROR
- * Exception::ERR_CODE_STATE_FILE_ERROR
- * SyscallException
  */
 
 void Dinosaur::AddTorrent(torrent::Metafile & metafile, const std::string & download_directory, std::string & hash)
 {
 	init_torrent(metafile, download_directory, hash);
-
+	pthread_mutex_lock(&m_mutex);
+	m_torrent_queue.in_queue.push_back(hash);
+	pthread_mutex_unlock(&m_mutex);
 	std::string fname =  m_directory + metafile.info_hash_hex + ".torrent";
 	metafile.save2file(fname);
-
-
-	std::ofstream fout;
-	std::string state_file = m_directory;
-
-	state_file.append("our_torrents");
-	fout.open(state_file.c_str(), std::ios_base::app);
-	if (fout.fail())
-		throw Exception(Exception::ERR_CODE_STATE_FILE_ERROR);
-	fout<<metafile.info_hash_hex<<".torrent"<<std::endl;
-	fout.close();
-}
-
-/*
- * Exception::ERR_CODE_TORRENT_NOT_EXISTS
- * Exception::ERR_CODE_INVALID_OPERATION
- */
-
-void Dinosaur::StartTorrent(const std::string & hash)
-{
-	if (m_torrents.count(hash) == 0)
-		throw Exception(Exception::ERR_CODE_TORRENT_NOT_EXISTS);
-	pthread_mutex_lock(&m_mutex);
-	try
-	{
-		m_torrents[hash]->start();
-		pthread_mutex_unlock(&m_mutex);
-	}
-	catch (Exception & e) {
-		pthread_mutex_unlock(&m_mutex);
-		throw Exception(e);
-	}
-}
-
-/*
- * Exception::ERR_CODE_TORRENT_NOT_EXISTS
- * Exception::ERR_CODE_INVALID_OPERATION
- */
-
-void Dinosaur::StopTorrent(const std::string & hash)
-{
-	if (m_torrents.count(hash) == 0)
-		throw Exception(Exception::ERR_CODE_TORRENT_NOT_EXISTS);
-	pthread_mutex_lock(&m_mutex);
-	try
-	{
-		m_torrents[hash]->stop();
-		pthread_mutex_unlock(&m_mutex);
-	}
-	catch (Exception & e) {
-		pthread_mutex_unlock(&m_mutex);
-		throw Exception(e);
-	}
 }
 
 /*
@@ -264,7 +275,8 @@ void Dinosaur::PauseTorrent(const std::string & hash)
 	pthread_mutex_lock(&m_mutex);
 	try
 	{
-		m_torrents[hash]->pause();
+		m_torrents[hash].ptr->pause();
+		m_torrents[hash].paused_by_user = true;
 		pthread_mutex_unlock(&m_mutex);
 	}
 	catch (Exception & e) {
@@ -285,7 +297,8 @@ void Dinosaur::ContinueTorrent(const std::string & hash)
 	pthread_mutex_lock(&m_mutex);
 	try
 	{
-		m_torrents[hash]->continue_();
+		m_torrents[hash].ptr->continue_();
+		m_torrents[hash].paused_by_user = false;
 		pthread_mutex_unlock(&m_mutex);
 	}
 	catch (Exception & e) {
@@ -306,7 +319,7 @@ void Dinosaur::CheckTorrent(const std::string & hash)
 	pthread_mutex_lock(&m_mutex);
 	try
 	{
-		m_torrents[hash]->check();
+		m_torrents[hash].ptr->check();
 		pthread_mutex_unlock(&m_mutex);
 	}
 	catch (Exception & e) {
@@ -317,42 +330,18 @@ void Dinosaur::CheckTorrent(const std::string & hash)
 
 /*
  * Exception::ERR_CODE_TORRENT_NOT_EXISTS
- * Exception::ERR_CODE_INVALID_OPERATION
  */
 
-void Dinosaur::DeleteTorrent(const std::string & hash)
+void Dinosaur::DeleteTorrent(const std::string & hash, bool with_data)
 {
 	if (m_torrents.count(hash) == 0)
 		throw Exception(Exception::ERR_CODE_TORRENT_NOT_EXISTS);
 	pthread_mutex_lock(&m_mutex);
-	torrent::TorrentInterfaceBasePtr torrent = m_torrents[hash];
+	torrent::TorrentInterfaceBasePtr torrent = m_torrents[hash].ptr;
 	torrent->erase_state();
 	torrent->prepare2release();
 
-	std::ifstream fin;
-	std::ofstream fout;
-	std::string state_file = m_directory;
-	state_file.append("our_torrents");
-
-	fin.open(state_file.c_str());
-	std::string readed_fname;
 	std::string current_fname = hash + ".torrent";
-	std::list<std::string> our_torrents;
-	while(fin>>readed_fname)
-	{
-		if (readed_fname != current_fname)
-			our_torrents.push_back(readed_fname);
-	}
-	fin.close();
-
-	fout.open(state_file.c_str());
-	while(!our_torrents.empty())
-	{
-		fout<<our_torrents.front()<<std::endl;
-		our_torrents.pop_front();
-	}
-	fout.close();
-
 	remove(current_fname.c_str());
 
 	pthread_mutex_unlock(&m_mutex);
@@ -367,7 +356,7 @@ void Dinosaur::get_torrent_info_stat(const std::string & hash, info::torrent_sta
 	if (m_torrents.count(hash) == 0)
 		throw Exception(Exception::ERR_CODE_TORRENT_NOT_EXISTS);
 	pthread_mutex_lock(&m_mutex);
-	m_torrents[hash]->get_info_stat(ref);
+	m_torrents[hash].ptr->get_info_stat(ref);
 	pthread_mutex_unlock(&m_mutex);
 }
 
@@ -380,7 +369,7 @@ void Dinosaur::get_torrent_info_dyn(const std::string & hash, info::torrent_dyn 
 	if (m_torrents.count(hash) == 0)
 		throw Exception(Exception::ERR_CODE_TORRENT_NOT_EXISTS);
 	pthread_mutex_lock(&m_mutex);
-	m_torrents[hash]->get_info_dyn(ref);
+	m_torrents[hash].ptr->get_info_dyn(ref);
 	pthread_mutex_unlock(&m_mutex);
 }
 
@@ -393,7 +382,7 @@ void Dinosaur::get_torrent_info_trackers(const std::string & hash, info::tracker
 	if (m_torrents.count(hash) == 0)
 		throw Exception(Exception::ERR_CODE_TORRENT_NOT_EXISTS);
 	pthread_mutex_lock(&m_mutex);
-	m_torrents[hash]->get_info_trackers(ref);
+	m_torrents[hash].ptr->get_info_trackers(ref);
 	pthread_mutex_unlock(&m_mutex);
 }
 
@@ -409,7 +398,7 @@ void Dinosaur::get_torrent_info_file_stat(const std::string & hash, FILE_INDEX i
 	pthread_mutex_lock(&m_mutex);
 	try
 	{
-		m_torrents[hash]->get_info_file_stat(index, ref);
+		m_torrents[hash].ptr->get_info_file_stat(index, ref);
 		pthread_mutex_unlock(&m_mutex);
 	}
 	catch (Exception & e) {
@@ -430,7 +419,7 @@ void  Dinosaur::get_torrent_info_file_dyn(const std::string & hash, FILE_INDEX i
 	pthread_mutex_lock(&m_mutex);
 	try
 	{
-		m_torrents[hash]->get_info_file_dyn(index, ref);
+		m_torrents[hash].ptr->get_info_file_dyn(index, ref);
 		pthread_mutex_unlock(&m_mutex);
 	}
 	catch (Exception & e) {
@@ -448,7 +437,7 @@ void Dinosaur::get_torrent_info_seeders(const std::string & hash, info::peers & 
 	if (m_torrents.count(hash) == 0)
 		throw Exception(Exception::ERR_CODE_TORRENT_NOT_EXISTS);
 	pthread_mutex_lock(&m_mutex);
-	m_torrents[hash]->get_info_seeders(ref);
+	m_torrents[hash].ptr->get_info_seeders(ref);
 	pthread_mutex_unlock(&m_mutex);
 }
 
@@ -461,7 +450,7 @@ void Dinosaur::get_torrent_info_leechers(const std::string & hash, info::peers &
 	if (m_torrents.count(hash) == 0)
 		throw Exception(Exception::ERR_CODE_TORRENT_NOT_EXISTS);
 	pthread_mutex_lock(&m_mutex);
-	m_torrents[hash]->get_info_leechers(ref);
+	m_torrents[hash].ptr->get_info_leechers(ref);
 	pthread_mutex_unlock(&m_mutex);
 }
 
@@ -474,9 +463,29 @@ void Dinosaur::get_torrent_info_downloadable_pieces(const std::string & hash, in
 	if (m_torrents.count(hash) == 0)
 		throw Exception(Exception::ERR_CODE_TORRENT_NOT_EXISTS);
 	pthread_mutex_lock(&m_mutex);
-	m_torrents[hash]->get_info_downloadable_pieces(ref);
+	m_torrents[hash].ptr->get_info_downloadable_pieces(ref);
 	pthread_mutex_unlock(&m_mutex);
 }
+
+/*
+ * Exception::ERR_CODE_TORRENT_NOT_EXISTS
+ */
+
+void Dinosaur::get_torrent_failure_desc(const std::string & hash, torrent_failure & ref)
+{
+	if (m_torrents.count(hash) == 0)
+		throw Exception(Exception::ERR_CODE_TORRENT_NOT_EXISTS);
+	pthread_mutex_lock(&m_mutex);
+	ref = m_torrents[hash].ptr->get_failure_desc();
+	pthread_mutex_unlock(&m_mutex);
+}
+
+/*
+ * Exception::ERR_CODE_TORRENT_NOT_EXISTS
+ * Exception::ERR_CODE_INVALID_FILE_INDEX
+ * Exception::ERR_CODE_FAIL_SET_FILE_PRIORITY
+ * Exception::ERR_CODE_INVALID_OPERATION
+ */
 
 void Dinosaur::set_file_priority(const std::string & hash, FILE_INDEX file, DOWNLOAD_PRIORITY prio)
 {
@@ -485,7 +494,7 @@ void Dinosaur::set_file_priority(const std::string & hash, FILE_INDEX file, DOWN
 	pthread_mutex_lock(&m_mutex);
 	try
 	{
-		m_torrents[hash]->set_file_priority(file, prio);
+		m_torrents[hash].ptr->set_file_priority(file, prio);
 		pthread_mutex_unlock(&m_mutex);
 	}
 	catch (Exception & e) {
@@ -499,8 +508,25 @@ void Dinosaur::get_TorrentList(std::list<std::string> & ref)
 {
 	ref.clear();
 	pthread_mutex_lock(&m_mutex);
-	for (torrent_map_iter iter = m_torrents.begin(); iter != m_torrents.end(); ++iter)
-		ref.push_back((*iter).first);
+	ref = m_torrent_queue.active;
+	for(string_list::iterator iter = m_torrent_queue.in_queue.begin(); iter != m_torrent_queue.in_queue.end(); ++iter)
+		ref.push_back(*iter);
+	pthread_mutex_unlock(&m_mutex);
+}
+
+void Dinosaur::get_active_torrents(std::list<std::string>  & ref)
+{
+	ref.clear();
+	pthread_mutex_lock(&m_mutex);
+	ref = m_torrent_queue.active;
+	pthread_mutex_unlock(&m_mutex);
+}
+
+void Dinosaur::get_torrents_in_queue(std::list<std::string>  & ref)
+{
+	ref.clear();
+	pthread_mutex_lock(&m_mutex);
+	ref = m_torrent_queue.in_queue;
 	pthread_mutex_unlock(&m_mutex);
 }
 
@@ -570,7 +596,7 @@ int Dinosaur::event_sock_ready2read(network::Socket sock)
 			m_nm.Socket_delete(sock);
 			return ERR_INTERNAL;
 		}
-		(*iter).second->add_leecher(sock);
+		(*iter).second.ptr->add_leecher(sock);
 		return 0;
 	}
 	catch (Exception & e) {
@@ -647,16 +673,71 @@ void * Dinosaur::thread(void * arg)
 #endif
 		}
 		bt->m_fm.notify();
-		for(torrent_map_iter iter = bt->m_torrents.begin(); iter != bt->m_torrents.end(); ++iter)
+		for(string_list::iterator iter = bt->m_torrent_queue.active.begin(), iter2 = iter; iter != bt->m_torrent_queue.active.end(); iter = iter2)
 		{
-			(*iter).second->clock();
-			if ((*iter).second->i_am_releasing() && (*iter).second.use_count() == 1)
-				bt->m_torrents.erase(iter);
+			++iter2;
+			bt->m_torrents[(*iter)].ptr->clock();
+			if (bt->m_torrents[(*iter)].ptr->i_am_releasing() && bt->m_torrents[(*iter)].ptr.use_count() == 1)
+			{
+				bt->m_torrents.erase(*iter);
+				bt->m_torrent_queue.active.erase(iter);
+				continue;
+			}
+			info::torrent_dyn dyn;
+			bt->m_torrents[(*iter)].ptr->get_info_dyn(dyn);
+			if (dyn.work == TORRENT_WORK_PAUSED || dyn.work == TORRENT_WORK_FAILURE || dyn.work == TORRENT_WORK_DONE)
+			{
+#ifdef BITTORRENT_DEBUG
+				LOG(INFO) << "Pushing " << *iter << " in to queue\n";
+#endif
+				bt->m_torrent_queue.in_queue.push_back(*iter);
+				bt->m_torrent_queue.active.erase(iter);
+			}
 		}
+
+		for(string_list::iterator iter = bt->m_torrent_queue.in_queue.begin(), iter2 = iter; iter != bt->m_torrent_queue.in_queue.end(); iter = iter2)
+		{
+			++iter2;
+
+			info::torrent_dyn dyn;
+			bt->m_torrents[(*iter)].ptr->get_info_dyn(dyn);
+			if (dyn.work == TORRENT_WORK_CHECKING || dyn.work == TORRENT_WORK_RELEASING)
+			{
+				bt->m_torrents[(*iter)].ptr->clock();
+				if (bt->m_torrents[(*iter)].ptr->i_am_releasing() && bt->m_torrents[(*iter)].ptr.use_count() == 1)
+				{
+					bt->m_torrents.erase(*iter);
+					bt->m_torrent_queue.in_queue.erase(iter);
+				}
+				continue;
+			}
+			if (bt->m_torrent_queue.active.size() >= bt->Config.get_max_active_torrents())
+				continue;
+			if (dyn.work == TORRENT_WORK_FAILURE)
+				continue;
+			if (bt->m_torrents[(*iter)].paused_by_user)
+				continue;
+			if (dyn.ratio > bt->Config.get_fin_ratio() && dyn.work == TORRENT_WORK_DONE)
+				continue;
+			if (dyn.work == TORRENT_WORK_PAUSED)
+				bt->m_torrents[(*iter)].ptr->continue_();
+#ifdef BITTORRENT_DEBUG
+		LOG(INFO) << "Pushing " << *iter << " in to active\n";
+#endif
+			bt->m_torrent_queue.active.push_back(*iter);
+			bt->m_torrent_queue.in_queue.erase(iter);
+		}
+
 		pthread_mutex_unlock(&bt->m_mutex);
 		usleep(1000);
 	}
 	return (void*)ret;
+}
+
+template<class Archive>
+void Dinosaur::serialize(Archive & ar, const unsigned int version)
+{
+	ar & m_serializable;
 }
 
 } /* namespace Dinosaur */

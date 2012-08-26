@@ -15,8 +15,7 @@ void catchCrash(int signum)
 	void *callstack[128];
     int frames = backtrace(callstack, 128);
     char **strs=backtrace_symbols(callstack, frames);
-    // тут выводим бэктрейс в файлик crash_report.txt
-    // можно так же вывести и иную полезную инфу - версию ОС, программы, etc
+
     FILE *f = fopen("crash_report.txt", "w");
     if (f)
     {
