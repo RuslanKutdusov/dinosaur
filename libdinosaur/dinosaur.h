@@ -95,7 +95,7 @@ public:
 	void PauseTorrent(const std::string & hash);
 	void ContinueTorrent(const std::string & hash);
 	void CheckTorrent(const std::string & hash);
-	void DeleteTorrent(const std::string & hash);
+	void DeleteTorrent(const std::string & hash, bool with_data);
 	void get_torrent_info_stat(const std::string & hash, info::torrent_stat & ref);
 	void get_torrent_info_dyn(const std::string & hash, info::torrent_dyn & ref);
 	void get_torrent_info_trackers(const std::string & hash, info::trackers & ref);
@@ -135,6 +135,7 @@ public:
 	}
 	~Dinosaur();
 	/*
+	 * Exception::ERR_CODE_CAN_NOT_CREATE_THREAD
 	 * SyscallException
 	 */
 	static void CreateDinosaur(DinosaurPtr & ptr, torrent_failures & fail_torrents )
@@ -149,6 +150,11 @@ public:
 			pthread_mutex_unlock(&ptr->m_mutex);
 		}
 		catch (SyscallException & e)
+		{
+			ptr.reset();
+			throw e;
+		}
+		catch(Exception & e)
 		{
 			ptr.reset();
 			throw e;

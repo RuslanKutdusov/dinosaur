@@ -429,6 +429,9 @@ protected:
 	TorrentBase(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc);
 	void init(const Metafile & metafile, const std::string & work_directory, const std::string & download_directory);
 	void save_state();
+	/*
+	 * Exception::ERR_CODE_UNDEF
+	 */
 	static void CreateTorrent(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc,
 				const Metafile & metafile, const std::string & work_directory, const std::string & download_directory, TorrentBasePtr & ptr)
 	{
@@ -450,6 +453,9 @@ public:
 class TorrentInterfaceBase : public TorrentBase
 {
 public:
+	/*
+	 * Exception::ERR_CODE_UNDEF
+	 */
 	static void CreateTorrent(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs::FileManager * fm, block_cache::Block_cache * bc,
 			const Metafile & metafile, const std::string & work_directory, const std::string & download_directory, TorrentInterfaceBasePtr & ptr)
 	{

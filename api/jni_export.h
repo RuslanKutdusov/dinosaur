@@ -77,7 +77,7 @@ JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_CheckTorrent
  * Signature: (Ljava/lang/String;)V
  */
 JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_DeleteTorrent
-  (JNIEnv *, jobject, jstring);
+  (JNIEnv *, jobject, jstring, jboolean);
 
 /*
  * Class:     dinosaur_Dinosaur

@@ -10,6 +10,7 @@
 namespace dinosaur {
 
 /*
+ * Exception::ERR_CODE_CAN_NOT_CREATE_THREAD
  * SyscallException
  */
 
@@ -53,7 +54,7 @@ Dinosaur::Dinosaur()
 
 	m_thread_stop = false;
 	if (pthread_create(&m_thread, &attr, Dinosaur::thread, (void *)this))
-		throw Exception(Exception::ERR_CODE_DINOSAUR_INIT_ERROR);
+		throw Exception(Exception::ERR_CODE_CAN_NOT_CREATE_THREAD);
 	pthread_attr_destroy(&attr);
 
 	load_our_torrents();
@@ -177,15 +178,19 @@ void Dinosaur::load_our_torrents()
 	for(std::list<torrent_info>::iterator iter = m_serializable.begin(); iter != m_serializable.end(); ++iter)
 	{
 		std::string hash;
+		std::string name;
 		try
 		{
-			init_torrent(iter->metafile_path, Config.get_download_directory(), hash);
+			torrent::Metafile meta(iter->metafile_path);
+			name = meta.name;
+			init_torrent(meta, Config.get_download_directory(), hash);
 		}
 		catch (Exception & e) {
 			torrent_failure tf;
 			tf.exception_errcode = e.get_errcode();
 			tf.errno_ = 0;
 			tf.where = TORRENT_FAILURE_INIT_TORRENT;
+			tf.description = name + " " + hash;
 			m_fails_torrents.push_back(tf);
 			continue;
 		}
@@ -229,7 +234,15 @@ void Dinosaur::init_torrent(const torrent::Metafile & metafile, const std::strin
 		pthread_mutex_unlock(&m_mutex);
 		throw Exception(Exception::ERR_CODE_TORRENT_EXISTS);
 	}
-	torrent::TorrentInterfaceBase::CreateTorrent(&m_nm, &Config, &m_fm, &m_bc, metafile, m_directory, download_directory, torrent);
+	try
+	{
+		torrent::TorrentInterfaceBase::CreateTorrent(&m_nm, &Config, &m_fm, &m_bc, metafile, m_directory, download_directory, torrent);
+	}
+	catch(Exception & e)
+	{
+		pthread_mutex_unlock(&m_mutex);
+		throw Exception(e);
+	}
 	m_torrents[hash].ptr = torrent;
 	m_torrents[hash].paused_by_user = false;
 	pthread_mutex_unlock(&m_mutex);
@@ -237,12 +250,7 @@ void Dinosaur::init_torrent(const torrent::Metafile & metafile, const std::strin
 
 /*
  * Exception::ERR_CODE_UNDEF
- * Exception::ERR_CODE_NOT_TORRENT_EXISTS
- * Exception::ERR_CODE_INVALID_OPERATION
- * Exception::ERR_CODE_NULL_REF
- * Exception::ERR_CODE_BENCODE_ENCODE_ERROR
- * Exception::ERR_CODE_STATE_FILE_ERROR
- * SyscallException
+ * Exception::ERR_CODE_TORRENT_EXISTS
  */
 
 void Dinosaur::AddTorrent(torrent::Metafile & metafile, const std::string & download_directory, std::string & hash)
@@ -322,10 +330,9 @@ void Dinosaur::CheckTorrent(const std::string & hash)
 
 /*
  * Exception::ERR_CODE_TORRENT_NOT_EXISTS
- * Exception::ERR_CODE_INVALID_OPERATION
  */
 
-void Dinosaur::DeleteTorrent(const std::string & hash)
+void Dinosaur::DeleteTorrent(const std::string & hash, bool with_data)
 {
 	if (m_torrents.count(hash) == 0)
 		throw Exception(Exception::ERR_CODE_TORRENT_NOT_EXISTS);
@@ -334,30 +341,7 @@ void Dinosaur::DeleteTorrent(const std::string & hash)
 	torrent->erase_state();
 	torrent->prepare2release();
 
-	std::ifstream fin;
-	std::ofstream fout;
-	std::string state_file = m_directory;
-	state_file.append("our_torrents");
-
-	fin.open(state_file.c_str());
-	std::string readed_fname;
 	std::string current_fname = hash + ".torrent";
-	std::list<std::string> our_torrents;
-	while(fin>>readed_fname)
-	{
-		if (readed_fname != current_fname)
-			our_torrents.push_back(readed_fname);
-	}
-	fin.close();
-
-	fout.open(state_file.c_str());
-	while(!our_torrents.empty())
-	{
-		fout<<our_torrents.front()<<std::endl;
-		our_torrents.pop_front();
-	}
-	fout.close();
-
 	remove(current_fname.c_str());
 
 	pthread_mutex_unlock(&m_mutex);
@@ -483,6 +467,10 @@ void Dinosaur::get_torrent_info_downloadable_pieces(const std::string & hash, in
 	pthread_mutex_unlock(&m_mutex);
 }
 
+/*
+ * Exception::ERR_CODE_TORRENT_NOT_EXISTS
+ */
+
 void Dinosaur::get_torrent_failure_desc(const std::string & hash, torrent_failure & ref)
 {
 	if (m_torrents.count(hash) == 0)
@@ -491,6 +479,13 @@ void Dinosaur::get_torrent_failure_desc(const std::string & hash, torrent_failur
 	ref = m_torrents[hash].ptr->get_failure_desc();
 	pthread_mutex_unlock(&m_mutex);
 }
+
+/*
+ * Exception::ERR_CODE_TORRENT_NOT_EXISTS
+ * Exception::ERR_CODE_INVALID_FILE_INDEX
+ * Exception::ERR_CODE_FAIL_SET_FILE_PRIORITY
+ * Exception::ERR_CODE_INVALID_OPERATION
+ */
 
 void Dinosaur::set_file_priority(const std::string & hash, FILE_INDEX file, DOWNLOAD_PRIORITY prio)
 {

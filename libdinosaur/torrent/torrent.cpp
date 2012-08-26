@@ -34,6 +34,10 @@ TorrentBase::TorrentBase(network::NetworkManager * nm, cfg::Glob_cfg * g_cfg, fs
 	m_remain_time = 0;
 }
 
+/*
+ * Exception::ERR_CODE_UNDEF
+ */
+
 void TorrentBase::init(const Metafile & metafile, const std::string & work_directory, const std::string & download_directory)
 {
 	if (work_directory.length() == 0)

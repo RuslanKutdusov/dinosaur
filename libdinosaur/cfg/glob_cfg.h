@@ -311,7 +311,7 @@ public:
 		cfg.send_have = v;
 	}
 	/*
-	 * Exception::ERR_CODE_INVALID_CONFIG_VALUE
+	 * Exception::ERR_CODE_INVALID_LISTEN_ON
 	 */
 	void set_listen_on(const char * ip)
 	{
