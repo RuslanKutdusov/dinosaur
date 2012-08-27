@@ -1,9 +1,9 @@
 package dinosaur;
 
 public class socket_status {
-	public boolean							listen;
-	public int 								errno_;
-	public DinosaurException.ERR_CODES 		exception_errcode;
+	public boolean							listen;//работает или нет
+	public int 								errno_;// != значит ошибка
+	public DinosaurException.ERR_CODES 		exception_errcode;// != NO_ERROR - ошибка
 	public socket_status() {
 		// TODO Auto-generated constructor stub
 	}

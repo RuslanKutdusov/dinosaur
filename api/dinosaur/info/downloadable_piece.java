@@ -3,10 +3,10 @@ package dinosaur.info;
 import dinosaur.DOWNLOAD_PRIORITY;
 
 public class downloadable_piece {
-	public long 				index;
-	public long					block2download;
-	public long					downloaded_blocks;
-	public DOWNLOAD_PRIORITY 	priority;
+	public long 				index;//индекс куска
+	public long					block2download;//блоков к загрузке
+	public long					downloaded_blocks;//блоков загружено
+	public DOWNLOAD_PRIORITY 	priority;//приоритет загрузки
 	public downloadable_piece()
 	{
 		

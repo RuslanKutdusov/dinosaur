@@ -3,21 +3,21 @@ package dinosaur.info;
 public class tracker {
 	public enum TRACKER_STATUS
 	{
-		TRACKER_STATUS_OK,
-		TRACKER_STATUS_UPDATING,
-		TRACKER_STATUS_ERROR,
-		TRACKER_STATUS_TIMEOUT,
-		TRACKER_STATUS_UNRESOLVED,
-		TRACKER_STATUS_INVALID_ANNOUNCE,
-		TRACKER_STATUS_CONNECTING,
-		TRACKER_STATUS_SEE_FAILURE_MESSAGE
+		TRACKER_STATUS_OK,//Все ок
+		TRACKER_STATUS_UPDATING,//обновляется
+		TRACKER_STATUS_ERROR,//произошла ошибка
+		TRACKER_STATUS_TIMEOUT,//таймаут запроса
+		TRACKER_STATUS_UNRESOLVED,//неудалось разрезолвить доменное имя
+		TRACKER_STATUS_INVALID_ANNOUNCE,//такой тип трекеров не поддерживаем
+		TRACKER_STATUS_CONNECTING,//подключается к трекеру...
+		TRACKER_STATUS_SEE_FAILURE_MESSAGE//произошла ошибка, для описания см. поле failure_mes
 	};
-	public String 			announce;
-	public TRACKER_STATUS 	status;
-	public String			failure_mes;
-	public long 			seeders;
-	public long 			leechers;
-	public long				update_in;
+	public String 			announce;//аннонс(url трекера)
+	public TRACKER_STATUS 	status;//статус
+	public String			failure_mes;//описание ошибки, есть только если status == TRACKER_STATUS_SEE_FAILURE_MESSAGE
+	public long 			seeders;//кол-во сидов в раздаче
+	public long 			leechers;//кол-во личеров в раздче
+	public long				update_in;//обновление через n секунд
 	public tracker()
 	{
 		

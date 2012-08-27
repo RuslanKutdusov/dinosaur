@@ -1,18 +1,18 @@
 package dinosaur.info;
 
 public class torrent_stat {
-	public String 		name;
-	public String 		comment;
-	public String 		created_by;
-	public String 		download_directory;
-	public long 		creation_date;
-	public long 		private_;
-	public long 		length;
-	public long 		piece_length;
-	public long 		piece_count;
-	public String 		info_hash_hex;
-	public long			start_time;
-	public long			files_count;
+	public String 		name;//название торрента
+	public String 		comment;//комментарий
+	public String 		created_by;//создан в ...
+	public String 		download_directory;//расположение
+	public long 		creation_date;//когда создан
+	public long 		private_;//приватный или нет
+	public long 		length;//размер
+	public long 		piece_length;//размер куска
+	public long 		piece_count;//кол-во кусков
+	public String 		info_hash_hex;//хэш
+	public long			start_time;//когда запущен
+	public long			files_count;//кол-во файлов
 	public torrent_stat()
 	{
 		

@@ -1,15 +1,15 @@
 package dinosaur.info;
 
 public class peer {
-	public String 		ip;
-	public long 		downloaded;
-	public long 		uploaded;
-	public long	 		downSpeed;
-	public long	 		upSpeed;
-	public double 		available;
-	public long			blocks2request;
-	public long			requested_blocks;
-	public boolean 		may_request;
+	public String 		ip;//без комментариев
+	public long 		downloaded;//загружено байт у него
+	public long 		uploaded;//отдано байт ему
+	public long	 		downSpeed;//скорость загрузки
+	public long	 		upSpeed;//скорость отдачи
+	public double 		available;//доступно у него(0.000 - 1.000)
+	public long			blocks2request;//блоков к загрузке
+	public long			requested_blocks;//запрошено блоков
+	public boolean 		may_request;//можем ли мы у него запрашивать
 	public peer()
 	{
 		

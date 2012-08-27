@@ -3,25 +3,25 @@ package dinosaur.info;
 public class torrent_dyn {
 	public enum TORRENT_WORK
 	{
-		TORRENT_WORK_DOWNLOADING,
-		TORRENT_WORK_UPLOADING,
-		TORRENT_WORK_CHECKING,
-		TORRENT_WORK_PAUSED,
-		TORRENT_WORK_FAILURE,
-		TORRENT_WORK_RELEASING,
-		TORRENT_WORK_DONE
+		TORRENT_WORK_DOWNLOADING,//качает
+		TORRENT_WORK_UPLOADING,//отдает
+		TORRENT_WORK_CHECKING,//проверяет
+		TORRENT_WORK_PAUSED,//приостановлен
+		TORRENT_WORK_FAILURE,//произошла ошибка, вызови get_torrent_failure_desc чтобы узнать подробности
+		TORRENT_WORK_RELEASING,//высвобождается
+		TORRENT_WORK_DONE//завершен 
 	};
-	public long 		downloaded;
-	public long 		uploaded;
-	public long 		rx_speed;
-	public long 		tx_speed;
-	public long			seeders;
-	public long			total_seeders;
-	public long			leechers;
-	public long 		progress;
-	public TORRENT_WORK	work;
-	public long			remain_time;
-	public float		ratio;
+	public long 		downloaded;//загружено байт
+	public long 		uploaded;//отдано байт
+	public long 		rx_speed;//скорость загрузки
+	public long 		tx_speed;//скорость отдачи
+	public long			seeders;//всего сидов
+	public long			total_seeders;//у скольких сидов сейчас качаем
+	public long			leechers;//личеры
+	public long 		progress;//прогресс 0 - 100 %
+	public TORRENT_WORK	work;//чем сейчас занимается торрент
+	public long			remain_time;//осталось времени, чтобы скачать
+	public float		ratio;//коэффициент = "отдано" поделить на "загружено"
 	public torrent_dyn()
 	{
 		
