@@ -14,7 +14,7 @@ Tracker::Tracker()
 	:network::SocketAssociation()
 {
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "Tracker default constructor";
+	logger::LOGGER() << "Tracker default constructor";
 #endif
 	memset(m_buf, 0, 16384);
 	m_buflen = 0;
@@ -56,7 +56,7 @@ Tracker::Tracker(const TorrentInterfaceInternalPtr & torrent, std::string & anno
 	:network::SocketAssociation()
 {
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "Tracker constructor " << announce.c_str();
+	logger::LOGGER() << "Tracker constructor " << announce.c_str();
 #endif
 	m_torrent = torrent;
 	m_nm = m_torrent->get_nm();
@@ -304,7 +304,7 @@ int Tracker::event_sock_sended(network::Socket sock)
 	{
 		m_ready2release = true;
 #ifdef BITTORRENT_DEBUG
-		LOG(INFO) << "Tracker " << m_announce.c_str() << " stop sended";
+		logger::LOGGER() << "Tracker " << m_announce.c_str() << " stop sended";
 #endif
 	}
 	return ERR_NO_ERROR;
@@ -338,7 +338,7 @@ int Tracker::event_sock_accepted(network::Socket sock, network::Socket accepted_
 int Tracker::event_sock_timeout(network::Socket sock)
 {
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "Tracker " << m_announce.c_str() << " timeout";
+	logger::LOGGER() << "Tracker " << m_announce.c_str() << " timeout";
 #endif
 	try
 	{
@@ -440,12 +440,12 @@ int Tracker::update()
 int Tracker::prepare2release()
 {
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "Tracker " << m_announce.c_str() << " prepare2release";
+	logger::LOGGER() << "Tracker " << m_announce.c_str() << " prepare2release";
 #endif
 	if (m_state == TRACKER_STATE_FAILURE)
 	{
 		#ifdef BITTORRENT_DEBUG
-			LOG(INFO) << "Tracker is fail " << m_announce.c_str() << " prepare2release";
+			logger::LOGGER() << "Tracker is fail " << m_announce.c_str() << " prepare2release";
 		#endif
 		return ERR_INTERNAL;
 	}
@@ -518,7 +518,7 @@ int Tracker::get_info(info::tracker & ref)
 Tracker::~Tracker()
 {
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "Tracker " << m_announce.c_str() << " destructor";
+	logger::LOGGER() << "Tracker " << m_announce.c_str() << " destructor";
 #endif
 	if(m_peers != NULL)
 		delete[] m_peers;
@@ -526,7 +526,7 @@ Tracker::~Tracker()
 		delete m_addr;
 	delete_socket();
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "Tracker " << m_announce.c_str() << " destroyed";
+	logger::LOGGER() << "Tracker " << m_announce.c_str() << " destroyed";
 #endif
 }
 

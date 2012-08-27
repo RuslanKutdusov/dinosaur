@@ -24,7 +24,7 @@
 #include "../consts.h"
 #include "../utils/utils.h"
 #include "../lru_cache/lru_cache.h"
-#include <glog/logging.h>
+#include "../log/log.h"
 #define BUFFER_SIZE 32768
 //#define CACHE_ELEMENT_SIZE BLOCK_LENGTH
 #define MAX_OPENED_FILES 512

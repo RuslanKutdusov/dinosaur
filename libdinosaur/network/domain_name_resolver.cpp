@@ -13,7 +13,7 @@ namespace network {
 DomainNameResolver::DomainNameResolver(std::string & domain, struct sockaddr_in * addr)
 {
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "DomainNameResolver constructor " << domain.c_str();
+	logger::LOGGER() << "DomainNameResolver constructor " << domain.c_str();
 #endif
 	if (addr == NULL || domain.length() == 0)
 		throw Exception(Exception::ERR_CODE_NULL_REF);
@@ -25,7 +25,7 @@ DomainNameResolver::DomainNameResolver(std::string & domain, struct sockaddr_in 
 DomainNameResolver::DomainNameResolver(const char * domain, struct sockaddr_in * addr)
 {
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "DomainNameResolver constructor " << domain;
+	logger::LOGGER() << "DomainNameResolver constructor " << domain;
 #endif
 	if (addr == NULL || domain == NULL)
 		throw Exception(Exception::ERR_CODE_NULL_REF);
@@ -37,7 +37,7 @@ DomainNameResolver::DomainNameResolver(const char * domain, struct sockaddr_in *
 DomainNameResolver::~DomainNameResolver()
 {
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "DomainNameResolver destructor";
+	logger::LOGGER() << "DomainNameResolver destructor";
 #endif
 }
 
@@ -58,7 +58,7 @@ void DomainNameResolver::addrinfo()
 	m_addr->sin_port = port;
 	freeaddrinfo(res);
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "DomainNameResolver name " << m_domain.c_str() << " is resolved " << inet_ntoa(m_addr->sin_addr);
+	logger::LOGGER() << "DomainNameResolver name " << m_domain.c_str() << " is resolved " << inet_ntoa(m_addr->sin_addr);
 #endif
 }
 

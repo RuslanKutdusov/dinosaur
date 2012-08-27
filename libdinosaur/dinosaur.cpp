@@ -29,6 +29,10 @@ Dinosaur::Dinosaur()
 		m_directory.append("/");
 	m_directory.append(".dinosaur/");
 	mkdir(m_directory.c_str(), S_IRWXU);
+	std::string log_dir = m_directory;
+	log_dir += "logs/";
+	mkdir(log_dir.c_str(), S_IRWXU);
+	logger::InitLogger(log_dir);
 
 	//инициализация всего и вся
 	Config = cfg::Glob_cfg(m_directory);
@@ -88,7 +92,7 @@ void Dinosaur::init_listen_socket()
 Dinosaur::~Dinosaur() {
 	// TODO Auto-generated destructor stub
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "Dinosaur destructor";
+	logger::LOGGER() << "Dinosaur destructor";
 #endif
 	pthread_mutex_lock(&m_mutex);
 	m_serializable.clear();
@@ -153,7 +157,7 @@ Dinosaur::~Dinosaur() {
 	}
 	m_torrents.clear();
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "Dinosaur destroyed";
+	logger::LOGGER() << "Dinosaur destroyed";
 #endif
 }
 
@@ -591,7 +595,7 @@ int Dinosaur::event_sock_ready2read(network::Socket sock)
 		if (handshake[0] != '\x13')
 		{
 			#ifdef BITTORRENT_DEBUG
-				LOG(INFO) << "Leecher " << ip << " sended not handshake";
+				logger::LOGGER() << "Leecher " << ip << " sended not handshake";
 			#endif
 			m_nm.Socket_delete(sock);
 			return ERR_INTERNAL;
@@ -599,7 +603,7 @@ int Dinosaur::event_sock_ready2read(network::Socket sock)
 		if (memcmp(&handshake[1], "BitTorrent protocol", 19) != 0)
 		{
 			#ifdef BITTORRENT_DEBUG
-				LOG(INFO) << "Leecher " << ip << " works with unsupported Bittorrent protocol";
+				logger::LOGGER() << "Leecher " << ip << " works with unsupported Bittorrent protocol";
 			#endif
 			m_nm.Socket_delete(sock);
 			return ERR_INTERNAL;
@@ -613,7 +617,7 @@ int Dinosaur::event_sock_ready2read(network::Socket sock)
 		if (iter == m_torrents.end() && m_torrents.count(str_infohash) == 0)
 		{
 			#ifdef BITTORRENT_DEBUG
-				LOG(INFO) << "Leecher " << ip << " wants to work with missed torrent";
+				logger::LOGGER() << "Leecher " << ip << " wants to work with missed torrent";
 			#endif
 			m_nm.Socket_delete(sock);
 			return ERR_INTERNAL;
@@ -623,7 +627,7 @@ int Dinosaur::event_sock_ready2read(network::Socket sock)
 	}
 	catch (Exception & e) {
 			#ifdef BITTORRENT_DEBUG
-				LOG(INFO) << "Leecher " << ip << " rejected";
+				logger::LOGGER() << "Leecher " << ip << " rejected";
 			#endif
 		m_nm.Socket_delete(sock);
 		return ERR_INTERNAL;
@@ -652,7 +656,7 @@ int Dinosaur::event_sock_accepted(network::Socket sock, network::Socket accepted
 #ifdef BITTORRENT_DEBUG
 	sockaddr_in addr;
 	m_nm.Socket_get_addr(sock, &addr);
-	LOG(INFO) << "Leecher connected " << inet_ntoa(addr.sin_addr);
+	logger::LOGGER() << "Leecher connected " << inet_ntoa(addr.sin_addr);
 #endif
 	m_nm.Socket_set_assoc(accepted_sock, shared_from_this());
 	return 0;
@@ -681,7 +685,7 @@ void * Dinosaur::thread(void * arg)
 		catch(SyscallException & e)
 		{
 #ifdef BITTORRENT_DEBUG
-			LOG(INFO) << "NetworkManager::clock throws exception: " << e.get_errno_str();
+			logger::LOGGER() << "NetworkManager::clock throws exception: " << e.get_errno_str();
 #endif
 		}
 		pthread_mutex_lock(&bt->m_mutex);
@@ -691,7 +695,7 @@ void * Dinosaur::thread(void * arg)
 		}
 		catch (Exception & e) {
 #ifdef BITTORRENT_DEBUG
-			LOG(INFO) <<  "NetworkManager::notify throws exception: " << exception_errcode2str(e).c_str();
+			logger::LOGGER() <<  "NetworkManager::notify throws exception: " << exception_errcode2str(e).c_str();
 #endif
 		}
 		bt->m_fm.notify();
@@ -710,7 +714,7 @@ void * Dinosaur::thread(void * arg)
 			if (dyn.work == TORRENT_WORK_PAUSED || dyn.work == TORRENT_WORK_FAILURE || dyn.work == TORRENT_WORK_DONE)
 			{
 #ifdef BITTORRENT_DEBUG
-				LOG(INFO) << "Pushing " << *iter << " in to queue\n";
+				logger::LOGGER() << "Pushing " << *iter << " in to queue\n";
 #endif
 				bt->m_torrent_queue.in_queue.push_back(*iter);
 				bt->m_torrent_queue.active.erase(iter);
@@ -744,7 +748,7 @@ void * Dinosaur::thread(void * arg)
 			if (dyn.work == TORRENT_WORK_PAUSED)
 				bt->m_torrents[(*iter)].ptr->continue_();
 #ifdef BITTORRENT_DEBUG
-		LOG(INFO) << "Pushing " << *iter << " in to active\n";
+		logger::LOGGER() << "Pushing " << *iter << " in to active\n";
 #endif
 			bt->m_torrent_queue.active.push_back(*iter);
 			bt->m_torrent_queue.in_queue.erase(iter);

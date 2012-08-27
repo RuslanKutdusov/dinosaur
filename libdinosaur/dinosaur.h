@@ -26,7 +26,7 @@
 #include <string>
 #include <list>
 #include <boost/shared_ptr.hpp>
-#include <glog/logging.h>
+#include "log/log.h"
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/serialization/list.hpp>
@@ -142,7 +142,6 @@ public:
 	{
 		try
 		{
-			google::InitGoogleLogging("dinosaur");
 			ptr.reset(new Dinosaur());
 			fail_torrents = ptr->m_fails_torrents;
 			pthread_mutex_lock(&ptr->m_mutex);

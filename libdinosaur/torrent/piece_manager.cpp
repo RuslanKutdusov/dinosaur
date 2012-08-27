@@ -501,7 +501,7 @@ int PieceManager::event_file_write(const fs::write_event & we, PIECE_STATE & pie
 				piece_state = PIECE_STATE_FIN_HASH_BAD;
 			}
 #ifdef BITTORRENT_DEBUG
-			LOG(INFO) << "PIECE DONE " << piece_index << " ret=" << ret;
+			logger::LOGGER() << "PIECE DONE " << piece_index << " ret=" << ret;
 #endif
 		}
 	}

@@ -22,7 +22,7 @@
 #include <boost/enable_shared_from_this.hpp>
 #include "../exceptions/exceptions.h"
 #include "../err/err_code.h"
-#include <glog/logging.h>
+#include "../log/log.h"
 
 namespace dinosaur {
 namespace network
@@ -126,13 +126,13 @@ public:
 	{
 		memset(&m_peer, 0, sizeof(sockaddr_in));
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "Socket constructor " << this;
+	logger::LOGGER() << "Socket constructor " << this;
 #endif
 	}
 	~socket_()
 	{
 #ifdef BITTORRENT_DEBUG
-		LOG(INFO) << "Socket destructed "<< this << " " << m_socket << " " << m_domain.c_str() << " " << inet_ntoa(m_peer.sin_addr);
+		logger::LOGGER() << "Socket destructed "<< this << " " << m_socket << " " << m_domain.c_str() << " " << inet_ntoa(m_peer.sin_addr);
 #endif
 		close(m_socket);
 	}
@@ -143,7 +143,7 @@ public:
 	}
 	void print_ip()
 	{
-		LOG(INFO) << inet_ntoa(m_peer.sin_addr);
+		logger::LOGGER() << inet_ntoa(m_peer.sin_addr);
 	}
 #endif
 	int get_errno()

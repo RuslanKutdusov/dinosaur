@@ -25,7 +25,7 @@ double get_time()
 NetworkManager::NetworkManager()
 {
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "NetworkManager default constructor";
+	logger::LOGGER() << "NetworkManager default constructor";
 #endif
 	m_thread = 0;
 	m_thread_stop = false;
@@ -59,7 +59,7 @@ void NetworkManager::Init() throw (SyscallException)
 NetworkManager::~NetworkManager()
 {
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "NetworkManager destructor";
+	logger::LOGGER() << "NetworkManager destructor";
 #endif
 	if (m_thread != 0)
 	{
@@ -83,7 +83,7 @@ NetworkManager::~NetworkManager()
 	m_timeout_sockets.clear();
 	m_unresolved_sockets.clear();
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "NetworkManager destroyed";
+	logger::LOGGER() << "NetworkManager destroyed";
 #endif
 }
 
@@ -128,7 +128,7 @@ void NetworkManager::Socket_add(const char * ip, uint16_t port, const SocketAsso
 void NetworkManager::Socket_add_domain(const char *domain_name, uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception)
 {
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "Adding socket " << domain_name;
+	logger::LOGGER() << "Adding socket " << domain_name;
 #endif
 	sock.reset(new socket_());
 	if (sock == NULL)
@@ -148,7 +148,7 @@ void NetworkManager::Socket_add_domain(const char *domain_name, uint16_t port, c
 	m_sockets.insert(sock);
 	pthread_mutex_unlock(&m_mutex_sockets);
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "Socket is added " << domain_name;
+	logger::LOGGER() << "Socket is added " << domain_name;
 #endif
 }
 
@@ -170,7 +170,7 @@ void NetworkManager::Socket_add_domain(std::string & domain_name, uint16_t port,
 void NetworkManager::Socket_add(struct sockaddr_in * addr, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException)
 {
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "Adding socket " <<  inet_ntoa(addr->sin_addr);
+	logger::LOGGER() << "Adding socket " <<  inet_ntoa(addr->sin_addr);
 #endif
 	sock.reset(new socket_());
 	if (sock == NULL)
@@ -220,7 +220,7 @@ end:
 	m_sockets.insert(sock);
 	pthread_mutex_unlock(&m_mutex_sockets);
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "Socket is added " <<  sock->m_socket << " " << inet_ntoa(sock->m_peer.sin_addr);
+	logger::LOGGER() << "Socket is added " <<  sock->m_socket << " " << inet_ntoa(sock->m_peer.sin_addr);
 #endif
 }
 
@@ -988,7 +988,7 @@ void * NetworkManager::timeout_thread(void * arg)
 	std::list<Socket> sock2resolve;
 	while(!nm->m_thread_stop)
 	{
-		//LOG(INFO) << "timeout_thread loop";
+		//logger::LOGGER() << "timeout_thread loop";
 		pthread_mutex_lock(&nm->m_mutex_sockets);
 		for(socket_set_iter iter = nm->m_sockets.begin(); iter != nm->m_sockets.end(); ++iter)
 		{
@@ -1038,7 +1038,7 @@ void * NetworkManager::timeout_thread(void * arg)
 			catch (...)
 			{
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "DomainNameResolver is can not resolve "<< sock->m_domain.c_str();
+	logger::LOGGER() << "DomainNameResolver is can not resolve "<< sock->m_domain.c_str();
 #endif
 				pthread_mutex_lock(&nm->m_mutex_sockets);
 				if (!sock->m_need2delete)
