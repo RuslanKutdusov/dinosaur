@@ -186,6 +186,7 @@ void Dinosaur::load_our_torrents()
 		std::string name;
 		try
 		{
+			name = iter->metafile_path;
 			torrent::Metafile metafile(iter->metafile_path);
 			name = metafile.name;
 			hash = metafile.info_hash_hex;
@@ -207,6 +208,16 @@ void Dinosaur::load_our_torrents()
 			torrent_failure tf;
 			tf.exception_errcode = e.get_errcode();
 			tf.errno_ = 0;
+			tf.where = TORRENT_FAILURE_INIT_TORRENT;
+			tf.description = name + " " + hash;
+			m_fails_torrents.push_back(tf);
+			continue;
+		}
+		catch(SyscallException &e)
+		{
+			torrent_failure tf;
+			tf.exception_errcode = Exception::NO_ERROR;
+			tf.errno_ = e.get_errno();
 			tf.where = TORRENT_FAILURE_INIT_TORRENT;
 			tf.description = name + " " + hash;
 			m_fails_torrents.push_back(tf);

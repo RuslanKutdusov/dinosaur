@@ -478,6 +478,8 @@ void TorrentBase::set_failure(const torrent_failure & tf)
 #endif
 }
 
+int update = 0;
+
 int TorrentBase::clock()
 {
 	m_rx_speed = 0.0f;
@@ -646,6 +648,12 @@ int TorrentBase::clock()
 			}
 		}
 		m_have_list.clear();
+		/*if (time(NULL) - update > 2)
+		{
+			printf("=================TURN ON SPEED CONTROL==================\n");
+			speed_ctrl();
+			update = time(NULL);
+		}*/
 
 		for(tracker_map_iter iter = m_trackers.begin(); iter != m_trackers.end(); ++iter)
 		{
@@ -864,6 +872,34 @@ void TorrentBase::set_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY prio)
 const torrent_failure & TorrentBase::get_failure_desc()
 {
 	return m_failure_desc;
+}
+
+void TorrentBase::speed_ctrl()
+{
+	if (m_rx_speed > 100000)
+		for(peer_list_iter seed_iter = m_active_seeders.begin(); seed_iter != m_active_seeders.end(); ++seed_iter)
+		{
+			PeerPtr seed = *seed_iter;
+			if (seed->is_sleep())
+				continue;
+			int fd = seed->m_sock->get_fd();
+			int rcvbuf;
+			int new_rcvbuf;
+			socklen_t size;
+			int err = getsockopt(fd, SOL_SOCKET, SO_RCVBUF,
+					  &rcvbuf, &size);
+			rcvbuf = rcvbuf / 2;
+			new_rcvbuf = rcvbuf - rcvbuf / 8;
+			printf("Socket %d: rcvbuf=%d, try to set rcvbuf=%d...", fd, rcvbuf, new_rcvbuf);
+			if (err != 0)
+			{
+				printf("%s\n", sys_errlist[err]);
+				continue;
+			}
+			err = setsockopt(fd, SOL_SOCKET, SO_RCVBUF,
+						  &new_rcvbuf, size);
+			printf(" Result = %s\n", sys_errlist[err]);
+		}
 }
 
 } /* namespace TorrentNamespace */
