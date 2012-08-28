@@ -236,7 +236,7 @@ extern "C" void on_button_delete_clicked (GtkWidget *object, gpointer user_data)
 		g_free(g_hash);
 		try
 		{
-			bt->DeleteTorrent(hash);
+			bt->DeleteTorrent(hash, false);
 			gtk_list_store_remove(torrent_list, &selected_iter);
 		}
 		catch (dinosaur::Exception & e) {
@@ -386,6 +386,10 @@ extern "C" void on_window1_show (GtkWidget *object, gpointer user_data)
 			case(dinosaur::TORRENT_WORK_DONE):
 					work = "Done";
 					break;
+			case(dinosaur::TORRENT_WORK_RELEASING):
+					work = "Releasing";
+					break;
+
 			}
 
 			char seeds[256];
@@ -642,6 +646,9 @@ gboolean foreach_torrent_list (GtkTreeModel *model,
 				break;
 		case(dinosaur::TORRENT_WORK_DONE):
 				work = "Done";
+				break;
+		case(dinosaur::TORRENT_WORK_RELEASING):
+				work = "Releasing";
 				break;
 		}
 

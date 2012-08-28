@@ -35,7 +35,7 @@
 #include "metafile.h"
 #include "torrent_types.h"
 #include "../types.h"
-#include <glog/logging.h>
+#include "../log/log.h"
 
 namespace dinosaur {
 namespace torrent {
@@ -154,7 +154,7 @@ private:
 	cfg::Glob_cfg * 					m_g_cfg;
 	TorrentInterfaceInternalPtr			m_torrent;
 	sockaddr_in 						m_addr;
-	network::Socket 					m_sock;
+	//network::Socket 					m_sock;
 	network::buffer 					m_buf;
 	std::string 						m_ip;
 	uint64_t 							m_downloaded;
@@ -180,6 +180,7 @@ private:
 	int send_request(PIECE_INDEX piece, BLOCK_INDEX block, uint32_t block_length);
 	int send_piece(PIECE_INDEX piece, BLOCK_OFFSET offset, uint32_t length,  char * block);
 public:
+	network::Socket 					m_sock;
 	Peer();
 	int Init(sockaddr_in * addr, const TorrentInterfaceInternalPtr & torrent);
 	int Init(network::Socket & sock, const TorrentInterfaceInternalPtr & torrent, PEER_ADD peer_add);
@@ -412,6 +413,7 @@ protected:
 	virtual bool is_downloaded();
 	virtual int event_file_write(const fs::write_event & we);
 	virtual int clock();
+	virtual void speed_ctrl();
 	virtual void get_info_stat(info::torrent_stat & ref);
 	virtual void get_info_dyn(info::torrent_dyn & ref);
 	virtual void get_info_trackers(info::trackers & ref);

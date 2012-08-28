@@ -15,7 +15,7 @@ Peer::Peer()
 :network::SocketAssociation()
 {
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "Peer default constructor";
+	logger::LOGGER() << "Peer default constructor";
 #endif
 	m_nm = NULL;
 	m_g_cfg = NULL;
@@ -94,7 +94,7 @@ int Peer::Init(network::Socket & sock, const TorrentInterfaceInternalPtr & torre
 int Peer::send_handshake()
 {
 #ifdef PEER_DEBUG
-	LOG(INFO) << "Peer " << m_ip.c_str() << ": sending handshake";
+	logger::LOGGER() << "Peer " << m_ip.c_str() << ": sending handshake";
 #endif
 
 	unsigned char handshake[HANDSHAKE_LENGHT];
@@ -119,7 +119,7 @@ int Peer::send_handshake()
 int Peer::send_bitfield()
 {
 #ifdef PEER_DEBUG
-	LOG(INFO) << "Peer " << m_ip.c_str() << ": sending bitfield";
+	logger::LOGGER() << "Peer " << m_ip.c_str() << ": sending bitfield";
 #endif
 
 	int len =  m_torrent->get_bitfield_length();
@@ -148,7 +148,7 @@ int Peer::send_bitfield()
 int Peer::send_request(PIECE_INDEX piece, BLOCK_INDEX block, uint32_t block_length)
 {
 #ifdef PEER_DEBUG
-	LOG(INFO) << "Peer " << m_ip.c_str() << ": sending request piece=" << piece << " block=" << block;
+	logger::LOGGER() << "Peer " << m_ip.c_str() << ": sending request piece=" << piece << " block=" << block;
 #endif
 
 	//<len=0013><id=6><index><begin><length>
@@ -180,7 +180,7 @@ int Peer::send_request(PIECE_INDEX piece, BLOCK_INDEX block, uint32_t block_leng
 int Peer::send_piece(PIECE_INDEX piece, BLOCK_OFFSET offset, uint32_t length, char * block)
 { //<len=0009+X><id=7><index><begin><block>
 #ifdef PEER_DEBUG
-	LOG(INFO) << "Peer " << m_ip.c_str() << ": sending piece piece=" << piece << " offset="<< offset;
+	logger::LOGGER() << "Peer " << m_ip.c_str() << ": sending piece piece=" << piece << " offset="<< offset;
 #endif
 
 	char mes[BLOCK_LENGTH + 13];
@@ -207,7 +207,7 @@ int Peer::send_piece(PIECE_INDEX piece, BLOCK_OFFSET offset, uint32_t length, ch
 int Peer::send_choke()
 {
 #ifdef PEER_DEBUG
-	LOG(INFO) << "Peer " << m_ip.c_str() << ": sending choke";
+	logger::LOGGER() << "Peer " << m_ip.c_str() << ": sending choke";
 #endif
 
 	char mes[5];
@@ -229,7 +229,7 @@ int Peer::send_choke()
 int Peer::send_unchoke()
 {
 #ifdef PEER_DEBUG
-	LOG(INFO) << "Peer " << m_ip.c_str() << ": sending unchoke";
+	logger::LOGGER() << "Peer " << m_ip.c_str() << ": sending unchoke";
 #endif
 
 	char mes[5];
@@ -251,7 +251,7 @@ int Peer::send_unchoke()
 int Peer::send_interested()
 {
 #ifdef PEER_DEBUG
-	LOG(INFO) << "Peer " << m_ip.c_str() << ": sending interested";
+	logger::LOGGER() << "Peer " << m_ip.c_str() << ": sending interested";
 #endif
 
 	char mes[5];
@@ -273,7 +273,7 @@ int Peer::send_interested()
 int Peer::send_not_interested()
 {
 #ifdef PEER_DEBUG
-	LOG(INFO) << "Peer " << m_ip.c_str() << ": sending not interested";
+	logger::LOGGER() << "Peer " << m_ip.c_str() << ": sending not interested";
 #endif
 
 	char mes[5];
@@ -298,7 +298,7 @@ int Peer::send_have(PIECE_INDEX piece_index)
 			return ERR_INTERNAL;
 
 #ifdef PEER_DEBUG
-	LOG(INFO) << "Peer " << m_ip.c_str() << ": sending have";
+	logger::LOGGER() << "Peer " << m_ip.c_str() << ": sending have";
 #endif
 
 	char mes[9];
@@ -333,7 +333,7 @@ int Peer::process_messages()
 		m_buf.pos += HANDSHAKE_LENGHT;
 		m_state = PEER_STATE_GENERAL_READY;
 		#ifdef PEER_DEBUG
-			LOG(INFO) << "Peer " << m_ip.c_str() << ": is received handshake\n";
+			logger::LOGGER() << "Peer " << m_ip.c_str() << ": is received handshake\n";
 		#endif
 	}
 	char ip[16];
@@ -356,7 +356,7 @@ int Peer::process_messages()
 			{
 			case '\x00'://choke: <len=0001><id=0>
 				#ifdef PEER_DEBUG
-					LOG(INFO) << "Peer " << m_ip.c_str() << ": is received choke";
+					logger::LOGGER() << "Peer " << m_ip.c_str() << ": is received choke";
 				#endif
 				if ( m_state == PEER_STATE_WAIT_HANDSHAKE)
 					return ERR_INTERNAL;
@@ -366,7 +366,7 @@ int Peer::process_messages()
 				break;
 			case '\x01'://unchoke: <len=0001><id=1>
 				#ifdef PEER_DEBUG
-					LOG(INFO) << "Peer " << m_ip.c_str() << ": is received unchoke";
+					logger::LOGGER() << "Peer " << m_ip.c_str() << ": is received unchoke";
 				#endif
 				if ( m_state == PEER_STATE_WAIT_HANDSHAKE)
 					return ERR_INTERNAL;
@@ -376,7 +376,7 @@ int Peer::process_messages()
 				break;
 			case '\x02'://interested: <len=0001><id=2>
 				#ifdef PEER_DEBUG
-					LOG(INFO) << "Peer " << m_ip.c_str() << ": is received interested";
+					logger::LOGGER() << "Peer " << m_ip.c_str() << ": is received interested";
 				#endif
 				if ( m_state == PEER_STATE_WAIT_HANDSHAKE)
 					return ERR_INTERNAL;
@@ -385,7 +385,7 @@ int Peer::process_messages()
 				break;
 			case '\x03'://not interested: <len=0001><id=3>
 				#ifdef PEER_DEBUG
-					LOG(INFO) << "Peer " << m_ip.c_str() << ": is received not interested";
+					logger::LOGGER() << "Peer " << m_ip.c_str() << ": is received not interested";
 				#endif
 				if ( m_state == PEER_STATE_WAIT_HANDSHAKE)
 					return ERR_INTERNAL;
@@ -393,7 +393,7 @@ int Peer::process_messages()
 				break;
 			case '\x04'://have: <len=0005><id=4><piece index>
 				#ifdef PEER_DEBUG
-					LOG(INFO) << "Peer " << m_ip.c_str() << ": is received have";
+					logger::LOGGER() << "Peer " << m_ip.c_str() << ": is received have";
 				#endif
 				if ( m_state == PEER_STATE_WAIT_HANDSHAKE)
 					return ERR_INTERNAL;
@@ -407,7 +407,7 @@ int Peer::process_messages()
 				break;
 			case '\x05'://bitfield: <len=0001+X><id=5><bitfield>
 				#ifdef PEER_DEBUG
-					LOG(INFO) << "Peer " << m_ip.c_str() << ": is received bitfield";
+					logger::LOGGER() << "Peer " << m_ip.c_str() << ": is received bitfield";
 				#endif
 
 				if (len - 1 != m_torrent->get_bitfield_length())
@@ -447,7 +447,7 @@ int Peer::process_messages()
 				m_requests_queue.insert(block_id);
 
 				#ifdef PEER_DEBUG
-					LOG(INFO) << "Peer " << m_ip.c_str() << ": is received request piece=" << index << " block=" << block_index;
+					logger::LOGGER() << "Peer " << m_ip.c_str() << ": is received request piece=" << index << " block=" << block_index;
 				#endif
 
 				break;
@@ -471,7 +471,7 @@ int Peer::process_messages()
 				std::set<BLOCK_ID>::iterator iter = m_requested_blocks.find(block_id);
 
 				#ifdef PEER_DEBUG
-					LOG(INFO) << "Peer " << m_ip.c_str() << ": is received piece piece=" << index << " block=" << offset / BLOCK_LENGTH;
+					logger::LOGGER() << "Peer " << m_ip.c_str() << ": is received piece piece=" << index << " block=" << offset / BLOCK_LENGTH;
 				#endif
 
 				if (iter == m_requested_blocks.end())
@@ -505,7 +505,7 @@ int Peer::process_messages()
 				m_torrent->get_block_index_by_offset(index, offset, block_index);
 
 				#ifdef PEER_DEBUG
-					LOG(INFO) << "Peer " << m_ip.c_str() << ": is received cancel piece=" << index << " block=" << block_index;
+					logger::LOGGER() << "Peer " << m_ip.c_str() << ": is received cancel piece=" << index << " block=" << block_index;
 				#endif
 
 				uint32_t real_block_length;
@@ -558,7 +558,7 @@ int Peer::event_sock_ready2read(network::Socket sock)
 int Peer::event_sock_closed(network::Socket sock)
 {
 #ifdef PEER_DEBUG
-	LOG(INFO) << "Peer " << m_ip.c_str() << ": close connection";
+	logger::LOGGER() << "Peer " << m_ip.c_str() << ": close connection";
 #endif
 	try
 	{
@@ -582,7 +582,7 @@ int Peer::event_sock_sended(network::Socket sock)
 int Peer::event_sock_connected(network::Socket sock)
 {
 #ifdef PEER_DEBUG
-	LOG(INFO) << "Peer " << m_ip.c_str() << ": connected";
+	logger::LOGGER() << "Peer " << m_ip.c_str() << ": connected";
 #endif
 	return 0;
 
@@ -596,7 +596,7 @@ int Peer::event_sock_accepted(network::Socket sock, network::Socket accepted_soc
 int Peer::event_sock_timeout(network::Socket sock)
 {
 #ifdef PEER_DEBUG
-	LOG(INFO) << "Peer " << m_ip.c_str() << ": timeout";
+	logger::LOGGER() << "Peer " << m_ip.c_str() << ": timeout";
 #endif
 	try
 	{
@@ -678,7 +678,7 @@ int Peer::clock()
 			m_requests_queue.erase(iter);
 			m_torrent->inc_uploaded(block_length);
 			m_uploaded += block_length;
-			//LOG(INFO) << "rx=%f tx=%f\n", get_rx_speed(), get_tx_speed());
+			//logger::LOGGER() << "rx=%f tx=%f\n", get_rx_speed(), get_tx_speed());
 		}
 	}
 	if (m_state == PEER_STATE_REQUEST_READY && m_requested_blocks.size() <= PEER_MAX_REQUEST_NUMBER && !m_blocks2request.empty())
@@ -826,13 +826,13 @@ void Peer::prepare2release()
 Peer::~Peer()
 {
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "Peer destructor "<<  m_ip.c_str();
+	logger::LOGGER() << "Peer destructor "<<  m_ip.c_str();
 #endif
 	if (m_bitfield != NULL)
 		delete[] m_bitfield;
 	prepare2release();
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "Peer destroyed "<< m_ip.c_str();
+	logger::LOGGER() << "Peer destroyed "<< m_ip.c_str();
 #endif
 }
 

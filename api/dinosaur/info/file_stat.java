@@ -1,9 +1,9 @@
 package dinosaur.info;
 
 public class file_stat {
-	public String 		path;
-	public long			length;
-	public long			index;
+	public String 		path;//путь к файлу
+	public long			length;//размер
+	public long			index;//индекс
 	public file_stat()
 	{
 		

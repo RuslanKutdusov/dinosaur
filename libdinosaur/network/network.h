@@ -22,7 +22,7 @@
 #include <boost/enable_shared_from_this.hpp>
 #include "../exceptions/exceptions.h"
 #include "../err/err_code.h"
-#include <glog/logging.h>
+#include "../log/log.h"
 
 namespace dinosaur {
 namespace network
@@ -118,21 +118,22 @@ private:
 	bool m_need2resolved;
 	bool m_need2delete;
 	std::string m_domain;
+	bool m_udp;
 public:
 	struct sockaddr_in m_peer;
 	socket_()
 	:m_epoll_events(0),m_state(0), m_socket(-1), m_closed(true), m_connected(false), m_errno(0), m_timer(0), m_rx_last_time(get_time()),m_tx_last_time(get_time()),
-	 m_rx(0.0f), m_tx(0.0f), m_need2resolved(false), m_need2delete(false)
+	 m_rx(0.0f), m_tx(0.0f), m_need2resolved(false), m_need2delete(false), m_udp(false)
 	{
 		memset(&m_peer, 0, sizeof(sockaddr_in));
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "Socket constructor " << this;
+	logger::LOGGER() << "Socket constructor " << this;
 #endif
 	}
 	~socket_()
 	{
 #ifdef BITTORRENT_DEBUG
-		LOG(INFO) << "Socket destructed "<< this << " " << m_socket << " " << m_domain.c_str() << " " << inet_ntoa(m_peer.sin_addr);
+		logger::LOGGER() << "Socket destructed "<< this << " " << m_socket << " " << m_domain.c_str() << " " << inet_ntoa(m_peer.sin_addr);
 #endif
 		close(m_socket);
 	}
@@ -143,7 +144,7 @@ public:
 	}
 	void print_ip()
 	{
-		LOG(INFO) << inet_ntoa(m_peer.sin_addr);
+		logger::LOGGER() << inet_ntoa(m_peer.sin_addr);
 	}
 #endif
 	int get_errno()
@@ -188,13 +189,15 @@ public:
 	void Socket_add(int sock_fd, struct sockaddr_in * addr, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException);
 	void Socket_add_domain(const char *domain_name, uint16_t port, const SocketAssociation::ptr & assoc, Socket & socket) throw (Exception);
 	void Socket_add_domain(std::string & domain_name, uint16_t port, const SocketAssociation::ptr & assoc, Socket & socket) throw (Exception);
+	void Socket_add_UDP(const SocketAssociation::ptr & assoc, Socket & socket) throw (Exception, SyscallException);
 	void ListenSocket_add(sockaddr_in * addr, const SocketAssociation::ptr & assoc, Socket & sock)  throw (Exception, SyscallException);
 	void ListenSocket_add(uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock)  throw (Exception, SyscallException);
 	void ListenSocket_add(uint16_t port, in_addr * addr, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException);
 	void ListenSocket_add(uint16_t port, const char * ip, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException);
 	void ListenSocket_add(uint16_t port, const std::string & ip, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException);
 	size_t Socket_send(Socket & sock, const void * data, size_t len, bool full = true) throw (Exception);//full == 1 => надо отправить все сразу
-	size_t Socket_recv(Socket & sock, void * data, size_t len) throw (Exception);
+	size_t Socket_send(Socket & sock, const void * data, size_t len, const sockaddr_in & addr) throw (SyscallException, Exception);
+	size_t Socket_recv(Socket & sock, void * data, size_t len, sockaddr_in * from = NULL) throw (SyscallException, Exception);
 	ssize_t Socket_datalen(Socket & sock) throw (Exception);
 	void Socket_closed(Socket & sock, bool * closed) throw (Exception);
 	void Socket_close(Socket & sock) throw (Exception);

@@ -14,7 +14,7 @@ namespace fs
 file::file()
 {
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "file default constructor";
+	logger::LOGGER() << "file default constructor";
 #endif
 	m_length = 0;
 	m_should_exists = false;
@@ -29,7 +29,7 @@ file::file()
 file::file(const char * fn, uint64_t length, bool should_exists, const FileAssociation::ptr & assoc) throw (Exception)
 {
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "file constructor fn=" << fn
+	logger::LOGGER() << "file constructor fn=" << fn
 			  << " length=" << length;
 #endif
 	if (fn == NULL)
@@ -45,12 +45,12 @@ file::file(const char * fn, uint64_t length, bool should_exists, const FileAssoc
 file::~file()
 {
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "file destructor fn=" << m_fn.c_str()
+	logger::LOGGER() << "file destructor fn=" << m_fn.c_str()
 			  << " " << this;
 #endif
 	_close();
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "file destructed";
+	logger::LOGGER() << "file destructed";
 #endif
 }
 
@@ -62,7 +62,7 @@ file::~file()
 void file::_open() throw(Exception, SyscallException)
 {
 #ifdef FS_DEBUG
-	LOG(INFO) << "Opening file " << m_fn.c_str();
+	logger::LOGGER() << "Opening file " << m_fn.c_str();
 #endif
 	bool not_exists = false;
 	struct stat st;
@@ -72,7 +72,7 @@ void file::_open() throw(Exception, SyscallException)
 	if (not_exists && m_should_exists)
 	{
 			#ifdef FS_DEBUG
-				LOG(INFO) << "Fail: file " << m_fn.c_str() <<" does not exists";
+				logger::LOGGER() << "Fail: file " << m_fn.c_str() <<" does not exists";
 			#endif
 		throw Exception(Exception::ERR_CODE_FILE_NOT_EXISTS);
 	}
@@ -82,7 +82,7 @@ void file::_open() throw(Exception, SyscallException)
 		if (m_fd == -1)
 		{
 			#ifdef FS_DEBUG
-				LOG(INFO) << "Fail: " << sys_errlist[errno];
+				logger::LOGGER() << "Fail: " << sys_errlist[errno];
 			#endif
 			throw SyscallException();
 		}
@@ -95,21 +95,21 @@ void file::_open() throw(Exception, SyscallException)
 		if (m_fd == -1)
 		{
 			#ifdef FS_DEBUG
-				LOG(INFO) << "Fail: " << sys_errlist[errno];
+				logger::LOGGER() << "Fail: " << sys_errlist[errno];
 			#endif
 			throw SyscallException();
 		}
-		//LOG(INFO) << "truncating";
+		//logger::LOGGER() << "truncating";
 		if (ftruncate64(m_fd, m_length) == -1)
 		{
 			#ifdef FS_DEBUG
-				LOG(INFO) << "Fail: " << sys_errlist[errno];
+				logger::LOGGER() << "Fail: " << sys_errlist[errno];
 			#endif
 			throw SyscallException();
 		}
 	}
 	#ifdef FS_DEBUG
-		LOG(INFO) << "OK";
+		logger::LOGGER() << "OK";
 	#endif
 }
 
@@ -121,7 +121,7 @@ void file::_open() throw(Exception, SyscallException)
 size_t file::_write(const char * buf, uint64_t offset, uint64_t length) throw(Exception, SyscallException)
 {
 	#ifdef FS_DEBUG
-		LOG(INFO) << "Writing to file " <<  m_fn.c_str()
+		logger::LOGGER() << "Writing to file " <<  m_fn.c_str()
 				  << " offset=" << offset
 				  << " length=" << length;
 	#endif
@@ -129,7 +129,7 @@ size_t file::_write(const char * buf, uint64_t offset, uint64_t length) throw(Ex
 	if (!is_opened())
 	{
 		#ifdef FS_DEBUG
-			LOG(INFO) << "Fail: File is not opened";
+			logger::LOGGER() << "Fail: File is not opened";
 		#endif
 		throw Exception(Exception::ERR_CODE_FILE_NOT_OPENED);
 	}
@@ -137,7 +137,7 @@ size_t file::_write(const char * buf, uint64_t offset, uint64_t length) throw(Ex
 	if (ret == -1)
 	{
 		#ifdef FS_DEBUG
-		LOG(INFO) << "Fail: " << sys_errlist[errno];
+		logger::LOGGER() << "Fail: " << sys_errlist[errno];
 		#endif
 		throw SyscallException();
 	}
@@ -145,12 +145,12 @@ size_t file::_write(const char * buf, uint64_t offset, uint64_t length) throw(Ex
 	if (ret == -1)
 	{
 		#ifdef FS_DEBUG
-		LOG(INFO) << "Fail: " << sys_errlist[errno];
+		logger::LOGGER() << "Fail: " << sys_errlist[errno];
 		#endif
 		throw SyscallException();
 	}
 	#ifdef FS_DEBUG
-		LOG(INFO) << "OK";
+		logger::LOGGER() << "OK";
 	#endif
 	return ret;
 }
@@ -180,7 +180,7 @@ size_t file::_read(char * buf, uint64_t offset, uint64_t length) throw(Exception
 void file::_close()
 {
 	close(m_fd);
-	LOG(INFO) << "file closed "<< m_fn.c_str();
+	logger::LOGGER() << "file closed "<< m_fn.c_str();
 	m_fd = -1;
 }
 

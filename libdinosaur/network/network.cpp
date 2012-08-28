@@ -25,7 +25,7 @@ double get_time()
 NetworkManager::NetworkManager()
 {
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "NetworkManager default constructor";
+	logger::LOGGER() << "NetworkManager default constructor";
 #endif
 	m_thread = 0;
 	m_thread_stop = false;
@@ -59,7 +59,7 @@ void NetworkManager::Init() throw (SyscallException)
 NetworkManager::~NetworkManager()
 {
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "NetworkManager destructor";
+	logger::LOGGER() << "NetworkManager destructor";
 #endif
 	if (m_thread != 0)
 	{
@@ -83,7 +83,7 @@ NetworkManager::~NetworkManager()
 	m_timeout_sockets.clear();
 	m_unresolved_sockets.clear();
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "NetworkManager destroyed";
+	logger::LOGGER() << "NetworkManager destroyed";
 #endif
 }
 
@@ -128,7 +128,7 @@ void NetworkManager::Socket_add(const char * ip, uint16_t port, const SocketAsso
 void NetworkManager::Socket_add_domain(const char *domain_name, uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception)
 {
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "Adding socket " << domain_name;
+	logger::LOGGER() << "Adding socket " << domain_name;
 #endif
 	sock.reset(new socket_());
 	if (sock == NULL)
@@ -148,7 +148,7 @@ void NetworkManager::Socket_add_domain(const char *domain_name, uint16_t port, c
 	m_sockets.insert(sock);
 	pthread_mutex_unlock(&m_mutex_sockets);
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "Socket is added " << domain_name;
+	logger::LOGGER() << "Socket is added " << domain_name;
 #endif
 }
 
@@ -170,7 +170,7 @@ void NetworkManager::Socket_add_domain(std::string & domain_name, uint16_t port,
 void NetworkManager::Socket_add(struct sockaddr_in * addr, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException)
 {
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "Adding socket " <<  inet_ntoa(addr->sin_addr);
+	logger::LOGGER() << "Adding socket " <<  inet_ntoa(addr->sin_addr);
 #endif
 	sock.reset(new socket_());
 	if (sock == NULL)
@@ -220,7 +220,7 @@ end:
 	m_sockets.insert(sock);
 	pthread_mutex_unlock(&m_mutex_sockets);
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "Socket is added " <<  sock->m_socket << " " << inet_ntoa(sock->m_peer.sin_addr);
+	logger::LOGGER() << "Socket is added " <<  sock->m_socket << " " << inet_ntoa(sock->m_peer.sin_addr);
 #endif
 }
 
@@ -262,6 +262,47 @@ void NetworkManager::Socket_add(int sock_fd, struct sockaddr_in * addr, const So
 	pthread_mutex_lock(&m_mutex_sockets);
 	m_sockets.insert(sock);
 	pthread_mutex_unlock(&m_mutex_sockets);
+}
+
+void NetworkManager::Socket_add_UDP(const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException)
+{
+#ifdef BITTORRENT_DEBUG
+	logger::LOGGER() << "Adding UDP socket ";
+#endif
+	sock.reset(new socket_());
+	if (sock == NULL)
+		throw Exception(Exception::ERR_CODE_UNDEF);
+	struct epoll_event event;
+	sock->m_closed = false;
+	sock->m_assoc = assoc;
+	sock->m_connected = false;
+	sock->m_udp = true;
+	memset(&sock->m_send_buffer,0,sizeof(struct buffer));
+	memset(&sock->m_recv_buffer,0,sizeof(struct buffer));
+	if ((sock->m_socket = socket (AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0)) == -1)
+	{
+		sock.reset();
+		throw SyscallException();
+	}
+	event.data.ptr=(void*)sock.get();
+	event.events = EPOLLIN;
+	sock->m_epoll_events = event.events;
+	if (epoll_ctl(m_epoll_fd, EPOLL_CTL_ADD, sock->m_socket, &event) == -1)
+	{
+		int err = errno;
+		close(sock->m_socket);
+		sock.reset();
+		throw SyscallException(err);
+	}
+	memset((void *)&sock->m_peer, 0, sizeof(struct sockaddr_in));
+	sock->m_state = STATE_TRANSMISSION;
+	sock->m_timer = time(NULL);
+	pthread_mutex_lock(&m_mutex_sockets);
+	m_sockets.insert(sock);
+	pthread_mutex_unlock(&m_mutex_sockets);
+#ifdef BITTORRENT_DEBUG
+	logger::LOGGER() << "UDP Socket is added " <<  sock->m_socket;
+#endif
 }
 
 /*
@@ -424,7 +465,12 @@ int NetworkManager::clock()  throw (SyscallException)
 
 		try
 		{
-			handle_event(sock.get(), events[i].events);
+			if (!sock->m_udp)
+				handle_event(sock.get(), events[i].events);
+			else if ((events[i].events & EPOLLIN) != 0)
+			{
+				m_ready2read_sockets.insert(sock);
+			}
 		}
 		catch(SyscallException & e)
 		{
@@ -537,12 +583,15 @@ void NetworkManager::notify()
  * Exception::ERR_CODE_NULL_REF
  * Exception::ERR_CODE_SOCKET_CLOSED
  * Exception::ERR_CODE_SOCKET_CAN_NOT_SEND
+ * Exception::ERR_CODE_INVALID_OPERATION
  */
 
 size_t NetworkManager::Socket_send(Socket & sock, const void * data, size_t len, bool full)  throw (Exception)
 {
 	if (sock == NULL  || data == NULL)
 		throw Exception(Exception::ERR_CODE_NULL_REF);
+	if (sock->m_udp)
+		throw Exception(Exception::ERR_CODE_INVALID_OPERATION);
 	if (sock->m_closed)
 	{
 		m_closed_sockets.insert(sock);
@@ -562,15 +611,49 @@ size_t NetworkManager::Socket_send(Socket & sock, const void * data, size_t len,
 
 /*
  * Exception::ERR_CODE_NULL_REF
+ * Exception::ERR_CODE_SOCKET_CLOSED
+ * Exception::ERR_CODE_INVALID_OPERATION
+ * SyscallException
  */
 
-size_t NetworkManager::Socket_recv(Socket & sock, void * data, size_t len) throw (Exception)
+size_t NetworkManager::Socket_send(Socket & sock, const void * data, size_t len, const sockaddr_in & addr) throw (SyscallException, Exception)
+{
+	if (sock == NULL  || data == NULL)
+		throw Exception(Exception::ERR_CODE_NULL_REF);
+	if (!sock->m_udp)
+		throw Exception(Exception::ERR_CODE_INVALID_OPERATION);
+	if (sock->m_closed)
+	{
+		m_closed_sockets.insert(sock);
+		throw Exception(Exception::ERR_CODE_SOCKET_CLOSED);
+	}
+	if (len == 0)
+		return 0;
+	int ret = sendto(sock->m_socket, data, len, 0, (const sockaddr*)&addr, sizeof(sockaddr_in));
+	if (ret != 0)
+		throw SyscallException(ret);
+	return ret;
+}
+
+/*
+ * Exception::ERR_CODE_NULL_REF
+ * SyscallException
+ */
+
+size_t NetworkManager::Socket_recv(Socket & sock, void * data, size_t len, sockaddr_in * from) throw (SyscallException, Exception)
 {
 	if (sock == NULL || data == NULL)
 		throw Exception(Exception::ERR_CODE_NULL_REF);
-
 	if (len == 0)
 		return 0;
+	if (sock->m_udp)
+	{
+		socklen_t s;
+		int ret = recvfrom(sock->m_socket, data, len, 0, (sockaddr*)from, &s);
+		if (ret != 0)
+			throw SyscallException(ret);
+		return ret;
+	}
 	size_t l = sock->m_recv_buffer.length - sock->m_recv_buffer.pos;
 	if (l > len)
 		l = len;
@@ -988,7 +1071,7 @@ void * NetworkManager::timeout_thread(void * arg)
 	std::list<Socket> sock2resolve;
 	while(!nm->m_thread_stop)
 	{
-		//LOG(INFO) << "timeout_thread loop";
+		//logger::LOGGER() << "timeout_thread loop";
 		pthread_mutex_lock(&nm->m_mutex_sockets);
 		for(socket_set_iter iter = nm->m_sockets.begin(); iter != nm->m_sockets.end(); ++iter)
 		{
@@ -1038,7 +1121,7 @@ void * NetworkManager::timeout_thread(void * arg)
 			catch (...)
 			{
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "DomainNameResolver is can not resolve "<< sock->m_domain.c_str();
+	logger::LOGGER() << "DomainNameResolver is can not resolve "<< sock->m_domain.c_str();
 #endif
 				pthread_mutex_lock(&nm->m_mutex_sockets);
 				if (!sock->m_need2delete)

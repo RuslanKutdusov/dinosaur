@@ -13,7 +13,7 @@ namespace torrent
 TorrentFile::TorrentFile(const TorrentInterfaceInternalPtr & t)
 {
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "TorrentFile default constructor";
+	logger::LOGGER() << "TorrentFile default constructor";
 #endif
 	m_torrent = t;
 	m_fm = t->get_fm();
@@ -81,10 +81,10 @@ void TorrentFile::init(const std::string & path, bool files_should_exists, uint3
 TorrentFile::~TorrentFile()
 {
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "TorrentFile destructor";
+	logger::LOGGER() << "TorrentFile destructor";
 #endif
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "TorrentFile destroyed";
+	logger::LOGGER() << "TorrentFile destroyed";
 #endif
 }
 
@@ -236,7 +236,7 @@ int TorrentFile::read_block(PIECE_INDEX piece, BLOCK_INDEX block_index, char * b
 
 int TorrentFile::read_piece(PIECE_INDEX piece_index, unsigned char * dst)
 {
-	//LOG(INFO) << "read piece %u\n", piece_index);
+	//logger::LOGGER() << "read piece %u\n", piece_index);
 	FILE_OFFSET offset;
 	FILE_INDEX file_index;
 	uint32_t piece_length;

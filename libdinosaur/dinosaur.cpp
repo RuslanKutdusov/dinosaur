@@ -29,6 +29,10 @@ Dinosaur::Dinosaur()
 		m_directory.append("/");
 	m_directory.append(".dinosaur/");
 	mkdir(m_directory.c_str(), S_IRWXU);
+	std::string log_dir = m_directory;
+	log_dir += "logs/";
+	mkdir(log_dir.c_str(), S_IRWXU);
+	logger::InitLogger(log_dir);
 
 	//инициализация всего и вся
 	Config = cfg::Glob_cfg(m_directory);
@@ -88,7 +92,7 @@ void Dinosaur::init_listen_socket()
 Dinosaur::~Dinosaur() {
 	// TODO Auto-generated destructor stub
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "Dinosaur destructor";
+	logger::LOGGER() << "Dinosaur destructor";
 #endif
 	pthread_mutex_lock(&m_mutex);
 	m_serializable.clear();
@@ -153,7 +157,7 @@ Dinosaur::~Dinosaur() {
 	}
 	m_torrents.clear();
 #ifdef BITTORRENT_DEBUG
-	LOG(INFO) << "Dinosaur destroyed";
+	logger::LOGGER() << "Dinosaur destroyed";
 #endif
 }
 
@@ -175,15 +179,30 @@ void Dinosaur::load_our_torrents()
 
 	}
 	ifs.close();
+	pthread_mutex_lock(&m_mutex);
 	for(std::list<torrent_info>::iterator iter = m_serializable.begin(); iter != m_serializable.end(); ++iter)
 	{
 		std::string hash;
 		std::string name;
 		try
 		{
-			torrent::Metafile meta(iter->metafile_path);
-			name = meta.name;
-			init_torrent(meta, Config.get_download_directory(), hash);
+			name = iter->metafile_path;
+			torrent::Metafile metafile(iter->metafile_path);
+			name = metafile.name;
+			hash = metafile.info_hash_hex;
+			torrent::TorrentInterfaceBasePtr torrent;
+
+			if (m_torrents.count(hash) !=0)
+				throw Exception(Exception::ERR_CODE_TORRENT_EXISTS);
+
+			torrent::TorrentInterfaceBase::CreateTorrent(&m_nm, &Config, &m_fm, &m_bc, metafile, m_directory, Config.get_download_directory(), torrent);
+
+			m_torrents[hash].ptr = torrent;
+			m_torrents[hash].paused_by_user = iter->paused_by_user;
+			if (iter->in_queue)
+				m_torrent_queue.in_queue.push_back(hash);
+			else
+				m_torrent_queue.active.push_back(hash);
 		}
 		catch (Exception & e) {
 			torrent_failure tf;
@@ -194,14 +213,18 @@ void Dinosaur::load_our_torrents()
 			m_fails_torrents.push_back(tf);
 			continue;
 		}
-		pthread_mutex_lock(&m_mutex);
-		m_torrents[hash].paused_by_user = iter->paused_by_user;
-		if (iter->in_queue)
-			m_torrent_queue.in_queue.push_back(hash);
-		else
-			m_torrent_queue.active.push_back(hash);
-		pthread_mutex_unlock(&m_mutex);
+		catch(SyscallException &e)
+		{
+			torrent_failure tf;
+			tf.exception_errcode = Exception::NO_ERROR;
+			tf.errno_ = e.get_errno();
+			tf.where = TORRENT_FAILURE_INIT_TORRENT;
+			tf.description = name + " " + hash;
+			m_fails_torrents.push_back(tf);
+			continue;
+		}
 	}
+	pthread_mutex_unlock(&m_mutex);
 }
 
 void Dinosaur::bin2hex(unsigned char * bin, char * hex, int len)
@@ -255,12 +278,26 @@ void Dinosaur::init_torrent(const torrent::Metafile & metafile, const std::strin
 
 void Dinosaur::AddTorrent(torrent::Metafile & metafile, const std::string & download_directory, std::string & hash)
 {
-	init_torrent(metafile, download_directory, hash);
+	hash = metafile.info_hash_hex;
+	if (m_torrents.count(hash) !=0)
+		throw Exception(Exception::ERR_CODE_TORRENT_EXISTS);
 	pthread_mutex_lock(&m_mutex);
-	m_torrent_queue.in_queue.push_back(hash);
+	try
+	{
+		torrent::TorrentInterfaceBasePtr torrent;
+		torrent::TorrentInterfaceBase::CreateTorrent(&m_nm, &Config, &m_fm, &m_bc, metafile, m_directory, download_directory, torrent);
+		m_torrents[hash].ptr = torrent;
+		m_torrents[hash].paused_by_user = false;
+		m_torrent_queue.in_queue.push_back(hash);
+		std::string fname =  m_directory + metafile.info_hash_hex + ".torrent";
+		metafile.save2file(fname);
+	}
+	catch(Exception & e)
+	{
+		pthread_mutex_unlock(&m_mutex);
+		throw Exception(e);
+	}
 	pthread_mutex_unlock(&m_mutex);
-	std::string fname =  m_directory + metafile.info_hash_hex + ".torrent";
-	metafile.save2file(fname);
 }
 
 /*
@@ -338,10 +375,10 @@ void Dinosaur::DeleteTorrent(const std::string & hash, bool with_data)
 		throw Exception(Exception::ERR_CODE_TORRENT_NOT_EXISTS);
 	pthread_mutex_lock(&m_mutex);
 	torrent::TorrentInterfaceBasePtr torrent = m_torrents[hash].ptr;
-	torrent->erase_state();
 	torrent->prepare2release();
+	torrent->erase_state();
 
-	std::string current_fname = hash + ".torrent";
+	std::string current_fname = m_directory + hash + ".torrent";
 	remove(current_fname.c_str());
 
 	pthread_mutex_unlock(&m_mutex);
@@ -569,7 +606,7 @@ int Dinosaur::event_sock_ready2read(network::Socket sock)
 		if (handshake[0] != '\x13')
 		{
 			#ifdef BITTORRENT_DEBUG
-				LOG(INFO) << "Leecher " << ip << " sended not handshake";
+				logger::LOGGER() << "Leecher " << ip << " sended not handshake";
 			#endif
 			m_nm.Socket_delete(sock);
 			return ERR_INTERNAL;
@@ -577,7 +614,7 @@ int Dinosaur::event_sock_ready2read(network::Socket sock)
 		if (memcmp(&handshake[1], "BitTorrent protocol", 19) != 0)
 		{
 			#ifdef BITTORRENT_DEBUG
-				LOG(INFO) << "Leecher " << ip << " works with unsupported Bittorrent protocol";
+				logger::LOGGER() << "Leecher " << ip << " works with unsupported Bittorrent protocol";
 			#endif
 			m_nm.Socket_delete(sock);
 			return ERR_INTERNAL;
@@ -591,7 +628,7 @@ int Dinosaur::event_sock_ready2read(network::Socket sock)
 		if (iter == m_torrents.end() && m_torrents.count(str_infohash) == 0)
 		{
 			#ifdef BITTORRENT_DEBUG
-				LOG(INFO) << "Leecher " << ip << " wants to work with missed torrent";
+				logger::LOGGER() << "Leecher " << ip << " wants to work with missed torrent";
 			#endif
 			m_nm.Socket_delete(sock);
 			return ERR_INTERNAL;
@@ -601,7 +638,7 @@ int Dinosaur::event_sock_ready2read(network::Socket sock)
 	}
 	catch (Exception & e) {
 			#ifdef BITTORRENT_DEBUG
-				LOG(INFO) << "Leecher " << ip << " rejected";
+				logger::LOGGER() << "Leecher " << ip << " rejected";
 			#endif
 		m_nm.Socket_delete(sock);
 		return ERR_INTERNAL;
@@ -630,7 +667,7 @@ int Dinosaur::event_sock_accepted(network::Socket sock, network::Socket accepted
 #ifdef BITTORRENT_DEBUG
 	sockaddr_in addr;
 	m_nm.Socket_get_addr(sock, &addr);
-	LOG(INFO) << "Leecher connected " << inet_ntoa(addr.sin_addr);
+	logger::LOGGER() << "Leecher connected " << inet_ntoa(addr.sin_addr);
 #endif
 	m_nm.Socket_set_assoc(accepted_sock, shared_from_this());
 	return 0;
@@ -659,7 +696,7 @@ void * Dinosaur::thread(void * arg)
 		catch(SyscallException & e)
 		{
 #ifdef BITTORRENT_DEBUG
-			LOG(INFO) << "NetworkManager::clock throws exception: " << e.get_errno_str();
+			logger::LOGGER() << "NetworkManager::clock throws exception: " << e.get_errno_str();
 #endif
 		}
 		pthread_mutex_lock(&bt->m_mutex);
@@ -669,7 +706,7 @@ void * Dinosaur::thread(void * arg)
 		}
 		catch (Exception & e) {
 #ifdef BITTORRENT_DEBUG
-			LOG(INFO) <<  "NetworkManager::notify throws exception: " << exception_errcode2str(e).c_str();
+			logger::LOGGER() <<  "NetworkManager::notify throws exception: " << exception_errcode2str(e).c_str();
 #endif
 		}
 		bt->m_fm.notify();
@@ -688,7 +725,7 @@ void * Dinosaur::thread(void * arg)
 			if (dyn.work == TORRENT_WORK_PAUSED || dyn.work == TORRENT_WORK_FAILURE || dyn.work == TORRENT_WORK_DONE)
 			{
 #ifdef BITTORRENT_DEBUG
-				LOG(INFO) << "Pushing " << *iter << " in to queue\n";
+				logger::LOGGER() << "Pushing " << *iter << " in to queue\n";
 #endif
 				bt->m_torrent_queue.in_queue.push_back(*iter);
 				bt->m_torrent_queue.active.erase(iter);
@@ -722,7 +759,7 @@ void * Dinosaur::thread(void * arg)
 			if (dyn.work == TORRENT_WORK_PAUSED)
 				bt->m_torrents[(*iter)].ptr->continue_();
 #ifdef BITTORRENT_DEBUG
-		LOG(INFO) << "Pushing " << *iter << " in to active\n";
+		logger::LOGGER() << "Pushing " << *iter << " in to active\n";
 #endif
 			bt->m_torrent_queue.active.push_back(*iter);
 			bt->m_torrent_queue.in_queue.erase(iter);

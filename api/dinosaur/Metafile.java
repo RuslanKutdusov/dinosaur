@@ -3,17 +3,17 @@ package dinosaur;
 import dinosaur.info.file_stat;
 
 public class Metafile {
-	public String[] 	announces;
-	public String 		comment;
-	public String 		created_by;
-	public long 		creation_date;
-	public long 		private_;
-	public long 		length;
-	public file_stat[] 	files;
-	public String 		name;
-	public long 		piece_length;
-	public long			piece_count;
-	public String 		infohash;
+	public String[] 	announces; //список аннонсов(трекеров)
+	public String 		comment;//комментарий к раздаче
+	public String 		created_by;//создан в ...
+	public long 		creation_date;//дата создания
+	public long 		private_;//приватный ии нет
+	public long 		length;//размер
+	public file_stat[] 	files;//список файлов
+	public String 		name;//назвние раздачи
+	public long 		piece_length;//рзмер куска
+	public long			piece_count;//кол-во кусков
+	public String 		infohash;//хэш
 	public Metafile() {
 		// TODO Auto-generated constructor stub
 	}
