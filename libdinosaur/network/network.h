@@ -189,7 +189,7 @@ public:
 	void Socket_add(int sock_fd, struct sockaddr_in * addr, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException);
 	void Socket_add_domain(const char *domain_name, uint16_t port, const SocketAssociation::ptr & assoc, Socket & socket) throw (Exception);
 	void Socket_add_domain(std::string & domain_name, uint16_t port, const SocketAssociation::ptr & assoc, Socket & socket) throw (Exception);
-	void Socket_add_UDP(const SocketAssociation::ptr & assoc, Socket & socket) throw (Exception, SyscallException);
+	void Socket_add_UDP(const SocketAssociation::ptr & assoc, Socket & socket, const sockaddr_in * bind_ = NULL) throw (Exception, SyscallException);
 	void ListenSocket_add(sockaddr_in * addr, const SocketAssociation::ptr & assoc, Socket & sock)  throw (Exception, SyscallException);
 	void ListenSocket_add(uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock)  throw (Exception, SyscallException);
 	void ListenSocket_add(uint16_t port, in_addr * addr, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException);

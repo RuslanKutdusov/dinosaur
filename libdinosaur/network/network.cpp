@@ -264,7 +264,7 @@ void NetworkManager::Socket_add(int sock_fd, struct sockaddr_in * addr, const So
 	pthread_mutex_unlock(&m_mutex_sockets);
 }
 
-void NetworkManager::Socket_add_UDP(const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException)
+void NetworkManager::Socket_add_UDP(const SocketAssociation::ptr & assoc, Socket & sock, const sockaddr_in * bind_) throw (Exception, SyscallException)
 {
 #ifdef BITTORRENT_DEBUG
 	logger::LOGGER() << "Adding UDP socket ";
@@ -284,6 +284,12 @@ void NetworkManager::Socket_add_UDP(const SocketAssociation::ptr & assoc, Socket
 		sock.reset();
 		throw SyscallException();
 	}
+	if (bind_ != NULL)
+		if (bind(sock->m_socket, (const sockaddr *)bind_, sizeof(sockaddr_in)) == -1)
+		{
+			sock.reset();
+			throw SyscallException();
+		}
 	event.data.ptr=(void*)sock.get();
 	event.events = EPOLLIN;
 	sock->m_epoll_events = event.events;
@@ -630,8 +636,8 @@ size_t NetworkManager::Socket_send(Socket & sock, const void * data, size_t len,
 	if (len == 0)
 		return 0;
 	int ret = sendto(sock->m_socket, data, len, 0, (const sockaddr*)&addr, sizeof(sockaddr_in));
-	if (ret != 0)
-		throw SyscallException(ret);
+	if (ret == -1)
+		throw SyscallException(errno);
 	return ret;
 }
 
@@ -648,10 +654,11 @@ size_t NetworkManager::Socket_recv(Socket & sock, void * data, size_t len, socka
 		return 0;
 	if (sock->m_udp)
 	{
-		socklen_t s;
+		socklen_t s = 0;//sizeof(sockaddr_in);
 		int ret = recvfrom(sock->m_socket, data, len, 0, (sockaddr*)from, &s);
-		if (ret != 0)
-			throw SyscallException(ret);
+		m_ready2read_sockets.erase(sock);
+		if (ret == -1)
+			throw SyscallException(errno);
 		return ret;
 	}
 	size_t l = sock->m_recv_buffer.length - sock->m_recv_buffer.pos;
@@ -1082,6 +1089,7 @@ void * NetworkManager::timeout_thread(void * arg)
 				(sock->m_state == STATE_CONNECTION || (sock->m_epoll_events & EPOLLIN) != 0) &&
 				!sock->m_closed)
 			{
+				printf("timeout\n");
 				nm->m_timeout_sockets.insert(sock);
 			}
 			if (sock->m_need2resolved)
