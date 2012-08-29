@@ -1089,7 +1089,6 @@ void * NetworkManager::timeout_thread(void * arg)
 				(sock->m_state == STATE_CONNECTION || (sock->m_epoll_events & EPOLLIN) != 0) &&
 				!sock->m_closed)
 			{
-				printf("timeout\n");
 				nm->m_timeout_sockets.insert(sock);
 			}
 			if (sock->m_need2resolved)
@@ -1138,7 +1137,7 @@ void * NetworkManager::timeout_thread(void * arg)
 			}
 		}
 
-		usleep(500);
+		usleep(5000);
 	}
 	return (void*)ret;
 }
