@@ -32,25 +32,110 @@ void catchCrash(int signum)
 	exit(3);
 }
 
+/*dinosaur::network::NetworkManager nm;
+dinosaur::network::Socket s;
+dinosaur::network::Socket s2;
+
 class A : public dinosaur::network::SocketAssociation
 {
 public:
-	int event_sock_ready2read(dinosaur::network::Socket sock){}
-	int event_sock_closed(dinosaur::network::Socket sock){}
-	int event_sock_sended(dinosaur::network::Socket sock){}
-	int event_sock_connected(dinosaur::network::Socket sock){}
-	int event_sock_accepted(dinosaur::network::Socket sock, dinosaur::network::Socket accepted_sock){}
-	int event_sock_timeout(dinosaur::network::Socket sock){}
-	int event_sock_unresolved(dinosaur::network::Socket sock){}
+	int event_sock_ready2read(dinosaur::network::Socket sock)
+	{
+		printf("ready2read\n");
+		char buf[256];
+		sockaddr_in addr;
+		try
+		{
+			size_t ret = nm.Socket_recv(s2, buf, 256, &addr);
+			printf("Received %d bytes, data=%s\n", ret, buf);
+		}catch (dinosaur::Exception & e) {
+			printf("Exception: %s\n", dinosaur::exception_errcode2str(e).c_str());
+		}
+		catch(dinosaur::SyscallException &e)
+		{
+			printf("syscallException: %s\n", e.get_errno_str());
+		}
+	}
+	int event_sock_closed(dinosaur::network::Socket sock){printf("event_sock_closed\n");}
+	int event_sock_sended(dinosaur::network::Socket sock){printf("event_sock_sended\n");}
+	int event_sock_connected(dinosaur::network::Socket sock){printf("event_sock_connected\n");}
+	int event_sock_accepted(dinosaur::network::Socket sock, dinosaur::network::Socket accepted_sock){printf("event_sock_accepted\n");}
+	int event_sock_timeout(dinosaur::network::Socket sock)
+	{
+		printf("event_sock_timeout\n");
+		nm.Socket_delete(s2);
+	}
+	int event_sock_unresolved(dinosaur::network::Socket sock){printf("event_sock_unresolved\n");}
 };
+
+class B : public dinosaur::network::SocketAssociation
+{
+public:
+	int event_sock_ready2read(dinosaur::network::Socket sock)
+	{
+		printf("ready2read_\n");
+	}
+	int event_sock_closed(dinosaur::network::Socket sock)
+	{
+		printf("event_sock_closed_\n");
+		nm.Socket_delete(s);
+	}
+	int event_sock_sended(dinosaur::network::Socket sock){printf("event_sock_sended_\n");}
+	int event_sock_connected(dinosaur::network::Socket sock){printf("event_sock_connected_\n");}
+	int event_sock_accepted(dinosaur::network::Socket sock, dinosaur::network::Socket accepted_sock){printf("event_sock_accepted_\n");}
+	int event_sock_timeout(dinosaur::network::Socket sock)
+	{
+		printf("event_sock_timeout_\n");
+		nm.Socket_close(s);
+	}
+	int event_sock_unresolved(dinosaur::network::Socket sock){printf("event_sock_unresolved_\n");}
+};*/
 
 int main(int argc,char* argv[])
 {
-	/*dinosaur::network::NetworkManager nm;
-	boost::shared_ptr<A> a(new A());
-	dinosaur::network::Socket s;
+	/*boost::shared_ptr<A> a(new A());
+	boost::shared_ptr<B> b(new B());
 	nm.Init();
-	nm.Socket_add("127.0.0.1", 5555, a, s);
+	nm.Socket_add_UDP(b, s);
+	struct sockaddr_in sockaddr;
+	sockaddr.sin_family = AF_INET;
+	sockaddr.sin_port = htons (6666);
+	inet_pton(AF_INET, "0.0.0.0", &sockaddr.sin_addr);
+	nm.Socket_add_UDP(a, s2, &sockaddr);
+	try
+	{
+		char * buf = "hello udp!\n";
+		struct sockaddr_in sockaddr;
+		sockaddr.sin_family = AF_INET;
+		sockaddr.sin_port = htons (6666);
+		inet_pton(AF_INET, "127.0.0.1", &sockaddr.sin_addr);
+		nm.Socket_send(s, buf, strlen(buf), sockaddr);
+	}
+	catch (dinosaur::Exception & e) {
+		printf("Exception: %s\n", dinosaur::exception_errcode2str(e).c_str());
+	}
+	catch(dinosaur::SyscallException &e)
+	{
+		printf("syscallException: %s\n", e.get_errno_str());
+	}
+	while(1)
+	{
+		try
+		{
+			nm.clock();
+			nm.notify();
+		}
+		catch (dinosaur::SyscallException & e) {
+			printf("syscallException: %s\n", e.get_errno_str());
+		}
+		catch (dinosaur::Exception & e) {
+			printf("Exception: %s\n", dinosaur::exception_errcode2str(e).c_str());
+		}
+
+	}
+	s.reset();
+	s2.reset();
+	/*nm.Socket_add("127.0.0.1", 5555, a, s);
 	int fd = s->get_fd();
 
     int rcvbuf;

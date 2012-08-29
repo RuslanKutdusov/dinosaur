@@ -25,282 +25,282 @@ JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_ReleaseLibrary
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    OpenMetafile
+ * Method:    native_OpenMetafile
  * Signature: (Ljava/lang/String;)Ldinosaur/Metafile;
  */
-JNIEXPORT jobject JNICALL Java_dinosaur_Dinosaur_OpenMetafile
+JNIEXPORT jobject JNICALL Java_dinosaur_Dinosaur_native_1OpenMetafile
   (JNIEnv *, jobject, jstring);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    CloseMetafile
+ * Method:    native_CloseMetafile
  * Signature: ()V
  */
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_CloseMetafile
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1CloseMetafile
   (JNIEnv *, jobject);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    AddTorrent
+ * Method:    native_AddTorrent
  * Signature: (Ljava/lang/String;)Ljava/lang/String;
  */
-JNIEXPORT jstring JNICALL Java_dinosaur_Dinosaur_AddTorrent
+JNIEXPORT jstring JNICALL Java_dinosaur_Dinosaur_native_1AddTorrent
   (JNIEnv *, jobject, jstring);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    PauseTorrent
+ * Method:    native_PauseTorrent
  * Signature: (Ljava/lang/String;)V
  */
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_PauseTorrent
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1PauseTorrent
   (JNIEnv *, jobject, jstring);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    ContinueTorrent
+ * Method:    native_ContinueTorrent
  * Signature: (Ljava/lang/String;)V
  */
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_ContinueTorrent
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1ContinueTorrent
   (JNIEnv *, jobject, jstring);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    CheckTorrent
+ * Method:    native_CheckTorrent
  * Signature: (Ljava/lang/String;)V
  */
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_CheckTorrent
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1CheckTorrent
   (JNIEnv *, jobject, jstring);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    DeleteTorrent
- * Signature: (Ljava/lang/String;)V
+ * Method:    native_DeleteTorrent
+ * Signature: (Ljava/lang/String;Z)V
  */
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_DeleteTorrent
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1DeleteTorrent
   (JNIEnv *, jobject, jstring, jboolean);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    get_torrent_info_stat
+ * Method:    native_get_torrent_info_stat
  * Signature: (Ljava/lang/String;)Ldinosaur/info/torrent_stat;
  */
-JNIEXPORT jobject JNICALL Java_dinosaur_Dinosaur_get_1torrent_1info_1stat
+JNIEXPORT jobject JNICALL Java_dinosaur_Dinosaur_native_1get_1torrent_1info_1stat
   (JNIEnv *, jobject, jstring);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    get_torrent_info_dyn
+ * Method:    native_get_torrent_info_dyn
  * Signature: (Ljava/lang/String;)Ldinosaur/info/torrent_dyn;
  */
-JNIEXPORT jobject JNICALL Java_dinosaur_Dinosaur_get_1torrent_1info_1dyn
+JNIEXPORT jobject JNICALL Java_dinosaur_Dinosaur_native_1get_1torrent_1info_1dyn
   (JNIEnv *, jobject, jstring);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    get_torrent_info_trackers
+ * Method:    native_get_torrent_info_trackers
  * Signature: (Ljava/lang/String;)[Ldinosaur/info/tracker;
  */
-JNIEXPORT jobjectArray JNICALL Java_dinosaur_Dinosaur_get_1torrent_1info_1trackers
+JNIEXPORT jobjectArray JNICALL Java_dinosaur_Dinosaur_native_1get_1torrent_1info_1trackers
   (JNIEnv *, jobject, jstring);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    get_torrent_info_file_stat
+ * Method:    native_get_torrent_info_file_stat
  * Signature: (Ljava/lang/String;J)Ldinosaur/info/file_stat;
  */
-JNIEXPORT jobject JNICALL Java_dinosaur_Dinosaur_get_1torrent_1info_1file_1stat
+JNIEXPORT jobject JNICALL Java_dinosaur_Dinosaur_native_1get_1torrent_1info_1file_1stat
   (JNIEnv *, jobject, jstring, jlong);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    get_torrent_info_file_dyn
+ * Method:    native_get_torrent_info_file_dyn
  * Signature: (Ljava/lang/String;J)Ldinosaur/info/file_dyn;
  */
-JNIEXPORT jobject JNICALL Java_dinosaur_Dinosaur_get_1torrent_1info_1file_1dyn
+JNIEXPORT jobject JNICALL Java_dinosaur_Dinosaur_native_1get_1torrent_1info_1file_1dyn
   (JNIEnv *, jobject, jstring, jlong);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    get_torrent_info_seeders
+ * Method:    native_get_torrent_info_seeders
  * Signature: (Ljava/lang/String;)[Ldinosaur/info/peer;
  */
-JNIEXPORT jobjectArray JNICALL Java_dinosaur_Dinosaur_get_1torrent_1info_1seeders
+JNIEXPORT jobjectArray JNICALL Java_dinosaur_Dinosaur_native_1get_1torrent_1info_1seeders
   (JNIEnv *, jobject, jstring);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    get_torrent_info_leechers
+ * Method:    native_get_torrent_info_leechers
  * Signature: (Ljava/lang/String;)[Ldinosaur/info/peer;
  */
-JNIEXPORT jobjectArray JNICALL Java_dinosaur_Dinosaur_get_1torrent_1info_1leechers
+JNIEXPORT jobjectArray JNICALL Java_dinosaur_Dinosaur_native_1get_1torrent_1info_1leechers
   (JNIEnv *, jobject, jstring);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    get_torrent_info_downloadable_pieces
+ * Method:    native_get_torrent_info_downloadable_pieces
  * Signature: (Ljava/lang/String;)[Ldinosaur/info/downloadable_piece;
  */
-JNIEXPORT jobjectArray JNICALL Java_dinosaur_Dinosaur_get_1torrent_1info_1downloadable_1pieces
+JNIEXPORT jobjectArray JNICALL Java_dinosaur_Dinosaur_native_1get_1torrent_1info_1downloadable_1pieces
   (JNIEnv *, jobject, jstring);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    get_torrent_failure_desc
+ * Method:    native_get_torrent_failure_desc
  * Signature: (Ljava/lang/String;)Ldinosaur/torrent_failure;
  */
-JNIEXPORT jobject JNICALL Java_dinosaur_Dinosaur_get_1torrent_1failure_1desc
+JNIEXPORT jobject JNICALL Java_dinosaur_Dinosaur_native_1get_1torrent_1failure_1desc
   (JNIEnv *, jobject, jstring);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    set_file_priority
+ * Method:    native_set_file_priority
  * Signature: (Ljava/lang/String;JI)V
  */
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1file_1priority
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1set_1file_1priority
   (JNIEnv *, jobject, jstring, jlong, jint);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    get_TorrentList
+ * Method:    native_get_TorrentList
  * Signature: ()[Ljava/lang/String;
  */
-JNIEXPORT jobjectArray JNICALL Java_dinosaur_Dinosaur_get_1TorrentList
+JNIEXPORT jobjectArray JNICALL Java_dinosaur_Dinosaur_native_1get_1TorrentList
   (JNIEnv *, jobject);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    get_active_torrents
+ * Method:    native_get_active_torrents
  * Signature: ()[Ljava/lang/String;
  */
-JNIEXPORT jobjectArray JNICALL Java_dinosaur_Dinosaur_get_1active_1torrents
+JNIEXPORT jobjectArray JNICALL Java_dinosaur_Dinosaur_native_1get_1active_1torrents
   (JNIEnv *, jobject);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    get_torrents_in_queue
+ * Method:    native_get_torrents_in_queue
  * Signature: ()[Ljava/lang/String;
  */
-JNIEXPORT jobjectArray JNICALL Java_dinosaur_Dinosaur_get_1torrents_1in_1queue
+JNIEXPORT jobjectArray JNICALL Java_dinosaur_Dinosaur_native_1get_1torrents_1in_1queue
   (JNIEnv *, jobject);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    get_socket_status
+ * Method:    native_get_socket_status
  * Signature: ()Ldinosaur/socket_status;
  */
-JNIEXPORT jobject JNICALL Java_dinosaur_Dinosaur_get_1socket_1status
+JNIEXPORT jobject JNICALL Java_dinosaur_Dinosaur_native_1get_1socket_1status
   (JNIEnv *, jobject);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    UpdateConfigs
+ * Method:    native_UpdateConfigs
  * Signature: ()V
  */
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_UpdateConfigs
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1UpdateConfigs
   (JNIEnv *, jobject);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    get_configs
+ * Method:    native_get_configs
  * Signature: ()Ldinosaur/Configs;
  */
-JNIEXPORT jobject JNICALL Java_dinosaur_Dinosaur_get_1configs
+JNIEXPORT jobject JNICALL Java_dinosaur_Dinosaur_native_1get_1configs
   (JNIEnv *, jobject);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    set_config_download_directory
+ * Method:    native_set_config_download_directory
  * Signature: (Ljava/lang/String;)V
  */
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1download_1directory
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1set_1config_1download_1directory
   (JNIEnv *, jobject, jstring);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    set_config_port
+ * Method:    native_set_config_port
  * Signature: (J)V
  */
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1port
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1set_1config_1port
   (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    set_config_write_cache_size
+ * Method:    native_set_config_write_cache_size
  * Signature: (J)V
  */
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1write_1cache_1size
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1set_1config_1write_1cache_1size
   (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    set_config_read_cache_size
+ * Method:    native_set_config_read_cache_size
  * Signature: (J)V
  */
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1read_1cache_1size
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1set_1config_1read_1cache_1size
   (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    set_config_tracker_numwant
+ * Method:    native_set_config_tracker_numwant
  * Signature: (J)V
  */
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1tracker_1numwant
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1set_1config_1tracker_1numwant
   (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    set_config_tracker_default_interval
+ * Method:    native_set_config_tracker_default_interval
  * Signature: (J)V
  */
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1tracker_1default_1interval
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1set_1config_1tracker_1default_1interval
   (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    set_config_max_active_seeders
+ * Method:    native_set_config_max_active_seeders
  * Signature: (J)V
  */
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1max_1active_1seeders
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1set_1config_1max_1active_1seeders
   (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    set_config_max_active_leechers
+ * Method:    native_set_config_max_active_leechers
  * Signature: (J)V
  */
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1max_1active_1leechers
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1set_1config_1max_1active_1leechers
   (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    set_config_send_have
+ * Method:    native_set_config_send_have
  * Signature: (Z)V
  */
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1send_1have
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1set_1config_1send_1have
   (JNIEnv *, jobject, jboolean);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    set_config_listen_on
+ * Method:    native_set_config_listen_on
  * Signature: (Ljava/lang/String;)V
  */
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1listen_1on
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1set_1config_1listen_1on
   (JNIEnv *, jobject, jstring);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    set_config_max_active_torrents
+ * Method:    native_set_config_max_active_torrents
  * Signature: (J)V
  */
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1max_1active_1torrents
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1set_1config_1max_1active_1torrents
   (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     dinosaur_Dinosaur
- * Method:    set_config_fin_ratio
+ * Method:    native_set_config_fin_ratio
  * Signature: (F)V
  */
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1fin_1ratio
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1set_1config_1fin_1ratio
   (JNIEnv *, jobject, jfloat);
 
 #ifdef __cplusplus
