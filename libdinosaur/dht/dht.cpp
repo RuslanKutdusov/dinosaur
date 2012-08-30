@@ -25,7 +25,7 @@ dht::dht(network::NetworkManager* nm, const node_id & our_id)
 #ifdef DHT_DEBUG
 	node_id_hex hex;
 	our_id.to_hex(hex);
-	printf("Creating DHT, our node id=%s", hex);
+	printf("Creating DHT, our node id=%s\n", hex);
 #endif
 	m_nm = nm;
 	m_node_id = our_id;
@@ -84,9 +84,6 @@ void dht::send_ping(const sockaddr_in & addr)
 				printf("Sending ping to %s:%d transaction=%u...", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port), transaction_id);
 		#endif
 		m_nm->Socket_send(m_sock, buf, PING_REQUEST_LENGHT, addr);
-		request r;
-		r.type = REQUEST_TYPE_PING;
-		r.transaction_id = transaction_id;
 		m_requests[ip_port(inet_ntoa(addr.sin_addr), addr.sin_port)][transaction_id] = REQUEST_TYPE_PING;
 		#ifdef DHT_DEBUG
 				printf("OK\n");
@@ -125,9 +122,6 @@ void dht::find_node(const sockaddr_in & recipient, const node_id & target)
 			printf("Sending find node to %s:%d transaction=%u searching node id=%s...", inet_ntoa(recipient.sin_addr), ntohs(recipient.sin_port), transaction_id, hex);
 		#endif
 		m_nm->Socket_send(m_sock, buf, FIND_NODE_REQUEST_LENGHT, recipient);
-		request r;
-		r.type = REQUEST_TYPE_FIND_NODE;
-		r.transaction_id = transaction_id;
 		m_requests[ip_port(inet_ntoa(recipient.sin_addr), recipient.sin_port)][transaction_id] = REQUEST_TYPE_FIND_NODE;
 		#ifdef DHT_DEBUG
 			printf("OK\n");
@@ -271,6 +265,53 @@ int dht::event_sock_ready2read(network::Socket sock)
 	if (*y_key->ptr == 'q')
 	{
 
+	}
+
+	if (*y_key->ptr == 'e')
+	{
+		#ifdef DHT_DEBUG
+				printf("	it`s error message for query with transaction id=%u\n", transaction_id);
+		#endif
+
+		request_container::iterator request_container_iter = m_requests.find(ip_port(inet_ntoa(addr.sin_addr), addr.sin_port));
+		if (request_container_iter == m_requests.end())
+		{
+			#ifdef DHT_DEBUG
+				printf("	such query does not exists or invalid transaction id\n");
+			#endif
+			return 0;
+		}
+		std::map<uint16_t, REQUEST_TYPE>::iterator iter = request_container_iter->second.find(transaction_id);
+		if (iter == request_container_iter->second.end())
+		{
+			#ifdef DHT_DEBUG
+				printf("	invalid transaction id\n");
+			#endif
+			return 0;
+		}
+		request_container_iter->second.erase(iter);
+
+
+		bencode::be_node * l;
+		if (bencode::get_node(node, "e", &l) != 0 || !bencode::is_list(l) || l->val.l.count != 2)
+		{
+			#ifdef DHT_DEBUG
+				printf("	reject, invalid format\n");
+			#endif
+			return 0;
+		}
+		uint64_t code;
+		bencode::be_str * desc;
+		if (bencode::get_int(l, 0, &code) != 0 || bencode::get_str(l, 1, &desc) != 0)
+		{
+			#ifdef DHT_DEBUG
+				printf("	reject, invalid format\n");
+			#endif
+			return 0;
+		}
+		#ifdef DHT_DEBUG
+				printf("	%llu, %s\n", code, desc->ptr);
+		#endif
 	}
 
 }
