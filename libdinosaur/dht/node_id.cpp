@@ -106,7 +106,7 @@ const node_id node_id::operator ^(const node_id & id)
 	return distance(*this, id);
 }
 
-bool node_id::operator<(const node_id & id)
+bool node_id::operator<(const node_id & id) const
 {
 	for(size_t i = 0; i < NODE_ID_LENGHT; i++)
 	{
@@ -116,21 +116,37 @@ bool node_id::operator<(const node_id & id)
 	return false;
 }
 
-bool node_id::operator==(const node_id & id)
+bool node_id::operator==(const node_id & id) const
 {
 	return memcmp(m_data, id.m_data, NODE_ID_LENGHT);
 }
 
-bool node_id::operator!=(const node_id & id)
+bool node_id::operator!=(const node_id & id) const
 {
 	return !memcmp(m_data, id.m_data, NODE_ID_LENGHT);
 }
 
-void node_id::print()
+void node_id::copy2(char * dst) const
+{
+	memcpy(dst, m_data, NODE_ID_LENGHT);
+}
+
+void node_id::copy2(unsigned char * dst) const
+{
+	memcpy(dst, m_data, NODE_ID_LENGHT);
+}
+
+void node_id::print()  const
 {
 	for(size_t i = 0; i < NODE_ID_LENGHT; i++)
 		printf("%02X", m_data[i]);
 	printf("\n");
+}
+
+void node_id::to_hex(node_id_hex id) const
+{
+	for(size_t i = 0; i < NODE_ID_LENGHT; i++)
+		sprintf(&id[i * 2], "%02X", m_data[i]);
 }
 
 void node_id::clear()

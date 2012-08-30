@@ -11,6 +11,7 @@
 #include "../consts.h"
 #include "../types.h"
 #include "../network/network.h"
+#include "../utils/bencode.h"
 #include <map>
 #include <set>
 #include <boost/shared_ptr.hpp>
@@ -20,6 +21,14 @@ namespace dinosaur
 namespace dht
 {
 
+#define NODE_ID_HEX_LENGHT (NODE_ID_LENGHT * 2 + 1)
+#define TRANSACTION_ID_LENGHT 2
+#define PING_REQUEST_LENGHT 56
+#define FIND_NODE_REQUEST_LENGHT 92
+#define COMPACT_NODE_INFO_LENGHT 26
+#define DHT_DEBUG
+
+typedef char node_id_hex[NODE_ID_HEX_LENGHT];
 class node_id
 {
 private:
@@ -35,16 +44,20 @@ public:
 	unsigned char & operator[](size_t i);
 	const unsigned char & operator[](size_t i) const;
 	const node_id operator ^(const node_id & id);
-	bool operator<(const node_id & id);
-	bool operator==(const node_id & id);
-	bool operator!=(const node_id & id);
-	void print();
+	bool operator<(const node_id & id) const;
+	bool operator==(const node_id & id) const;
+	bool operator!=(const node_id & id) const;
+	void copy2(char * dst) const;
+	void copy2(unsigned char * dst) const;
+	void print() const;
+	void to_hex(node_id_hex id) const ;
 };
 
 node_id distance(const node_id & id1, const node_id & id2);
 node_id generate_random_node_id();
 void generate_random_node_id(node_id & id);
 size_t get_bucket(const node_id & id1, const node_id & id2);
+void parse_compact_node_info(char * buf, node_id & id, sockaddr_in & addr);
 
 class dht;
 typedef boost::shared_ptr<dht> dhtPtr;
@@ -52,23 +65,35 @@ typedef boost::shared_ptr<dht> dhtPtr;
 class dht : public network::SocketAssociation
 {
 private:
-	enum REQUEST
+	enum REQUEST_TYPE
 	{
-		REQUEST_PING,
-		REQUEST_FIND_NODE,
-		REQUEST_GET_PEERS,
-		REQUEST_ANNOUNCE_PEER
+		REQUEST_TYPE_PING,
+		REQUEST_TYPE_FIND_NODE,
+		REQUEST_TYPE_GET_PEERS,
+		REQUEST_TYPE_ANNOUNCE_PEER
 	};
-	std::map<node_id, std::set<uint16_t> > 	m_requests;
+	struct request
+	{
+		REQUEST_TYPE 	type;
+		uint16_t		transaction_id;
+	};
+	typedef std::pair<std::string, uint16_t> ip_port;
+	typedef std::map<node_id, sockaddr_in>	node_container;
+	typedef std::map<ip_port, std::map<uint16_t, REQUEST_TYPE> > request_container;
+	request_container						m_requests;
 	node_id									m_node_id;
 	network::NetworkManager*				m_nm;
 	network::Socket							m_sock;
 	socket_status							m_sock_status;
+	node_container							m_nodes;
 	dht(){}
 	dht(const dht & dht){}
 	dht & operator=(const dht & dht){ return *this;}
 	dht(network::NetworkManager* nm, const node_id & our_id);
 public:
+	void send_ping(const sockaddr_in & addr);
+	void find_node(const node_id & recipient, const node_id & target);
+	void find_node(const sockaddr_in & recipient, const node_id & target);
 	static void CreateDHT(const in_addr & listen_on, uint16_t port, network::NetworkManager* nm, dhtPtr & ptr, const node_id & our_id = generate_random_node_id())
 	{
 		if (nm == NULL)
