@@ -9,6 +9,42 @@
 
 namespace dinosaur {
 
+void catchCrash(int signum)
+{
+	void *callstack[128];
+	std::string fname;
+	FILE * f;
+    int frames = backtrace(callstack, 128);
+    char **strs=backtrace_symbols(callstack, frames);
+
+    passwd *pw = getpwuid(getuid());
+	if (pw == NULL)
+		goto end;
+	fname = pw->pw_dir;
+	if (fname.length() <= 0)
+		goto end;
+	if (fname[fname.length() - 1] != '/')
+		fname.append("/");
+
+    fname += "libdinosaur_crash_report_";
+    fname += boost::posix_time::to_simple_string(boost::posix_time::microsec_clock::local_time());
+    fname += ".txt";
+    f = fopen(fname.c_str(), "w");
+    if (f)
+    {
+        for(int i = 0; i < frames; ++i)
+        {
+            fprintf(f, "%s\n", strs[i]);
+        }
+        fclose(f);
+    }
+
+end:
+    free(strs);
+    signal(signum, SIG_DFL);
+	exit(3);
+}
+
 /*
  * Exception::ERR_CODE_CAN_NOT_CREATE_THREAD
  * SyscallException
@@ -17,6 +53,10 @@ namespace dinosaur {
 Dinosaur::Dinosaur()
  {
 	m_thread = 0;
+
+	signal(SIGSEGV, catchCrash);
+	signal(SIGABRT, catchCrash);
+
 	//создаем рабочую папку в пользовательской папке
 	errno = 0;
 	passwd *pw = getpwuid(getuid());

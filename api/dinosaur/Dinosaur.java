@@ -52,7 +52,7 @@ public class Dinosaur {
 	/*
 	 * вернет истину если удалось загрузить либу, иначе - ложь
 	 */
-	boolean Initialized()
+	public boolean Initialized()
 	{
 		return initialized;
 	}

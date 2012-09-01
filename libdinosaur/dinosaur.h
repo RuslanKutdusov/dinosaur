@@ -30,6 +30,8 @@
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/serialization/list.hpp>
+#include <execinfo.h>
+#include <boost/date_time/posix_time/posix_time.hpp>
 
 namespace dinosaur {
 

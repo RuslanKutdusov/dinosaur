@@ -22,7 +22,7 @@ void ThrowException(JNIEnv * env, dinosaur::Exception & e)
 
 void ThrowSyscallException(JNIEnv * env, dinosaur::SyscallException & e)
 {
-	jclass clazz = env->FindClass("dinosaur/DinosaurException");
+	jclass clazz = env->FindClass("dinosaur/DinosaurSyscallException");
 	jmethodID ID = env->GetMethodID(clazz, "<init>", "(I)V");
 	env->Throw((jthrowable)env->NewObject(clazz, ID, e.get_errno()));
 }

@@ -264,6 +264,11 @@ void NetworkManager::Socket_add(int sock_fd, struct sockaddr_in * addr, const So
 	pthread_mutex_unlock(&m_mutex_sockets);
 }
 
+/*
+ * Exception::ERR_CODE_UNDEF
+ * SyscallException
+ */
+
 void NetworkManager::Socket_add_UDP(const SocketAssociation::ptr & assoc, Socket & sock, const sockaddr_in * bind_) throw (Exception, SyscallException)
 {
 #ifdef BITTORRENT_DEBUG
