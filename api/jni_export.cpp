@@ -14,7 +14,6 @@
 dinosaur::DinosaurPtr dino;
 dinosaur::torrent::MetafilePtr meta;
 
-
 jobjectArray Java_dinosaur_Dinosaur_InitLibrary
   (JNIEnv * env, jobject jobj)
 {
