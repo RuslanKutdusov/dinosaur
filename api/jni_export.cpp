@@ -14,7 +14,6 @@
 dinosaur::DinosaurPtr dino;
 dinosaur::torrent::MetafilePtr meta;
 
-
 jobjectArray Java_dinosaur_Dinosaur_InitLibrary
   (JNIEnv * env, jobject jobj)
 {
@@ -44,7 +43,7 @@ void Java_dinosaur_Dinosaur_ReleaseLibrary
 		dinosaur::Dinosaur::DeleteDinosaur(dino);
 }
 
-jobject Java_dinosaur_Dinosaur_OpenMetafile
+jobject Java_dinosaur_Dinosaur_native_1OpenMetafile
   (JNIEnv * env, jobject jobj, jstring jmetafile_path)
 {
 	if (dino == NULL)
@@ -76,7 +75,7 @@ jobject Java_dinosaur_Dinosaur_OpenMetafile
 	return NULL;
 }
 
-void Java_dinosaur_Dinosaur_CloseMetafile
+void Java_dinosaur_Dinosaur_native_1CloseMetafile
 (JNIEnv * env, jobject jobj)
 {
 	if (dino == NULL)
@@ -88,7 +87,7 @@ void Java_dinosaur_Dinosaur_CloseMetafile
 	meta.reset();
 }
 
-jstring Java_dinosaur_Dinosaur_AddTorrent
+jstring Java_dinosaur_Dinosaur_native_1AddTorrent
   (JNIEnv * env, jobject jobj, jstring jsave_directory)
 {
 	if (dino == NULL || meta == NULL)
@@ -116,7 +115,7 @@ jstring Java_dinosaur_Dinosaur_AddTorrent
 	return env->NewStringUTF(hash.c_str());
 }
 
-void Java_dinosaur_Dinosaur_PauseTorrent
+void Java_dinosaur_Dinosaur_native_1PauseTorrent
 	(JNIEnv * env, jobject jobj, jstring jhash)
 {
 	if (dino == NULL)
@@ -138,7 +137,7 @@ void Java_dinosaur_Dinosaur_PauseTorrent
 	}
 }
 
-void Java_dinosaur_Dinosaur_ContinueTorrent
+void Java_dinosaur_Dinosaur_native_1ContinueTorrent
 	(JNIEnv * env, jobject jobj, jstring jhash)
 {
 	if (dino == NULL)
@@ -160,7 +159,7 @@ void Java_dinosaur_Dinosaur_ContinueTorrent
 	}
 }
 
-void Java_dinosaur_Dinosaur_CheckTorrent
+void Java_dinosaur_Dinosaur_native_1CheckTorrent
 	(JNIEnv * env, jobject jobj, jstring jhash)
 {
 	if (dino == NULL )
@@ -182,7 +181,7 @@ void Java_dinosaur_Dinosaur_CheckTorrent
 	}
 }
 
-void Java_dinosaur_Dinosaur_DeleteTorrent
+void Java_dinosaur_Dinosaur_native_1DeleteTorrent
 	(JNIEnv * env, jobject jobj, jstring jhash, jboolean with_data)
 {
 	if (dino == NULL)
@@ -204,7 +203,7 @@ void Java_dinosaur_Dinosaur_DeleteTorrent
 	}
 }
 
-jobject Java_dinosaur_Dinosaur_get_1torrent_1info_1stat
+jobject Java_dinosaur_Dinosaur_native_1get_1torrent_1info_1stat
   (JNIEnv * env, jobject jobj, jstring jhash)
 {
 	if (dino == NULL)
@@ -229,7 +228,7 @@ jobject Java_dinosaur_Dinosaur_get_1torrent_1info_1stat
 	return NULL;
 }
 
-jobject Java_dinosaur_Dinosaur_get_1torrent_1info_1dyn
+jobject Java_dinosaur_Dinosaur_native_1get_1torrent_1info_1dyn
 (JNIEnv * env, jobject jobj, jstring jhash)
 {
 	if (dino == NULL)
@@ -254,7 +253,7 @@ jobject Java_dinosaur_Dinosaur_get_1torrent_1info_1dyn
 	return NULL;
 }
 
-jobjectArray Java_dinosaur_Dinosaur_get_1torrent_1info_1trackers
+jobjectArray Java_dinosaur_Dinosaur_native_1get_1torrent_1info_1trackers
 (JNIEnv * env, jobject jobj, jstring jhash)
 {
 	if (dino == NULL)
@@ -279,7 +278,7 @@ jobjectArray Java_dinosaur_Dinosaur_get_1torrent_1info_1trackers
 	return NULL;
 }
 
-jobject Java_dinosaur_Dinosaur_get_1torrent_1info_1file_1stat
+jobject Java_dinosaur_Dinosaur_native_1get_1torrent_1info_1file_1stat
 (JNIEnv * env, jobject jobj, jstring jhash, jlong jindex)
 {
 	if (dino == NULL)
@@ -304,7 +303,7 @@ jobject Java_dinosaur_Dinosaur_get_1torrent_1info_1file_1stat
 	return NULL;
 }
 
-jobject Java_dinosaur_Dinosaur_get_1torrent_1info_1file_1dyn
+jobject Java_dinosaur_Dinosaur_native_1get_1torrent_1info_1file_1dyn
 (JNIEnv * env, jobject jobj, jstring jhash, jlong jindex)
 {
 	if (dino == NULL)
@@ -327,7 +326,7 @@ jobject Java_dinosaur_Dinosaur_get_1torrent_1info_1file_1dyn
 	return NULL;
 }
 
-jobjectArray Java_dinosaur_Dinosaur_get_1torrent_1info_1seeders
+jobjectArray Java_dinosaur_Dinosaur_native_1get_1torrent_1info_1seeders
 (JNIEnv * env, jobject jobj, jstring jhash)
 {
 	if (dino == NULL)
@@ -352,7 +351,7 @@ jobjectArray Java_dinosaur_Dinosaur_get_1torrent_1info_1seeders
 	return NULL;
 }
 
-jobjectArray Java_dinosaur_Dinosaur_get_1torrent_1info_1leechers
+jobjectArray Java_dinosaur_Dinosaur_native_1get_1torrent_1info_1leechers
 (JNIEnv * env, jobject jobj, jstring jhash)
 {
 	if (dino == NULL)
@@ -377,7 +376,7 @@ jobjectArray Java_dinosaur_Dinosaur_get_1torrent_1info_1leechers
 	return NULL;
 }
 
-jobjectArray Java_dinosaur_Dinosaur_get_1torrent_1info_1downloadable_1pieces
+jobjectArray Java_dinosaur_Dinosaur_native_1get_1torrent_1info_1downloadable_1pieces
 (JNIEnv * env, jobject jobj, jstring jhash)
 {
 	if (dino == NULL)
@@ -402,7 +401,7 @@ jobjectArray Java_dinosaur_Dinosaur_get_1torrent_1info_1downloadable_1pieces
 	return NULL;
 }
 
-jobject Java_dinosaur_Dinosaur_get_1torrent_1failure_1desc
+jobject Java_dinosaur_Dinosaur_native_1get_1torrent_1failure_1desc
 (JNIEnv * env, jobject jobj, jstring jhash)
 {
 	if (dino == NULL)
@@ -427,7 +426,7 @@ jobject Java_dinosaur_Dinosaur_get_1torrent_1failure_1desc
 	return NULL;
 }
 
-void Java_dinosaur_Dinosaur_set_1file_1priority
+void Java_dinosaur_Dinosaur_native_1set_1file_1priority
   (JNIEnv * env, jobject jobj, jstring jhash, jlong jindex, jint jprio)
 {
 	if (dino == NULL)
@@ -450,7 +449,7 @@ void Java_dinosaur_Dinosaur_set_1file_1priority
 	return;
 }
 
-jobjectArray Java_dinosaur_Dinosaur_get_1TorrentList
+jobjectArray Java_dinosaur_Dinosaur_native_1get_1TorrentList
 (JNIEnv * env, jobject jobj)
 {
 	if (dino == NULL)
@@ -472,7 +471,7 @@ jobjectArray Java_dinosaur_Dinosaur_get_1TorrentList
 	return NULL;
 }
 
-jobjectArray Java_dinosaur_Dinosaur_get_1active_1torrents(JNIEnv * env, jobject jobj)
+jobjectArray Java_dinosaur_Dinosaur_native_1get_1active_1torrents(JNIEnv * env, jobject jobj)
 {
 	if (dino == NULL)
 	{
@@ -493,7 +492,7 @@ jobjectArray Java_dinosaur_Dinosaur_get_1active_1torrents(JNIEnv * env, jobject 
 	return NULL;
 }
 
-jobjectArray Java_dinosaur_Dinosaur_get_1torrents_1in_1queue(JNIEnv * env, jobject jobj)
+jobjectArray Java_dinosaur_Dinosaur_native_1get_1torrents_1in_1queue(JNIEnv * env, jobject jobj)
 {
 	if (dino == NULL)
 	{
@@ -515,7 +514,7 @@ jobjectArray Java_dinosaur_Dinosaur_get_1torrents_1in_1queue(JNIEnv * env, jobje
 }
 
 
-jobject Java_dinosaur_Dinosaur_get_1socket_1status
+jobject Java_dinosaur_Dinosaur_native_1get_1socket_1status
 (JNIEnv * env, jobject jobj)
 {
 	if (dino == NULL)
@@ -527,7 +526,7 @@ jobject Java_dinosaur_Dinosaur_get_1socket_1status
 	return Create_socket_status(env, dino->get_socket_status());
 }
 
-void Java_dinosaur_Dinosaur_UpdateConfigs
+void Java_dinosaur_Dinosaur_native_1UpdateConfigs
   (JNIEnv * env, jobject obj)
 {
 	if (dino == NULL)
@@ -546,7 +545,7 @@ void Java_dinosaur_Dinosaur_UpdateConfigs
 	}
 }
 
-jobject Java_dinosaur_Dinosaur_get_1configs
+jobject Java_dinosaur_Dinosaur_native_1get_1configs
 (JNIEnv * env, jobject obj)
 {
 	if (dino == NULL)
@@ -558,7 +557,7 @@ jobject Java_dinosaur_Dinosaur_get_1configs
 	return Create_configs(env, dino);
 }
 
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1download_1directory
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1set_1config_1download_1directory
   (JNIEnv * env, jobject jobj, jstring jdir)
 {
 	if (dino == NULL || jdir == NULL)
@@ -582,7 +581,7 @@ JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1download_1directory
 	}
 }
 
-void Java_dinosaur_Dinosaur_set_1config_1port
+void Java_dinosaur_Dinosaur_native_1set_1config_1port
   (JNIEnv * env, jobject obj, jlong v)
 {
 	if (dino == NULL)
@@ -601,7 +600,7 @@ void Java_dinosaur_Dinosaur_set_1config_1port
 }
 
 
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1write_1cache_1size
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1set_1config_1write_1cache_1size
 (JNIEnv * env, jobject obj, jlong v)
 {
 	if (dino == NULL)
@@ -619,7 +618,7 @@ JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1write_1cache_1size
 	dino->Config.set_write_cache_size(v);
 }
 
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1read_1cache_1size
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1set_1config_1read_1cache_1size
 (JNIEnv * env, jobject obj, jlong v)
 {
 	if (dino == NULL)
@@ -637,7 +636,7 @@ JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1read_1cache_1size
 	dino->Config.set_read_cache_size(v);
 }
 
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1tracker_1numwant
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1set_1config_1tracker_1numwant
 (JNIEnv * env, jobject obj, jlong v)
 {
 	if (dino == NULL)
@@ -655,7 +654,7 @@ JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1tracker_1numwant
 	dino->Config.set_tracker_numwant(v);
 }
 
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1tracker_1default_1interval
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1set_1config_1tracker_1default_1interval
 (JNIEnv * env, jobject obj, jlong v)
 {
 	if (dino == NULL)
@@ -673,7 +672,7 @@ JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1tracker_1default_1int
 	dino->Config.set_tracker_default_interval(v);
 }
 
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1max_1active_1seeders
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1set_1config_1max_1active_1seeders
 (JNIEnv * env, jobject obj, jlong v)
 {
 	if (dino == NULL)
@@ -691,7 +690,7 @@ JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1max_1active_1seeders
 	dino->Config.set_max_active_seeders(v);
 }
 
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1max_1active_1leechers
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1set_1config_1max_1active_1leechers
 (JNIEnv * env, jobject obj, jlong v)
 {
 	if (dino == NULL)
@@ -709,7 +708,7 @@ JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1max_1active_1leechers
 	dino->Config.set_max_active_leechers(v);
 }
 
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1send_1have
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1set_1config_1send_1have
 (JNIEnv * env, jobject obj, jboolean v)
 {
 	if (dino == NULL)
@@ -721,7 +720,7 @@ JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1send_1have
 	dino->Config.set_send_have(v);
 }
 
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1listen_1on
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1set_1config_1listen_1on
 (JNIEnv * env, jobject obj, jstring v)
 {
 	if (dino == NULL || v == NULL)
@@ -743,7 +742,7 @@ JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1listen_1on
 	env->ReleaseStringUTFChars( v, cv);
 }
 
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1max_1active_1torrents
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1set_1config_1max_1active_1torrents
 (JNIEnv * env, jobject obj, jlong v)
 {
 	if (dino == NULL)
@@ -761,7 +760,7 @@ JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1max_1active_1torrents
 	dino->Config.set_max_active_torrents(v);
 }
 
-JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_set_1config_1fin_1ratio
+JNIEXPORT void JNICALL Java_dinosaur_Dinosaur_native_1set_1config_1fin_1ratio
 (JNIEnv * env, jobject obj, jfloat v)
 {
 	if (dino == NULL)
