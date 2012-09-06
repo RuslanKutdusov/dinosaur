@@ -12,6 +12,7 @@
 #include "../types.h"
 #include "../network/network.h"
 #include "../utils/bencode.h"
+#include "../utils/sha1.h"
 #include <map>
 #include <set>
 #include <boost/shared_ptr.hpp>
@@ -25,8 +26,16 @@ namespace dht
 #define TRANSACTION_ID_LENGHT 2
 #define PING_REQUEST_LENGHT 56
 #define FIND_NODE_REQUEST_LENGHT 92
+#define GET_PEERS_REQUEST_LENGHT 96
 #define COMPACT_NODE_INFO_LENGHT 26
-#define DHT_DEBUG
+
+#define MESSAGE_TYPE_QUERY 'q'
+#define MESSAGE_TYPE_REPLY 'r'
+#define MESSAGE_TYPE_ERROR 'e'
+
+#define ERROR_MESSAGE_LEN 2
+#define ERROR_MESSAGE_ERR_CODE_INDEX 0
+#define ERROR_MESSAGE_ERR_DESC_INDEX 1
 
 typedef char node_id_hex[NODE_ID_HEX_LENGHT];
 class node_id
@@ -90,10 +99,19 @@ private:
 	dht(const dht & dht){}
 	dht & operator=(const dht & dht){ return *this;}
 	dht(network::NetworkManager* nm, const node_id & our_id);
+	ip_port sockaddr2ip_port(const sockaddr_in & addr);
+	void response_handler(bencode::be_node * message_bencoded, REQUEST_TYPE request_type, const sockaddr_in & addr);
+	void ping_handler(const node_id & id, const sockaddr_in & addr);
+	void find_node_handler(bencode::be_node * r);
+	void get_peers_handler();
+	void announce_peer_handler();
+	void error_handler(bencode::be_node * node);
 public:
 	void send_ping(const sockaddr_in & addr);
 	void find_node(const node_id & recipient, const node_id & target);
 	void find_node(const sockaddr_in & recipient, const node_id & target);
+	void get_peers(const node_id & recipient, const SHA1_HASH infohash);
+	void get_peers(const sockaddr_in & recipient, const SHA1_HASH infohash);
 	static void CreateDHT(const in_addr & listen_on, uint16_t port, network::NetworkManager* nm, dhtPtr & ptr, const node_id & our_id = generate_random_node_id())
 	{
 		if (nm == NULL)

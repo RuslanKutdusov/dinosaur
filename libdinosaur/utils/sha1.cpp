@@ -189,4 +189,12 @@ void CSHA1::GetHash(unsigned char *uDest)
 	memcpy(uDest, m_digest, 20);
 }
 
+void sha1ToHex(const SHA1_HASH src, SHA1_HASH_HEX dst)
+{
+	for(size_t i = 0; i < SHA1_LENGTH; i++)
+	{
+		sprintf(&dst[i * 2], "%02X", src[i]);
+	}
+}
+
 }

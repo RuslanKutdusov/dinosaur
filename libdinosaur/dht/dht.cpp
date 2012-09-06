@@ -72,6 +72,11 @@ void dht::prepare2release()
 	m_nm->Socket_delete(m_sock);
 }
 
+dht::ip_port dht::sockaddr2ip_port(const sockaddr_in & addr)
+{
+	return ip_port(inet_ntoa(addr.sin_addr), addr.sin_port);
+}
+
 void dht::send_ping(const sockaddr_in & addr)
 {
 	uint16_t transaction_id = rand() % 65536;
@@ -84,7 +89,7 @@ void dht::send_ping(const sockaddr_in & addr)
 				printf("Sending ping to %s:%d transaction=%u...", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port), transaction_id);
 		#endif
 		m_nm->Socket_send(m_sock, buf, PING_REQUEST_LENGHT, addr);
-		m_requests[ip_port(inet_ntoa(addr.sin_addr), addr.sin_port)][transaction_id] = REQUEST_TYPE_PING;
+		m_requests[sockaddr2ip_port(addr)][transaction_id] = REQUEST_TYPE_PING;
 		#ifdef DHT_DEBUG
 				printf("OK\n");
 		#endif
@@ -122,7 +127,7 @@ void dht::find_node(const sockaddr_in & recipient, const node_id & target)
 			printf("Sending find node to %s:%d transaction=%u searching node id=%s...", inet_ntoa(recipient.sin_addr), ntohs(recipient.sin_port), transaction_id, hex);
 		#endif
 		m_nm->Socket_send(m_sock, buf, FIND_NODE_REQUEST_LENGHT, recipient);
-		m_requests[ip_port(inet_ntoa(recipient.sin_addr), recipient.sin_port)][transaction_id] = REQUEST_TYPE_FIND_NODE;
+		m_requests[sockaddr2ip_port(recipient)][transaction_id] = REQUEST_TYPE_FIND_NODE;
 		#ifdef DHT_DEBUG
 			printf("OK\n");
 		#endif
@@ -140,6 +145,137 @@ void dht::find_node(const sockaddr_in & recipient, const node_id & target)
 	}
 }
 
+void dht::get_peers(const node_id & recipient, const SHA1_HASH infohash)
+{
+	get_peers(m_nodes[recipient], infohash);
+}
+
+void dht::get_peers(const sockaddr_in & recipient, const SHA1_HASH infohash)
+{
+	uint16_t transaction_id = rand() % 65536;
+	char buf[256] = "d1:ad2:id20:abcdefghij01234567899:info_hash20:mnopqrstuvwxyz123456e1:q9:get_peers1:t2:aa1:y1:qe";
+	m_node_id.copy2(&buf[12]);
+	memcpy(&buf[46], infohash, SHA1_LENGTH);
+	memcpy(&buf[86], &transaction_id, TRANSACTION_ID_LENGHT);
+	try
+	{
+		#ifdef DHT_DEBUG
+			SHA1_HASH_HEX hex;
+			sha1ToHex(infohash, hex);
+			printf("Sending get peers to %s:%d transaction=%u infohash=%s...", inet_ntoa(recipient.sin_addr), ntohs(recipient.sin_port), transaction_id, hex);
+		#endif
+		m_nm->Socket_send(m_sock, buf, GET_PEERS_REQUEST_LENGHT, recipient);
+		m_requests[sockaddr2ip_port(recipient)][transaction_id] = REQUEST_TYPE_GET_PEERS;
+		#ifdef DHT_DEBUG
+			printf("OK\n");
+		#endif
+	}
+	catch (Exception & e) {
+		#ifdef DHT_DEBUG
+			printf("Fail: %s\n", exception_errcode2str(e).c_str());
+		#endif
+	}
+	catch(SyscallException & e)
+	{
+		#ifdef DHT_DEBUG
+			printf("Fail: %s\n", e.get_errno_str());
+		#endif
+	}
+}
+
+void dht::response_handler(bencode::be_node * message_bencoded, REQUEST_TYPE request_type, const sockaddr_in & addr)
+{
+	bencode::be_node * reply_bencoded;
+	if (bencode::get_node(message_bencoded, "r", &reply_bencoded) != 0)
+	{
+		#ifdef DHT_DEBUG
+			printf("	reject, invalid format\n");
+		#endif
+		return;
+	}
+
+	bencode::be_str * id_str;
+	if (bencode::get_str(reply_bencoded, "id", &id_str) == -1 || id_str->len != NODE_ID_LENGHT)
+	{
+		#ifdef DHT_DEBUG
+			printf("	reject, invalid format\n");
+		#endif
+		return;
+	}
+	node_id id = id_str->ptr;
+	#ifdef DHT_DEBUG
+			node_id_hex hex;
+			id.to_hex(hex);
+			printf("	from node id=%s\n", hex);
+	#endif
+
+	if (request_type == REQUEST_TYPE_PING)
+		ping_handler(id, addr);
+
+	if (request_type == REQUEST_TYPE_FIND_NODE)
+		find_node_handler(reply_bencoded);
+}
+
+void dht::ping_handler(const node_id & id, const sockaddr_in & addr)
+{
+	#ifdef DHT_DEBUG
+		printf("	it`s 'ping' response\n");
+	#endif
+	m_nodes[id] = addr;
+}
+
+void dht::find_node_handler(bencode::be_node * reply_bencoded)
+{
+	bencode::be_str * nodes_list_bencoded;
+	#ifdef DHT_DEBUG
+		printf("	it`s 'find node' response\n");
+	#endif
+	if (bencode::get_str(reply_bencoded, "nodes", &nodes_list_bencoded) == -1 || nodes_list_bencoded->len % COMPACT_NODE_INFO_LENGHT != 0)
+	{
+		#ifdef DHT_DEBUG
+			printf("	reject, invalid format\n");
+		#endif
+		return;
+	}
+	for(ssize_t i = 0; i < nodes_list_bencoded->len / COMPACT_NODE_INFO_LENGHT; i++)
+	{
+		node_id node_from_list;
+		sockaddr_in addr;
+		parse_compact_node_info(&nodes_list_bencoded->ptr[i * COMPACT_NODE_INFO_LENGHT], node_from_list, addr);
+		m_nodes[node_from_list] = addr;
+		#ifdef DHT_DEBUG
+			node_id_hex hex;
+			node_from_list.to_hex(hex);
+			int bucket = get_bucket(node_from_list, m_node_id);
+			printf("	node id=%s bucket = %d %s:%d\n", hex,  bucket, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+		#endif
+	}
+}
+
+void dht::error_handler(bencode::be_node * message_bencoded)
+{
+	bencode::be_node * error_message_bencoded;
+	if (bencode::get_node(message_bencoded, "e", &error_message_bencoded) != 0 || !bencode::is_list(error_message_bencoded) || error_message_bencoded->val.l.count != ERROR_MESSAGE_LEN)
+	{
+		#ifdef DHT_DEBUG
+			printf("	reject, invalid format\n");
+		#endif
+		return;
+	}
+	uint64_t err_code;
+	bencode::be_str * err_desc;
+	if (bencode::get_int(error_message_bencoded, ERROR_MESSAGE_ERR_CODE_INDEX, &err_code) != 0 || bencode::get_str(error_message_bencoded, ERROR_MESSAGE_ERR_DESC_INDEX, &err_desc) != 0)
+	{
+		#ifdef DHT_DEBUG
+			printf("	reject, invalid format\n");
+		#endif
+		return;
+	}
+	#ifdef DHT_DEBUG
+			printf("	%llu, %s\n", err_code, err_desc->ptr);
+	#endif
+}
+
 int dht::event_sock_ready2read(network::Socket sock)
 {
 	char buf[1024];
@@ -148,8 +284,8 @@ int dht::event_sock_ready2read(network::Socket sock)
 	#ifdef DHT_DEBUG
 		printf("Incomming message from %s:%d\n", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
 	#endif
-	bencode::be_node * node = bencode::decode(buf, len, false);
-	if (node == NULL)
+	bencode::be_node * message_bencoded = bencode::decode(buf, len, false);
+	if (message_bencoded == NULL)
 	{
 		#ifdef DHT_DEBUG
 			printf("	reject, invalid format\n");
@@ -158,19 +294,18 @@ int dht::event_sock_ready2read(network::Socket sock)
 	}
 
 	bencode::be_str * str;
-	if (bencode::get_str(node, "t", &str) != 0 || str->len != TRANSACTION_ID_LENGHT)
+	if (bencode::get_str(message_bencoded, "t", &str) != 0 || str->len != TRANSACTION_ID_LENGHT)
 	{
 		#ifdef DHT_DEBUG
 			printf("	reject, invalid format\n");
 		#endif
 		return 0;
 	}
-
 	uint16_t transaction_id;
 	memcpy(&transaction_id, str->ptr, TRANSACTION_ID_LENGHT);
 
-	bencode::be_str * y_key;
-	if (bencode::get_str(node, "y", &y_key) != 0)
+	bencode::be_str * message_type;
+	if (bencode::get_str(message_bencoded, "y", &message_type) != 0)
 	{
 		#ifdef DHT_DEBUG
 			printf("	reject, invalid format\n");
@@ -178,36 +313,9 @@ int dht::event_sock_ready2read(network::Socket sock)
 		return 0;
 	}
 
-	if (*y_key->ptr == 'r')
+	if (*message_type->ptr == MESSAGE_TYPE_REPLY || *message_type->ptr == MESSAGE_TYPE_ERROR)
 	{
-		#ifdef DHT_DEBUG
-			printf("	it`s response, transaction id=%u\n", transaction_id);
-		#endif
-		bencode::be_node * r;
-		if (bencode::get_node(node, "r", &r) != 0)
-		{
-			#ifdef DHT_DEBUG
-				printf("	reject, invalid format\n");
-			#endif
-			return 0;
-		}
-
-		bencode::be_str * id_str;
-		if (bencode::get_str(r, "id", &id_str) == -1 || id_str->len != NODE_ID_LENGHT)
-		{
-			#ifdef DHT_DEBUG
-				printf("	reject, invalid format\n");
-			#endif
-			return 0;
-		}
-		node_id id = id_str->ptr;
-		#ifdef DHT_DEBUG
-				node_id_hex hex;
-				id.to_hex(hex);
-				printf("	from node id=%s\n", hex);
-		#endif
-
-		request_container::iterator request_container_iter = m_requests.find(ip_port(inet_ntoa(addr.sin_addr), addr.sin_port));
+		request_container::iterator request_container_iter = m_requests.find(sockaddr2ip_port(addr));
 		if (request_container_iter == m_requests.end())
 		{
 			#ifdef DHT_DEBUG
@@ -226,92 +334,25 @@ int dht::event_sock_ready2read(network::Socket sock)
 		REQUEST_TYPE request_type = iter->second;
 		request_container_iter->second.erase(iter);
 
-		if (request_type == REQUEST_TYPE_PING)
+		if (*message_type->ptr == MESSAGE_TYPE_REPLY)
 		{
 			#ifdef DHT_DEBUG
-				printf("	it`s 'ping' response\n");
+				printf("	it`s response, transaction id=%u\n", transaction_id);
 			#endif
-			m_nodes[id] = addr;
+			response_handler(message_bencoded, request_type, addr);
 		}
-
-		if (request_type == REQUEST_TYPE_FIND_NODE)
+		if (*message_type->ptr == MESSAGE_TYPE_ERROR)
 		{
-			bencode::be_str * nodes;
 			#ifdef DHT_DEBUG
-				printf("	it`s 'find node' response\n");
+					printf("	it`s error message for query with transaction id=%u\n", transaction_id);
 			#endif
-			if (bencode::get_str(r, "nodes", &nodes) == -1 || nodes->len % COMPACT_NODE_INFO_LENGHT != 0)
-			{
-				#ifdef DHT_DEBUG
-					printf("	reject, invalid format\n");
-				#endif
-				return 0;
-			}
-			for(ssize_t i = 0; i < nodes->len / COMPACT_NODE_INFO_LENGHT; i++)
-			{
-				node_id found_id;
-				sockaddr_in addr;
-				parse_compact_node_info(&nodes->ptr[i * COMPACT_NODE_INFO_LENGHT], found_id, addr);
-				m_nodes[found_id] = addr;
-				#ifdef DHT_DEBUG
-					node_id_hex hex;
-					found_id.to_hex(hex);
-					int bucket = get_bucket(found_id, m_node_id);
-					printf("	node id=%s bucket = %d %s:%d\n", hex,  bucket, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
-				#endif
-			}
+			error_handler(message_bencoded);
 		}
-	}
-	if (*y_key->ptr == 'q')
-	{
 
 	}
-
-	if (*y_key->ptr == 'e')
+	if (*message_type->ptr == MESSAGE_TYPE_QUERY)
 	{
-		#ifdef DHT_DEBUG
-				printf("	it`s error message for query with transaction id=%u\n", transaction_id);
-		#endif
 
-		request_container::iterator request_container_iter = m_requests.find(ip_port(inet_ntoa(addr.sin_addr), addr.sin_port));
-		if (request_container_iter == m_requests.end())
-		{
-			#ifdef DHT_DEBUG
-				printf("	such query does not exists or invalid transaction id\n");
-			#endif
-			return 0;
-		}
-		std::map<uint16_t, REQUEST_TYPE>::iterator iter = request_container_iter->second.find(transaction_id);
-		if (iter == request_container_iter->second.end())
-		{
-			#ifdef DHT_DEBUG
-				printf("	invalid transaction id\n");
-			#endif
-			return 0;
-		}
-		request_container_iter->second.erase(iter);
-
-
-		bencode::be_node * l;
-		if (bencode::get_node(node, "e", &l) != 0 || !bencode::is_list(l) || l->val.l.count != 2)
-		{
-			#ifdef DHT_DEBUG
-				printf("	reject, invalid format\n");
-			#endif
-			return 0;
-		}
-		uint64_t code;
-		bencode::be_str * desc;
-		if (bencode::get_int(l, 0, &code) != 0 || bencode::get_str(l, 1, &desc) != 0)
-		{
-			#ifdef DHT_DEBUG
-				printf("	reject, invalid format\n");
-			#endif
-			return 0;
-		}
-		#ifdef DHT_DEBUG
-				printf("	%llu, %s\n", code, desc->ptr);
-		#endif
 	}
 
 }

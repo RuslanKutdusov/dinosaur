@@ -19,6 +19,8 @@
 #ifndef ___SHA1_H___
 #define ___SHA1_H___
 
+#include "../types.h"
+
 //
 // SOLARIS USERS - IF YOUR SYSTEM IS LITTLE ENDIAN, REMOVE THE NEXT 3 LINES
 //  also see bnbt.h
@@ -90,6 +92,8 @@ private:
 	// Private SHA-1 transformation
 	void Transform(unsigned long state[5], unsigned char buffer[64]);
 };
+
+void sha1ToHex(const SHA1_HASH src, SHA1_HASH_HEX dst);
 
 }
 
