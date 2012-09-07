@@ -13,6 +13,7 @@
 #include "../network/network.h"
 #include "../utils/bencode.h"
 #include "../utils/sha1.h"
+#include "../lru_cache/lru_cache.h"
 #include <map>
 #include <set>
 #include <boost/shared_ptr.hpp>
@@ -22,12 +23,12 @@ namespace dinosaur
 namespace dht
 {
 
-#define NODE_ID_HEX_LENGHT (NODE_ID_LENGHT * 2 + 1)
-#define TRANSACTION_ID_LENGHT 2
-#define PING_REQUEST_LENGHT 56
-#define FIND_NODE_REQUEST_LENGHT 92
-#define GET_PEERS_REQUEST_LENGHT 96
-#define COMPACT_NODE_INFO_LENGHT 26
+#define NODE_ID_HEX_LENGTH (NODE_ID_LENGTH * 2 + 1)
+#define TRANSACTION_ID_LENGTH 2
+#define PING_REQUEST_LENGTH 56
+#define FIND_NODE_REQUEST_LENGTH 92
+#define GET_PEERS_REQUEST_LENGTH 96
+#define COMPACT_NODE_INFO_LENGTH 26
 
 #define MESSAGE_TYPE_QUERY 'q'
 #define MESSAGE_TYPE_REPLY 'r'
@@ -37,11 +38,23 @@ namespace dht
 #define ERROR_MESSAGE_ERR_CODE_INDEX 0
 #define ERROR_MESSAGE_ERR_DESC_INDEX 1
 
-typedef char node_id_hex[NODE_ID_HEX_LENGHT];
+#define BUCKET_K 8
+#define BUCKETS_COUNT 160
+#define BUCKET_UPDATE_PERIOD_SECS 900//15min
+
+#define NODE_PING_TIMEOUT_SECS 10
+
+struct TOKEN
+{
+	char* 	token;
+	size_t 	length;
+};
+
+typedef char node_id_hex[NODE_ID_HEX_LENGTH];
 class node_id
 {
 private:
-	unsigned char m_data[NODE_ID_LENGHT];
+	unsigned char m_data[NODE_ID_LENGTH];
 	void clear();
 public:
 	node_id();
@@ -67,6 +80,45 @@ node_id generate_random_node_id();
 void generate_random_node_id(node_id & id);
 size_t get_bucket(const node_id & id1, const node_id & id2);
 void parse_compact_node_info(char * buf, node_id & id, sockaddr_in & addr);
+
+class routing_table
+{
+private:
+	struct node_info
+	{
+		node_id 	id;
+		sockaddr_in addr;
+		uint64_t	last_update;
+	};
+	typedef lru_cache::LRU_Cache<node_id, sockaddr_in> bucket;
+	typedef lru_cache::LRU_Cache<bucket*, char > buckets_age;//char для экономии памяти, значение по ключи не используется, используется только ключ
+	bucket*					m_buckets;
+	buckets_age 			m_buckets_age;
+	char					m_value_for_all_buckets_age;
+	std::list<node_info>	m_queue4adding_nodes;
+	uint64_t get_time()
+	{
+		timeval tv;
+		gettimeofday(&tv, NULL);
+		return ((uint64_t)tv.tv_sec << 32) + tv.tv_usec;
+	}
+
+public:
+	routing_table()
+	{
+		m_buckets = new bucket[BUCKETS_COUNT];
+		for(size_t i = 0; i < BUCKETS_COUNT; i++)
+		{
+			m_buckets[i].Init(BUCKET_K);
+			m_buckets_age.put(&m_buckets[i], &m_value_for_all_buckets_age);
+		}
+	}
+	~routing_table()
+	{
+		if (m_buckets != NULL)
+			delete[] m_buckets;
+	}
+};
 
 class dht;
 typedef boost::shared_ptr<dht> dhtPtr;
@@ -112,6 +164,8 @@ public:
 	void find_node(const sockaddr_in & recipient, const node_id & target);
 	void get_peers(const node_id & recipient, const SHA1_HASH infohash);
 	void get_peers(const sockaddr_in & recipient, const SHA1_HASH infohash);
+	void announce_peer(const node_id & recipient, const SHA1_HASH infohash, uint16_t port, const std::string & token);
+	void announce_peer(const sockaddr_in & recipient, const SHA1_HASH infohash, uint16_t port, const TOKEN & token);
 	static void CreateDHT(const in_addr & listen_on, uint16_t port, network::NetworkManager* nm, dhtPtr & ptr, const node_id & our_id = generate_random_node_id())
 	{
 		if (nm == NULL)

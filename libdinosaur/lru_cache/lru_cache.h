@@ -39,13 +39,18 @@ protected:
 	cache_element * m_elements;
 	uint16_t m_elements_count;
 	uint64_t get_time();
+	LRU_Cache(const LRU_Cache & copy){};
+	LRU_Cache & operator=(const LRU_Cache & dht){ return *this; }
 public:
 	LRU_Cache();
 	virtual ~LRU_Cache();
 	void Init(uint16_t size);
 	void put(cache_key key, cache_element * value);
 	void get(cache_key key, cache_element * value);
+	void get_without_time_update(cache_key key, cache_element * value);
+	const cache_key & get_old();
 	bool empty();
+	size_t elements_count();
 	void remove(cache_key key);
 };
 
@@ -196,10 +201,75 @@ void LRU_Cache<cache_key, cache_element>::get(cache_key key, cache_element * val
 	}
 }
 
+/*
+ * Exception::ERR_CODE_NULL_REF
+ * Exception::ERR_CODE_LRU_CACHE_NE
+ * Exception::ERR_CODE_UNDEF
+ */
+
+template <class cache_key, class cache_element>
+void LRU_Cache<cache_key, cache_element>::get_without_time_update(cache_key key, cache_element * value)
+{
+	if (value == NULL || m_elements == NULL)
+		throw Exception(Exception::ERR_CODE_NULL_REF);
+	try
+	{
+		//cache_key key(torrent, block_id);
+		hash_table_iterator iter = m_hash_table.find(key);
+		if (iter == m_hash_table.end() && m_hash_table.count(key) == 0)
+			throw Exception(Exception::ERR_CODE_LRU_CACHE_NE);
+
+		cache_element * element = (*iter).second;
+		memcpy(value, element, sizeof(cache_element));
+		//ищем справа данный элемент(key)
+		typename time_queue::right_iterator it = m_time_queue.right.find(key);
+		//если его нет, добавляем
+		if (it == m_time_queue.right.end() && m_time_queue.right.count(key) == 0)
+			m_time_queue.insert(time_queue_value_type(get_time(), key));
+
+	}
+	catch(Exception & e)
+	{
+		throw Exception(e);
+	}
+	catch(...)
+	{
+		throw Exception(Exception::ERR_CODE_UNDEF);
+	}
+}
+
+
+/*
+ * Exception::ERR_CODE_NULL_REF
+ * Exception::ERR_CODE_UNDEF
+ */
+
+template <class cache_key, class cache_element>
+const cache_key & LRU_Cache<cache_key, cache_element>::get_old()
+{
+	if (m_elements == NULL)
+		throw Exception(Exception::ERR_CODE_NULL_REF);
+	try
+	{
+		time_queue_left_iterator time_queue_iter_to_old_element = m_time_queue.left.begin();
+		return time_queue_iter_to_old_element->second;
+	}
+	catch(...)
+	{
+		throw Exception(Exception::ERR_CODE_UNDEF);
+	}
+}
+
 template <class cache_key, class cache_element>
 bool LRU_Cache<cache_key, cache_element>::empty()
 {
 	return m_hash_table.empty();
+}
+
+template <class cache_key, class cache_element>
+size_t LRU_Cache<cache_key, cache_element>::elements_count()
+{
+	return m_elements_count - m_free_elements.size();
 }
 
 /*

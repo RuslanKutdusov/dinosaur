@@ -84,6 +84,13 @@ bool is_list(be_node * node);
 bool is_dict(be_node * node);
 void dump(be_node *node);
 void _free(be_node * data);
+be_node * create_int(uint64_t value);
+be_node * create_str(const char * value, size_t value_len);
+be_node * create_list();
+be_node * create_dict();
+void dict_add_node(be_node * dict, const char * key_c_str, size_t key_len, be_node * value);
+void dict_add_int(be_node * dict, const char * key, size_t key_len, uint64_t value);
+void dict_add_str(be_node * dict, const char * key, size_t key_len, const char * value, size_t value_len);
 
 }
 }

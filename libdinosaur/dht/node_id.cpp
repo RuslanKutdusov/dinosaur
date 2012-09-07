@@ -15,7 +15,7 @@ namespace dht
 node_id distance(const node_id & id1, const node_id & id2)
 {
 	node_id r;
-	for(size_t i = 0; i < NODE_ID_LENGHT; i++)
+	for(size_t i = 0; i < NODE_ID_LENGTH; i++)
 	{
 		r[i] = id1[i] ^ id2[i];
 	}
@@ -31,7 +31,7 @@ node_id generate_random_node_id()
 
 void generate_random_node_id(node_id & id)
 {
-	for(size_t i = 0; i < NODE_ID_LENGHT; i++)
+	for(size_t i = 0; i < NODE_ID_LENGTH; i++)
 	{
 		id[i] = rand() % 256 ;
 	}
@@ -39,8 +39,8 @@ void generate_random_node_id(node_id & id)
 
 size_t get_bucket(const node_id & id1, const node_id & id2)
 {
-	int byte = NODE_ID_LENGHT - 1;
-	for (size_t i = 0; i < NODE_ID_LENGHT; i++, byte--)
+	int byte = NODE_ID_LENGTH - 1;
+	for (size_t i = 0; i < NODE_ID_LENGTH; i++, byte--)
 	{
 		unsigned char t = id1[i] ^ id2[i];
 		if (t == 0) continue;
@@ -59,12 +59,12 @@ node_id::node_id()
 
 node_id::node_id(const node_id & id)
 {
-	memcpy(this->m_data, id.m_data, NODE_ID_LENGHT);
+	memcpy(this->m_data, id.m_data, NODE_ID_LENGTH);
 }
 
 node_id::node_id(const char * id)
 {
-	memcpy(this->m_data, id, NODE_ID_LENGHT);
+	memcpy(this->m_data, id, NODE_ID_LENGTH);
 }
 
 node_id::~node_id()
@@ -76,27 +76,27 @@ node_id & node_id::operator=(const node_id & id)
 {
 	if (this != &id)
 	{
-		memcpy(this->m_data, id.m_data, NODE_ID_LENGHT);
+		memcpy(this->m_data, id.m_data, NODE_ID_LENGTH);
 	}
 	return *this;
 }
 
 node_id & node_id::operator=(const char * id)
 {
-	memcpy(this->m_data, id, NODE_ID_LENGHT);
+	memcpy(this->m_data, id, NODE_ID_LENGTH);
 	return *this;
 }
 
 unsigned char & node_id::operator[](size_t i)
 {
-	if (i >= NODE_ID_LENGHT)
+	if (i >= NODE_ID_LENGTH)
 		throw Exception(Exception::ERR_CODE_INVALID_OPERATION);
 	return m_data[i];
 }
 
 const unsigned char & node_id::operator[](size_t i) const
 {
-	if (i >= NODE_ID_LENGHT)
+	if (i >= NODE_ID_LENGTH)
 		throw Exception(Exception::ERR_CODE_INVALID_OPERATION);
 	return m_data[i];
 }
@@ -108,7 +108,7 @@ const node_id node_id::operator ^(const node_id & id)
 
 bool node_id::operator<(const node_id & id) const
 {
-	for(size_t i = 0; i < NODE_ID_LENGHT; i++)
+	for(size_t i = 0; i < NODE_ID_LENGTH; i++)
 	{
 		if (m_data[i] != id.m_data[i])
 			return m_data[i] < id.m_data[i];
@@ -118,40 +118,40 @@ bool node_id::operator<(const node_id & id) const
 
 bool node_id::operator==(const node_id & id) const
 {
-	return memcmp(m_data, id.m_data, NODE_ID_LENGHT);
+	return memcmp(m_data, id.m_data, NODE_ID_LENGTH);
 }
 
 bool node_id::operator!=(const node_id & id) const
 {
-	return !memcmp(m_data, id.m_data, NODE_ID_LENGHT);
+	return !memcmp(m_data, id.m_data, NODE_ID_LENGTH);
 }
 
 void node_id::copy2(char * dst) const
 {
-	memcpy(dst, m_data, NODE_ID_LENGHT);
+	memcpy(dst, m_data, NODE_ID_LENGTH);
 }
 
 void node_id::copy2(unsigned char * dst) const
 {
-	memcpy(dst, m_data, NODE_ID_LENGHT);
+	memcpy(dst, m_data, NODE_ID_LENGTH);
 }
 
 void node_id::print()  const
 {
-	for(size_t i = 0; i < NODE_ID_LENGHT; i++)
+	for(size_t i = 0; i < NODE_ID_LENGTH; i++)
 		printf("%02X", m_data[i]);
 	printf("\n");
 }
 
 void node_id::to_hex(node_id_hex id) const
 {
-	for(size_t i = 0; i < NODE_ID_LENGHT; i++)
+	for(size_t i = 0; i < NODE_ID_LENGTH; i++)
 		sprintf(&id[i * 2], "%02X", m_data[i]);
 }
 
 void node_id::clear()
 {
-	memset(m_data, 0, NODE_ID_LENGHT);
+	memset(m_data, 0, NODE_ID_LENGTH);
 }
 }
 }

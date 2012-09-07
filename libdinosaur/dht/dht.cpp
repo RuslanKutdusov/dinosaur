@@ -82,13 +82,13 @@ void dht::send_ping(const sockaddr_in & addr)
 	uint16_t transaction_id = rand() % 65536;
 	char buf[256] = "d1:ad2:id20:00000000000000000000e1:q4:ping1:t2:001:y1:qe";
 	m_node_id.copy2(&buf[12]);
-	memcpy(&buf[47], &transaction_id, TRANSACTION_ID_LENGHT);
+	memcpy(&buf[47], &transaction_id, TRANSACTION_ID_LENGTH);
 	try
 	{
 		#ifdef DHT_DEBUG
 				printf("Sending ping to %s:%d transaction=%u...", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port), transaction_id);
 		#endif
-		m_nm->Socket_send(m_sock, buf, PING_REQUEST_LENGHT, addr);
+		m_nm->Socket_send(m_sock, buf, PING_REQUEST_LENGTH, addr);
 		m_requests[sockaddr2ip_port(addr)][transaction_id] = REQUEST_TYPE_PING;
 		#ifdef DHT_DEBUG
 				printf("OK\n");
@@ -118,7 +118,7 @@ void dht::find_node(const sockaddr_in & recipient, const node_id & target)
 	char buf[256] = "d1:ad2:id20:abcdefghij01234567896:target20:mnopqrstuvwxyz123456e1:q9:find_node1:t2:aa1:y1:qe";
 	m_node_id.copy2(&buf[12]);
 	target.copy2(&buf[43]);
-	memcpy(&buf[83], &transaction_id, TRANSACTION_ID_LENGHT);
+	memcpy(&buf[83], &transaction_id, TRANSACTION_ID_LENGTH);
 	try
 	{
 		#ifdef DHT_DEBUG
@@ -126,7 +126,7 @@ void dht::find_node(const sockaddr_in & recipient, const node_id & target)
 			target.to_hex(hex);
 			printf("Sending find node to %s:%d transaction=%u searching node id=%s...", inet_ntoa(recipient.sin_addr), ntohs(recipient.sin_port), transaction_id, hex);
 		#endif
-		m_nm->Socket_send(m_sock, buf, FIND_NODE_REQUEST_LENGHT, recipient);
+		m_nm->Socket_send(m_sock, buf, FIND_NODE_REQUEST_LENGTH, recipient);
 		m_requests[sockaddr2ip_port(recipient)][transaction_id] = REQUEST_TYPE_FIND_NODE;
 		#ifdef DHT_DEBUG
 			printf("OK\n");
@@ -156,7 +156,7 @@ void dht::get_peers(const sockaddr_in & recipient, const SHA1_HASH infohash)
 	char buf[256] = "d1:ad2:id20:abcdefghij01234567899:info_hash20:mnopqrstuvwxyz123456e1:q9:get_peers1:t2:aa1:y1:qe";
 	m_node_id.copy2(&buf[12]);
 	memcpy(&buf[46], infohash, SHA1_LENGTH);
-	memcpy(&buf[86], &transaction_id, TRANSACTION_ID_LENGHT);
+	memcpy(&buf[86], &transaction_id, TRANSACTION_ID_LENGTH);
 	try
 	{
 		#ifdef DHT_DEBUG
@@ -164,7 +164,7 @@ void dht::get_peers(const sockaddr_in & recipient, const SHA1_HASH infohash)
 			sha1ToHex(infohash, hex);
 			printf("Sending get peers to %s:%d transaction=%u infohash=%s...", inet_ntoa(recipient.sin_addr), ntohs(recipient.sin_port), transaction_id, hex);
 		#endif
-		m_nm->Socket_send(m_sock, buf, GET_PEERS_REQUEST_LENGHT, recipient);
+		m_nm->Socket_send(m_sock, buf, GET_PEERS_REQUEST_LENGTH, recipient);
 		m_requests[sockaddr2ip_port(recipient)][transaction_id] = REQUEST_TYPE_GET_PEERS;
 		#ifdef DHT_DEBUG
 			printf("OK\n");
@@ -183,6 +183,56 @@ void dht::get_peers(const sockaddr_in & recipient, const SHA1_HASH infohash)
 	}
 }
 
+void dht::announce_peer(const node_id & recipient, const SHA1_HASH infohash, uint16_t port, const std::string & token)
+{
+	//announce_peer(m_nodes[recipient], infohash, port, token);
+}
+
+void dht::announce_peer(const sockaddr_in & recipient, const SHA1_HASH infohash, uint16_t port, const TOKEN & token)
+{
+	uint16_t transaction_id = rand() % 65536;
+	bencode::be_node * message_bencoded = bencode::create_dict();
+	bencode::dict_add_str(message_bencoded, "t", 1, (const char*)&transaction_id, 2);
+	bencode::dict_add_str(message_bencoded, "y", 1, "q", 1);
+	bencode::dict_add_str(message_bencoded, "q", 1, "announce_peer", 13);
+	bencode::be_node * message_body_encoded = bencode::create_dict();
+	bencode::dict_add_str(message_body_encoded, "id", 2, (const char*)&m_node_id[0], NODE_ID_LENGTH);
+	bencode::dict_add_str(message_body_encoded, "infohash", 8, (const char*)infohash, SHA1_LENGTH);
+	bencode::dict_add_int(message_body_encoded, "port", 4, port);
+	bencode::dict_add_str(message_body_encoded, "token", 5, token.token, token.length);
+	bencode::dict_add_node(message_bencoded, "a", 1, message_body_encoded);
+	bencode::dump(message_bencoded);
+
+	char * buf = new char[1024];
+	uint32_t encoded_message_len;
+	bencode::encode(message_bencoded, &buf, 1024, &encoded_message_len);
+	try
+	{
+		#ifdef DHT_DEBUG
+			SHA1_HASH_HEX hex;
+			sha1ToHex(infohash, hex);
+			printf("Sending announce_peer to %s:%d transaction=%u infohash=%s...", inet_ntoa(recipient.sin_addr), ntohs(recipient.sin_port), transaction_id, hex);
+		#endif
+		m_nm->Socket_send(m_sock, buf, encoded_message_len, recipient);
+		m_requests[sockaddr2ip_port(recipient)][transaction_id] = REQUEST_TYPE_ANNOUNCE_PEER;
+		#ifdef DHT_DEBUG
+			printf("OK\n");
+		#endif
+	}
+	catch (Exception & e) {
+		#ifdef DHT_DEBUG
+			printf("Fail: %s\n", exception_errcode2str(e).c_str());
+		#endif
+	}
+	catch(SyscallException & e)
+	{
+		#ifdef DHT_DEBUG
+			printf("Fail: %s\n", e.get_errno_str());
+		#endif
+	}
+	delete[] buf;
+}
+
 void dht::response_handler(bencode::be_node * message_bencoded, REQUEST_TYPE request_type, const sockaddr_in & addr)
 {
 	bencode::be_node * reply_bencoded;
@@ -195,7 +245,7 @@ void dht::response_handler(bencode::be_node * message_bencoded, REQUEST_TYPE req
 	}
 
 	bencode::be_str * id_str;
-	if (bencode::get_str(reply_bencoded, "id", &id_str) == -1 || id_str->len != NODE_ID_LENGHT)
+	if (bencode::get_str(reply_bencoded, "id", &id_str) == -1 || id_str->len != NODE_ID_LENGTH)
 	{
 		#ifdef DHT_DEBUG
 			printf("	reject, invalid format\n");
@@ -230,18 +280,18 @@ void dht::find_node_handler(bencode::be_node * reply_bencoded)
 	#ifdef DHT_DEBUG
 		printf("	it`s 'find node' response\n");
 	#endif
-	if (bencode::get_str(reply_bencoded, "nodes", &nodes_list_bencoded) == -1 || nodes_list_bencoded->len % COMPACT_NODE_INFO_LENGHT != 0)
+	if (bencode::get_str(reply_bencoded, "nodes", &nodes_list_bencoded) == -1 || nodes_list_bencoded->len % COMPACT_NODE_INFO_LENGTH != 0)
 	{
 		#ifdef DHT_DEBUG
 			printf("	reject, invalid format\n");
 		#endif
 		return;
 	}
-	for(ssize_t i = 0; i < nodes_list_bencoded->len / COMPACT_NODE_INFO_LENGHT; i++)
+	for(ssize_t i = 0; i < nodes_list_bencoded->len / COMPACT_NODE_INFO_LENGTH; i++)
 	{
 		node_id node_from_list;
 		sockaddr_in addr;
-		parse_compact_node_info(&nodes_list_bencoded->ptr[i * COMPACT_NODE_INFO_LENGHT], node_from_list, addr);
+		parse_compact_node_info(&nodes_list_bencoded->ptr[i * COMPACT_NODE_INFO_LENGTH], node_from_list, addr);
 		m_nodes[node_from_list] = addr;
 		#ifdef DHT_DEBUG
 			node_id_hex hex;
@@ -294,7 +344,7 @@ int dht::event_sock_ready2read(network::Socket sock)
 	}
 
 	bencode::be_str * str;
-	if (bencode::get_str(message_bencoded, "t", &str) != 0 || str->len != TRANSACTION_ID_LENGHT)
+	if (bencode::get_str(message_bencoded, "t", &str) != 0 || str->len != TRANSACTION_ID_LENGTH)
 	{
 		#ifdef DHT_DEBUG
 			printf("	reject, invalid format\n");
@@ -302,7 +352,7 @@ int dht::event_sock_ready2read(network::Socket sock)
 		return 0;
 	}
 	uint16_t transaction_id;
-	memcpy(&transaction_id, str->ptr, TRANSACTION_ID_LENGHT);
+	memcpy(&transaction_id, str->ptr, TRANSACTION_ID_LENGTH);
 
 	bencode::be_str * message_type;
 	if (bencode::get_str(message_bencoded, "y", &message_type) != 0)
