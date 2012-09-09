@@ -29,11 +29,12 @@ dht::dht(network::NetworkManager* nm, const node_id & our_id)
 #endif
 	m_nm = nm;
 	m_node_id = our_id;
+	m_rt = new routing_table(m_node_id, this);
 }
 
 dht::~dht()
 {
-
+	delete m_rt;
 }
 
 void dht::InitSocket(const in_addr & listen_on, uint16_t port)
@@ -109,7 +110,7 @@ void dht::send_ping(const sockaddr_in & addr)
 
 void dht::find_node(const node_id & recipient, const node_id & target)
 {
-	find_node(m_nodes[recipient], target);
+	find_node((*m_rt)[recipient], target);
 }
 
 void dht::find_node(const sockaddr_in & recipient, const node_id & target)
@@ -147,7 +148,7 @@ void dht::find_node(const sockaddr_in & recipient, const node_id & target)
 
 void dht::get_peers(const node_id & recipient, const SHA1_HASH infohash)
 {
-	get_peers(m_nodes[recipient], infohash);
+	get_peers((*m_rt)[recipient], infohash);
 }
 
 void dht::get_peers(const sockaddr_in & recipient, const SHA1_HASH infohash)
@@ -183,9 +184,9 @@ void dht::get_peers(const sockaddr_in & recipient, const SHA1_HASH infohash)
 	}
 }
 
-void dht::announce_peer(const node_id & recipient, const SHA1_HASH infohash, uint16_t port, const std::string & token)
+void dht::announce_peer(const node_id & recipient, const SHA1_HASH infohash, uint16_t port, const TOKEN & token)
 {
-	//announce_peer(m_nodes[recipient], infohash, port, token);
+	announce_peer((*m_rt)[recipient], infohash, port, token);
 }
 
 void dht::announce_peer(const sockaddr_in & recipient, const SHA1_HASH infohash, uint16_t port, const TOKEN & token)
@@ -258,6 +259,7 @@ void dht::response_handler(bencode::be_node * message_bencoded, REQUEST_TYPE req
 			id.to_hex(hex);
 			printf("	from node id=%s\n", hex);
 	#endif
+	m_rt->update_node(id);
 
 	if (request_type == REQUEST_TYPE_PING)
 		ping_handler(id, addr);
@@ -271,7 +273,6 @@ void dht::ping_handler(const node_id & id, const sockaddr_in & addr)
 	#ifdef DHT_DEBUG
 		printf("	it`s 'ping' response\n");
 	#endif
-	m_nodes[id] = addr;
 }
 
 void dht::find_node_handler(bencode::be_node * reply_bencoded)
@@ -292,7 +293,7 @@ void dht::find_node_handler(bencode::be_node * reply_bencoded)
 		node_id node_from_list;
 		sockaddr_in addr;
 		parse_compact_node_info(&nodes_list_bencoded->ptr[i * COMPACT_NODE_INFO_LENGTH], node_from_list, addr);
-		m_nodes[node_from_list] = addr;
+		m_rt->add_node(node_from_list, addr);
 		#ifdef DHT_DEBUG
 			node_id_hex hex;
 			node_from_list.to_hex(hex);

@@ -25,7 +25,7 @@ D835E8D466826498D9A8877565705A8A3F628029
 
 int main(int argc,char* argv[])
 {
-	using namespace dinosaur::dht;
+	/*using namespace dinosaur::dht;
 	node_id own = generate_random_node_id();
 	routing_table rt(own);
 	sockaddr_in a;
@@ -42,7 +42,7 @@ int main(int argc,char* argv[])
 		sleep(1);
 	}
 
-	return 0;
+	return 0;*/
 	dinosaur::network::NetworkManager nm;
 	nm.Init();
 	uint32_t addr = 0;
