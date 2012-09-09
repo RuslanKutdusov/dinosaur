@@ -8,8 +8,8 @@
 #include "jni_export.h"
 #include "conversions.h"
 
-#define UINT16_MAX 65535
-#define UINT32_MAX 4294967295
+#define UINT16_MAX 0xFFFF
+#define UINT32_MAX 0xFFFFFFFF
 
 dinosaur::DinosaurPtr dino;
 dinosaur::torrent::MetafilePtr meta;

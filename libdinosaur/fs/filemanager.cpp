@@ -120,7 +120,7 @@ void FileManager::prepare_file(File & file) throw (Exception, SyscallException)
 	int fd;
 	try
 	{
-		m_fd_cache.get(file, &fd);
+		m_fd_cache.get(file, fd);
 	}
 	catch (Exception & e)
 	{
