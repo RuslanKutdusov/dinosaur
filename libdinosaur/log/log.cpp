@@ -20,7 +20,7 @@ ofstream ofs;
 void InitLogger(const std::string & log_dir)
 {
 	string fname = log_dir;
-	fname += "dinousar.";
+	fname += "dinosaur.";
 	fname +=  to_simple_string(microsec_clock::local_time());
 	ofs.open(fname.c_str());
 	ofs << "Log created at: " << to_simple_string(microsec_clock::local_time());

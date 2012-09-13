@@ -20,6 +20,9 @@ uint64_t routing_table::get_time()
 
 void routing_table::update_bucket(size_t bucket)
 {
+#ifdef DHT_DEBUG
+	printf("Update bucket %u\n", bucket);
+#endif
 	m_buckets_age.update_element_time(bucket);
 }
 
@@ -40,17 +43,19 @@ void routing_table::replace(const node_id & old, const node_id & new_, const soc
 	printf("	nodes in the bucket:\n");
 	for(bucket::iterator iter = m_buckets[bucket].begin(); iter != m_buckets[bucket].end(); ++iter)
 	{
-		printf("	%llu ", iter->first);iter->second.print();
+		printf("	");iter->first.print();
 	}
 #endif
 }
 
 void routing_table::delete_node(const node_id & id)
 {
+#ifdef DHT_DEBUG
+	printf("Delete node id=");id.print();
+#endif
 	size_t bucket = get_bucket(id, m_own_node_id);
 	m_buckets[bucket].remove(id);
-	if (m_buckets[bucket].size() == 0)
-		update_bucket(bucket);
+	update_bucket(bucket);
 }
 
 void routing_table::add_node_(const node_id & id, const sockaddr_in & addr)
@@ -105,9 +110,8 @@ void routing_table::add_node_(const node_id & id, const sockaddr_in & addr)
 	m_queue4adding_nodes[id] = addr;
 }
 
-routing_table::routing_table(const node_id & own_node_id, ping_sender_interface * psi)
+routing_table::routing_table(ping_sender_interface * psi, const std::string & work_dir)
 {
-	m_own_node_id = own_node_id;
 	m_psi = psi;
 	m_buckets_age.Init(BUCKETS_COUNT);
 	m_buckets = new bucket[BUCKETS_COUNT];
@@ -116,6 +120,10 @@ routing_table::routing_table(const node_id & own_node_id, ping_sender_interface 
 		m_buckets[i].Init(BUCKET_K);
 		m_buckets_age.put(i, m_value_for_all_buckets_age);
 	}
+	m_serialize_filepath = work_dir;
+	if (m_serialize_filepath[m_serialize_filepath.length() - 1] != '/')
+		m_serialize_filepath += "/";
+	m_serialize_filepath += "dht_rt";
 }
 
 routing_table::~routing_table()
@@ -146,6 +154,10 @@ void routing_table::clock()
 		++iter2;
 		if (time(NULL) - iter->second.ping_at > NODE_PING_TIMEOUT_SECS)
 		{
+#ifdef DHT_DEBUG
+			printf("No ping response from node id=");
+			iter->first.print();
+#endif
 			if (iter->second.do_replace)
 				replace(iter->first, iter->second.replacement_.id, iter->second.replacement_.addr);
 			else
@@ -171,23 +183,9 @@ void routing_table::clock()
 	m_buckets_age.get_element_time(old_bucket, tv);
 	if (time(NULL) - tv.tv_sec > BUCKET_UPDATE_PERIOD_SECS)
 	{
-#ifdef DHT_DEBUG
-		printf("Old bucket found %u\n", old_bucket);
-#endif
-		for(bucket::iterator iter = m_buckets[old_bucket].begin(); iter != m_buckets[old_bucket].end(); ++iter)
-		{
-			node_id current_node = iter->second;
-			pings::iterator iter2old = m_pings.find(current_node);
-			if (iter2old != m_pings.end())
-				return;
-
-			m_pings[current_node].ping_at = time(NULL);
-			m_pings[current_node].do_replace = false;
-			m_psi->send_ping(m_buckets[old_bucket][current_node]);
-#ifdef DHT_DEBUG
-			printf("	old node push to m_pings and we send ping to him\n");
-#endif
-		}
+		if (m_buckets[old_bucket].size() == 0)
+			update_bucket(old_bucket);
+		check_old_bucket(old_bucket);
 	}
 }
 
@@ -216,6 +214,125 @@ sockaddr_in & routing_table::operator[](const node_id & node)
 	catch(Exception & e)
 	{
 		throw Exception(Exception::ERR_CODE_NODE_NOT_EXISTS);
+	}
+}
+
+bool routing_table::node_exists(const node_id & node)
+{
+	size_t bucket = get_bucket(node, m_own_node_id);
+	return m_buckets[bucket].exists(node);
+}
+
+void routing_table::save()
+{
+	std::ofstream ofs(m_serialize_filepath.c_str());
+	if (ofs.fail())
+		return;
+	m_map4serialize.clear();
+	for(size_t bucket = 0; bucket < BUCKETS_COUNT; bucket++)
+		for(bucket::iterator iter = m_buckets[bucket].begin(); iter != m_buckets[bucket].end(); ++iter)
+		{
+			sockaddr_in_serializable addr;
+			addr.sin_family = iter->second.sin_family;
+			addr.sin_addr = iter->second.sin_addr;
+			addr.sin_port = iter->second.sin_port;
+			m_map4serialize[iter->first] = addr;
+		}
+	try
+	{
+		boost::archive::text_oarchive oa(ofs);
+		oa << *this;
+	}
+	catch(...)
+	{
+
+	}
+	ofs.close();
+}
+
+void routing_table::restore()
+{
+	try
+	{
+		std::ifstream ifs(m_serialize_filepath.c_str());
+		if (ifs.fail())
+			throw 1;
+		m_map4serialize.clear();
+		boost::archive::text_iarchive ia(ifs);
+		ia >> *this;
+		ifs.close();
+	}
+	catch(...)
+	{
+		m_own_node_id = generate_random_node_id();
+#ifdef DHT_DEBUG
+		printf("Can not restore routing table "); m_own_node_id.print();
+#endif
+		return;
+	}
+#ifdef DHT_DEBUG
+	printf("Restoring routing table...\n");
+	printf("	own node id=");m_own_node_id.print();
+#endif
+	for(map_serializable::iterator iter = m_map4serialize.begin(); iter != m_map4serialize.end(); ++iter)
+	{
+		add_node(iter->first, iter->second);
+	}
+	for(size_t bucket = 0; bucket < BUCKETS_COUNT; bucket++)
+	{
+		check_old_bucket(bucket);
+	}
+}
+
+const node_id & routing_table::get_node_id()
+{
+	return m_own_node_id;
+}
+
+void routing_table::get_closest_ids(const node_id & close2, node_list & nodes)
+{
+	size_t bucket = get_bucket(m_own_node_id, close2);
+	size_t bucket_iter = 0;
+	int sign = -1;
+	nodes.clear();
+	size_t buckets_passed = 0;
+	int current_bucket = bucket;
+	while(buckets_passed != BUCKETS_COUNT)
+	{
+		current_bucket +=  bucket_iter * sign;
+		bucket_iter++;
+		sign = -sign;
+		if (current_bucket < 0 || current_bucket > BUCKETS_COUNT - 1)
+			continue;
+		buckets_passed++;
+		for(bucket::iterator iter = m_buckets[current_bucket].begin(); iter != m_buckets[current_bucket].end(); ++iter)
+		{
+			nodes.push_back(iter->first);
+			if (nodes.size() == BUCKET_K)
+				return;
+		}
+	}
+}
+
+void routing_table::check_old_bucket(size_t old_bucket)
+{
+#ifdef DHT_DEBUG
+		printf("Old bucket %u\n", old_bucket);
+#endif
+	for(bucket::iterator iter = m_buckets[old_bucket].begin(); iter != m_buckets[old_bucket].end(); ++iter)
+	{
+		node_id current_node = iter->first;
+		pings::iterator iter2old = m_pings.find(current_node);
+		if (iter2old != m_pings.end())
+			return;
+
+		m_pings[current_node].ping_at = time(NULL);
+		m_pings[current_node].do_replace = false;
+
+		m_psi->send_ping(iter->second);
+#ifdef DHT_DEBUG
+		printf("	old node push to m_pings and we send ping to him\n");
+#endif
 	}
 }
 

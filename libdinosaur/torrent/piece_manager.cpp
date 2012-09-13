@@ -135,7 +135,7 @@ void PieceManager::build_piece_info()
 
 
 		m_piece_info[piece_index].length = piece_length;
-		m_torrent->copy_piece_hash(m_piece_info[piece_index].hash, piece_index);
+		m_piece_info[piece_index].hash = m_torrent->get_piece_hash(piece_index);
 		m_piece_info[piece_index].prio = DOWNLOAD_PRIORITY_NORMAL;
 
 		if (need2download)
@@ -439,17 +439,16 @@ bool PieceManager::check_piece_hash(PIECE_INDEX piece_index)
 	if (m_torrent->read_piece(piece_index, m_piece_for_check_hash) != ERR_NO_ERROR)
 		return false;
 	SHA1_HASH sha1;
-	memset(sha1, 0, SHA1_LENGTH);
 	m_csha1.Update(m_piece_for_check_hash, m_piece_info[piece_index].length);
 	m_csha1.Final();
 	m_csha1.GetHash(sha1);
 	m_csha1.Reset();
-	bool ret =  memcmp(sha1, m_piece_info[piece_index].hash, SHA1_LENGTH) == 0;
-	if (ret)
+	if (sha1 == m_piece_info[piece_index].hash)
 	{
 		set_bitfield(piece_index, m_piece_info.size(), m_bitfield);
 		m_piece_info[piece_index].block2download.clear();
 		m_torrent->inc_downloaded(m_piece_info[piece_index].length);
+		return true;
 	}
 	else
 	{
@@ -458,8 +457,8 @@ bool PieceManager::check_piece_hash(PIECE_INDEX piece_index)
 				m_piece_info[piece_index].block2download.insert(block);
 		m_piece_info[piece_index].downloaded_blocks.clear();
 		push_piece2download(piece_index);
+		return false;
 	}
-	return ret;
 }
 
 int PieceManager::event_file_write(const fs::write_event & we, PIECE_STATE & piece_state)

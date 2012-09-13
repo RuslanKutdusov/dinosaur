@@ -119,15 +119,16 @@ void TorrentInterfaceInternal::get_file_index_by_piece(uint32_t piece_index, FIL
 	m_piece_manager->get_file_index_by_piece(piece_index, index);
 }
 
-void TorrentInterfaceInternal::copy_infohash_bin(SHA1_HASH dst)
+SHA1_HASH & TorrentInterfaceInternal::get_infohash()
 {
-	memcpy(dst, m_metafile.info_hash_bin, SHA1_LENGTH);
+	return m_metafile.info_hash_bin;
 }
 
-int TorrentInterfaceInternal::memcmp_infohash_bin(SHA1_HASH mem)
+bool TorrentInterfaceInternal::memcmp_infohash_bin(const SHA1_HASH & hash)
 {
-	return memcmp(mem, m_metafile.info_hash_bin, SHA1_LENGTH);
+	return hash == m_metafile.info_hash_bin;
 }
+
 
 void TorrentInterfaceInternal::copy_bitfield(BITFIELD dst)
 {
@@ -144,9 +145,9 @@ void TorrentInterfaceInternal::inc_downloaded(uint32_t bytes_num)
 	m_downloaded += bytes_num;
 }
 
-void TorrentInterfaceInternal::copy_piece_hash(SHA1_HASH dst, uint32_t piece_index)
+SHA1_HASH & TorrentInterfaceInternal::get_piece_hash(uint32_t piece_index)
 {
-	memcpy(dst, &m_metafile.pieces[piece_index * SHA1_LENGTH], SHA1_LENGTH);
+	return m_metafile.pieces[piece_index];
 }
 
 int TorrentInterfaceInternal::save_block(uint32_t piece, uint32_t block_offset, uint32_t block_length, char * block)

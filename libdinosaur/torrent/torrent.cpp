@@ -750,7 +750,7 @@ void TorrentBase::get_info_stat(info::torrent_stat & ref)
 	ref.private_ = m_metafile.private_;
 	ref.start_time = m_start_time;
 	ref.files_count = m_metafile.files.size();
-	memcpy(ref.info_hash_hex, m_metafile.info_hash_hex, SHA1_HEX_LENGTH);
+	ref.info_hash_hex =m_metafile.info_hash_hex;
 }
 
 void TorrentBase::get_info_dyn(info::torrent_dyn & ref)

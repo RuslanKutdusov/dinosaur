@@ -46,6 +46,7 @@ public:
 	void Init(uint16_t size);
 	void put(const cache_key & key, const cache_element & value);
 	void get(const cache_key & key, cache_element & value);
+	bool exists(const cache_key & key);
 	cache_element & operator[](const cache_key & key);
 	void get_without_time_update(const cache_key & key, cache_element & value);
 	const cache_key & get_old();
@@ -54,14 +55,14 @@ public:
 	bool empty();
 	size_t size();
 	void remove(const cache_key & key);
-	typedef typename time_queue::left_map::iterator iterator;
+	typedef hash_table_iterator iterator;
 	iterator begin()
 	{
-		return m_time_queue.left.begin();
+		return m_hash_table.begin();
 	}
 	iterator end()
 	{
-		return m_time_queue.left.end();
+		return m_hash_table.end();
 	}
 };
 
@@ -136,6 +137,13 @@ void LRU_Cache<cache_key, cache_element>::get(const cache_key & key, cache_eleme
 {
 	get_without_time_update(key, value);
 	update_element_time(key);
+}
+
+template <class cache_key, class cache_element>
+bool LRU_Cache<cache_key, cache_element>::exists(const cache_key & key)
+{
+	hash_table_iterator iter = m_hash_table.find(key);
+	return iter != m_hash_table.end();
 }
 
 /*

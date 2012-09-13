@@ -87,12 +87,10 @@ Tracker::Tracker(const TorrentInterfaceInternalPtr & torrent, std::string & anno
 void Tracker::hash2urlencode()
 {
 	memset(m_infohash, 0, SHA1_LENGTH * 3 + 1);
-	unsigned char infohash_bin[SHA1_LENGTH];
-	m_torrent->copy_infohash_bin(infohash_bin);
 	for(int i = 0; i < SHA1_LENGTH; i++)
 	{
 		m_infohash[i * 3] = '%';
-		sprintf(&m_infohash[i * 3 + 1], "%02x", infohash_bin[i]);
+		sprintf(&m_infohash[i * 3 + 1], "%02x", m_torrent->get_infohash()[i]);
 	}
 }
 

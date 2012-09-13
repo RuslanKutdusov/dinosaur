@@ -31,10 +31,16 @@ node_id generate_random_node_id()
 
 void generate_random_node_id(node_id & id)
 {
-	for(size_t i = 0; i < NODE_ID_LENGTH; i++)
+	/*for(size_t i = 0; i < NODE_ID_LENGTH; i++)
 	{
 		id[i] = rand() % 256 ;
-	}
+	}*/
+	CSHA1 csha1;
+	timeval tv;
+	gettimeofday(&tv, NULL);
+	csha1.Update((unsigned char*)&tv, sizeof(timeval));
+	csha1.Final();
+	csha1.GetHash(id);
 }
 
 size_t get_bucket(const node_id & id1, const node_id & id2)
@@ -53,18 +59,27 @@ size_t get_bucket(const node_id & id1, const node_id & id2)
 }
 
 node_id::node_id()
+ 	 : SHA1_HASH()
 {
-	clear();
+
 }
 
 node_id::node_id(const node_id & id)
+	: SHA1_HASH(id)
 {
-	memcpy(this->m_data, id.m_data, NODE_ID_LENGTH);
+
 }
 
 node_id::node_id(const char * id)
+	: SHA1_HASH(id)
 {
-	memcpy(this->m_data, id, NODE_ID_LENGTH);
+
+}
+
+node_id::node_id(const unsigned char * id)
+	: SHA1_HASH(id)
+{
+
 }
 
 node_id::~node_id()
@@ -72,86 +87,10 @@ node_id::~node_id()
 
 }
 
-node_id & node_id::operator=(const node_id & id)
-{
-	if (this != &id)
-	{
-		memcpy(this->m_data, id.m_data, NODE_ID_LENGTH);
-	}
-	return *this;
-}
-
-node_id & node_id::operator=(const char * id)
-{
-	memcpy(this->m_data, id, NODE_ID_LENGTH);
-	return *this;
-}
-
-unsigned char & node_id::operator[](size_t i)
-{
-	if (i >= NODE_ID_LENGTH)
-		throw Exception(Exception::ERR_CODE_INVALID_OPERATION);
-	return m_data[i];
-}
-
-const unsigned char & node_id::operator[](size_t i) const
-{
-	if (i >= NODE_ID_LENGTH)
-		throw Exception(Exception::ERR_CODE_INVALID_OPERATION);
-	return m_data[i];
-}
-
 const node_id node_id::operator ^(const node_id & id)
 {
 	return distance(*this, id);
 }
 
-bool node_id::operator<(const node_id & id) const
-{
-	for(size_t i = 0; i < NODE_ID_LENGTH; i++)
-	{
-		if (m_data[i] != id.m_data[i])
-			return m_data[i] < id.m_data[i];
-	}
-	return false;
-}
-
-bool node_id::operator==(const node_id & id) const
-{
-	return memcmp(m_data, id.m_data, NODE_ID_LENGTH);
-}
-
-bool node_id::operator!=(const node_id & id) const
-{
-	return !memcmp(m_data, id.m_data, NODE_ID_LENGTH);
-}
-
-void node_id::copy2(char * dst) const
-{
-	memcpy(dst, m_data, NODE_ID_LENGTH);
-}
-
-void node_id::copy2(unsigned char * dst) const
-{
-	memcpy(dst, m_data, NODE_ID_LENGTH);
-}
-
-void node_id::print()  const
-{
-	for(size_t i = 0; i < NODE_ID_LENGTH; i++)
-		printf("%02X", m_data[i]);
-	printf("\n");
-}
-
-void node_id::to_hex(node_id_hex id) const
-{
-	for(size_t i = 0; i < NODE_ID_LENGTH; i++)
-		sprintf(&id[i * 2], "%02X", m_data[i]);
-}
-
-void node_id::clear()
-{
-	memset(m_data, 0, NODE_ID_LENGTH);
-}
 }
 }
