@@ -85,8 +85,10 @@ public:
 
 	// Finalize hash and report
 	void Final();
-	void ReportHash(char *szReport, unsigned char uReportType = REPORT_HEX);
-	void GetHash(unsigned char *uDest);
+	//void ReportHash(char *szReport, unsigned char uReportType = REPORT_HEX);
+	//void GetHash(unsigned char *uDest);
+	void GetHEXHash(SHA1_HASH_HEX & hash);
+	void GetHash(SHA1_HASH & hash);
 
 private:
 	// Private SHA-1 transformation

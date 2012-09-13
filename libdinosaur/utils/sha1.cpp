@@ -152,49 +152,17 @@ void CSHA1::Final()
 	Transform(m_state, m_buffer);
 }
 
-// Get the final hash as a pre-formatted string
-void CSHA1::ReportHash(char *szReport, unsigned char uReportType)
+void CSHA1::GetHEXHash(SHA1_HASH_HEX & hash)
 {
-	unsigned char i = 0;
-	char szTemp[4];
+	SHA1_HASH h = m_digest;
+	h.to_hex(hash);
 
-	if(uReportType == REPORT_HEX)
-	{
-		sprintf(szTemp, "%02x", m_digest[0]);
-		strcat(szReport, szTemp);
-
-		for(i = 1; i < 20; i++)
-		{
-			sprintf(szTemp, "%02x", m_digest[i]);
-			strcat(szReport, szTemp);
-		}
-	}
-	else if(uReportType == REPORT_DIGIT)
-	{
-		sprintf(szTemp, "%u", m_digest[0]);
-		strcat(szReport, szTemp);
-
-		for(i = 1; i < 20; i++)
-		{
-			sprintf(szTemp, " %u", m_digest[i]);
-			strcat(szReport, szTemp);
-		}
-	}
-	else strcpy(szReport, "Error: Unknown report type!");
 }
 
 // Get the raw message digest
-void CSHA1::GetHash(unsigned char *uDest)
+void CSHA1::GetHash(SHA1_HASH & hash)
 {
-	memcpy(uDest, m_digest, 20);
-}
-
-void sha1ToHex(const SHA1_HASH src, SHA1_HASH_HEX dst)
-{
-	for(size_t i = 0; i < SHA1_LENGTH; i++)
-	{
-		sprintf(&dst[i * 2], "%02X", src[i]);
-	}
+	hash = m_digest;
 }
 
 }

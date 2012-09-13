@@ -135,7 +135,7 @@ jobject Create_Metafile(JNIEnv * env, dinosaur::torrent::MetafilePtr & metafile)
 											env->NewStringUTF(metafile->name.c_str()),
 											(jlong)metafile->piece_length,
 											(jlong)metafile->piece_count,
-											env->NewStringUTF(metafile->info_hash_hex));
+											env->NewStringUTF(metafile->info_hash_hex.c_str()));
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -156,7 +156,7 @@ jobject Create_torrent_stat(JNIEnv * env, dinosaur::info::torrent_stat & ts)
 									(jlong)ts.length,
 									(jlong)ts.piece_length,
 									(jlong)ts.piece_count,
-									env->NewStringUTF(ts.info_hash_hex),
+									env->NewStringUTF(ts.info_hash_hex.c_str()),
 									(jlong)ts.start_time,
 									(jlong)ts.files_count);
 

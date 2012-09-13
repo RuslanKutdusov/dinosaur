@@ -101,7 +101,7 @@ int Peer::send_handshake()
 	memset(handshake, 0, HANDSHAKE_LENGHT);
 	handshake[0] = '\x13';
 	strncpy((char*)&handshake[1], "BitTorrent protocol", 19);
-	m_torrent->copy_infohash_bin(&handshake[28]);
+	m_torrent->get_infohash().copy2(&handshake[28]);
 	m_g_cfg->get_peer_id((char*)&handshake[48]);
 	try
 	{

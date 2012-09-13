@@ -659,7 +659,7 @@ size_t NetworkManager::Socket_recv(Socket & sock, void * data, size_t len, socka
 		return 0;
 	if (sock->m_udp)
 	{
-		socklen_t s = 0;//sizeof(sockaddr_in);
+		socklen_t s = sizeof(sockaddr_in);
 		int ret = recvfrom(sock->m_socket, data, len, 0, (sockaddr*)from, &s);
 		m_ready2read_sockets.erase(sock);
 		if (ret == -1)

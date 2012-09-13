@@ -157,7 +157,7 @@ int TorrentFile::read_block(PIECE_INDEX piece, BLOCK_INDEX block_index, char * b
 	block_cache::cache_key key(m_torrent.get(), block_id);
 	try
 	{
-		m_torrent->get_bc()->get(key, (block_cache::cache_element *)block);
+		m_torrent->get_bc()->get(key, block);
 		return ERR_NO_ERROR;
 	}
 	catch (Exception & e) {
@@ -218,7 +218,7 @@ int TorrentFile::read_block(PIECE_INDEX piece, BLOCK_INDEX block_index, char * b
 	}
 	try
 	{
-		m_torrent->get_bc()->put(key, (block_cache::cache_element*)block);
+		m_torrent->get_bc()->put(key, block);
 	}
 	catch(Exception & e)
 	{

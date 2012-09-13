@@ -763,5 +763,79 @@ be_node * copy(be_node * src)
 	return NULL;
 }
 
+be_node * create_int(uint64_t value)
+{
+	be_node * ret = new be_node;
+	ret->type = BE_INT;
+	ret->val.i = value;
+	return ret;
+}
+
+be_node * create_str(const char * value, size_t value_len)
+{
+	be_node * ret = new be_node;
+	ret->type = BE_STR;
+	ret->val.s.len = value_len;
+	ret->val.s.ptr = new char[value_len];
+	memcpy(ret->val.s.ptr, value, value_len);
+	return ret;
+}
+
+be_node * create_list()
+{
+	be_node * ret = new be_node;
+	ret->type = BE_LIST;
+	ret->val.l.count = 0;
+	ret->val.l.elements = NULL;
+	return ret;
+}
+
+be_node * create_dict()
+{
+	be_node * ret = new be_node;
+	ret->type = BE_DICT;
+	ret->val.d.count = 0;
+	ret->val.d.keys = NULL;
+	ret->val.d.vals = NULL;
+	return ret;
+}
+
+void dict_add_node(be_node * dict, const char * key_c_str, size_t key_len, be_node * value)
+{
+	be_node * vals = new be_node[++dict->val.d.count];
+	be_str * keys  = new be_str[dict->val.d.count];
+	if (dict->val.d.count != 1)
+	{
+		memcpy(vals, dict->val.d.vals, sizeof(be_node)*(dict->val.d.count - 1));
+		delete[] dict->val.d.vals;
+		memcpy(keys, dict->val.d.keys, sizeof(be_str)*(dict->val.d.count - 1));
+		delete[] dict->val.d.keys;
+	}
+	be_str  key;
+	key.len = key_len;
+	key.ptr = new char[key_len];
+	memcpy(key.ptr, key_c_str, key_len);
+	memcpy(&keys[dict->val.d.count - 1], &key, sizeof(be_str));
+	memcpy(&vals[dict->val.d.count - 1], value, sizeof(be_node));
+	dict->val.d.keys = keys;
+	dict->val.d.vals = vals;
+}
+
+void dict_add_int(be_node * dict, const char * key, size_t key_len, uint64_t value)
+{
+	if (dict == NULL)
+		return;
+	be_node * node = create_int(value);
+	dict_add_node(dict, key, key_len, node);
+}
+
+void dict_add_str(be_node * dict, const char * key, size_t key_len, const char * value, size_t value_len)
+{
+	if (dict == NULL)
+		return;
+	be_node * node = create_str(value, value_len);
+	dict_add_node(dict, key, key_len, node);
+}
+
 }
 }

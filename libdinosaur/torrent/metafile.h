@@ -49,9 +49,9 @@ public:
 	std::string 					name;
 	uint64_t 						piece_length;
 	uint32_t 						piece_count;
-	char * 							pieces;
-	dinosaur::SHA1_HASH 			info_hash_bin;
-	dinosaur::SHA1_HASH_HEX 		info_hash_hex;
+	std::vector<SHA1_HASH>			pieces;
+	SHA1_HASH 						info_hash_bin;
+	SHA1_HASH_HEX 					info_hash_hex;
 	Metafile();
 	Metafile(const Metafile & metafile);
 	Metafile & operator = (const Metafile & metafile);

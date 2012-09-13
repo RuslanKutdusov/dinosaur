@@ -21,10 +21,12 @@ namespace dinosaur {
 namespace lru_cache
 {
 
+#define DEFAULT_MAX_LRU_SIZE 512
+
 template <class cache_key, class cache_element>
 class LRU_Cache {
 protected:
-	typedef std::map<cache_key, cache_element *> hash_table;
+	typedef std::map<cache_key, cache_element> hash_table;
 	typedef typename hash_table::iterator hash_table_iterator;
 
 	typedef boost::bimap<uint64_t, cache_key> time_queue;
@@ -32,35 +34,47 @@ protected:
 	typedef typename time_queue::left_map::iterator time_queue_left_iterator;
 	typedef typename time_queue::value_type time_queue_value_type;
 
-	//typedef std::map<uint64_t, cache_key> time_queue;
-	std::list<cache_element *> m_free_elements;
 	hash_table m_hash_table;
 	time_queue m_time_queue;
-	cache_element * m_elements;
-	uint16_t m_elements_count;
+	size_t	m_max_size;
 	uint64_t get_time();
+	LRU_Cache(const LRU_Cache & copy){};
+	LRU_Cache & operator=(const LRU_Cache & dht){ return *this; }
 public:
 	LRU_Cache();
 	virtual ~LRU_Cache();
 	void Init(uint16_t size);
-	void put(cache_key key, cache_element * value);
-	void get(cache_key key, cache_element * value);
+	void put(const cache_key & key, const cache_element & value);
+	void get(const cache_key & key, cache_element & value);
+	bool exists(const cache_key & key);
+	cache_element & operator[](const cache_key & key);
+	void get_without_time_update(const cache_key & key, cache_element & value);
+	const cache_key & get_old();
+	void get_element_time(const cache_key & key, timeval & t);
+	void update_element_time(const cache_key & key);
 	bool empty();
-	void remove(cache_key key);
+	size_t size();
+	void remove(const cache_key & key);
+	typedef hash_table_iterator iterator;
+	iterator begin()
+	{
+		return m_hash_table.begin();
+	}
+	iterator end()
+	{
+		return m_hash_table.end();
+	}
 };
 
 template <class cache_key, class cache_element>
 LRU_Cache<cache_key, cache_element>::LRU_Cache() {
 	// TODO Auto-generated constructor stub
-	m_elements_count = 0;
-	m_elements = NULL;
+	m_max_size = DEFAULT_MAX_LRU_SIZE;
 }
 
 template <class cache_key, class cache_element>
 LRU_Cache<cache_key, cache_element>::~LRU_Cache() {
 	// TODO Auto-generated destructor stub
-	if (m_elements != NULL && m_elements_count > 0)
-		delete[] m_elements;
 }
 
 template <class cache_key, class cache_element>
@@ -71,129 +85,124 @@ uint64_t LRU_Cache<cache_key, cache_element>::get_time()
 	return ((uint64_t)tv.tv_sec << 32) + tv.tv_usec;
 }
 
-/*
- * Exception::ERR_CODE_NO_MEMORY_AVAILABLE
- * Exception::ERR_CODE_UNDEF
- */
-
 template <class cache_key, class cache_element>
 void LRU_Cache<cache_key, cache_element>::Init(uint16_t size)//thrown
 {
-	try
-	{
-		m_elements_count = size;
-		m_elements = new cache_element[size];//исключение возможно здесь
-		for(uint16_t i = 0; i < size; i++)
-			m_free_elements.push_front(&m_elements[i]);//исключение возможно здесь
-	}
-	catch (std::bad_alloc & e) {
-		throw Exception(Exception::ERR_CODE_NO_MEMORY_AVAILABLE);
-	}
-	catch(...)
-	{
-		throw Exception(Exception::ERR_CODE_UNDEF);
-	}
+	m_max_size = size;
 }
 
-/*
- * Exception::ERR_CODE_NULL_REF
- * Exception::ERR_CODE_UNDEF
- */
-
 template <class cache_key, class cache_element>
-void LRU_Cache<cache_key, cache_element>::put(cache_key key, cache_element * value)
+void LRU_Cache<cache_key, cache_element>::put(const cache_key & key, const cache_element & value)
 {
-	if (value == NULL || m_elements == NULL)
-		throw Exception(Exception::ERR_CODE_NULL_REF);
-	try
+	if (m_hash_table.size() >= m_max_size)
 	{
-		if (m_free_elements.empty())
+		typename time_queue::right_iterator time_queue_iter_to_element = m_time_queue.right.find(key);
+		//обновляемся если есть элемент с таким ключом
+		if (time_queue_iter_to_element != m_time_queue.right.end())
 		{
-			typename time_queue::right_iterator time_queue_iter_to_element = m_time_queue.right.find(key);
-			//обновляемся если есть элемент с таким ключом
-			if (time_queue_iter_to_element != m_time_queue.right.end() || m_time_queue.right.count(key) != 0)
-			{
-				memcpy(m_hash_table[key], value, sizeof(cache_element));
-				m_time_queue.right.replace_data(time_queue_iter_to_element, get_time());
-				return;
-			}
-			//находим самый старый элемент
-			time_queue_left_iterator time_queue_iter_to_old_element = m_time_queue.left.begin();
-			//берем его ключ
-			cache_key key_of_old_element = time_queue_iter_to_old_element->second;
-			//находим ссылку на элемент
-			hash_table_iterator hash_table_iter_to_old_element = m_hash_table.find(key_of_old_element);
-			//добавляем ссылку в free_elements
-			m_free_elements.push_back((*hash_table_iter_to_old_element).second);
-			//удаляем из таблицы и очереди элемент
-			m_hash_table.erase(hash_table_iter_to_old_element);
-			m_time_queue.left.erase(time_queue_iter_to_old_element);
-			//в итоге в free_elements есть свободный элемент, его и займем
-			return put(key, value);
+			m_hash_table[key] = value;
+			m_time_queue.right.replace_data(time_queue_iter_to_element, get_time());
+			return;
 		}
-		else
-		{
-			cache_element * free_element = m_free_elements.front();
-			memcpy(free_element, value, sizeof(cache_element));
-			//cache_key key(torrent, block_id);
-			m_hash_table[key] = free_element;
-			m_free_elements.pop_front();
-			//ищем справа данный свободный элемент(key)
-			typename time_queue::right_iterator time_queue_iter_to_element = m_time_queue.right.find(key);
-			//если его нет, добавляем
-			if (time_queue_iter_to_element == m_time_queue.right.end() && m_time_queue.right.count(key) == 0)
-				m_time_queue.insert(time_queue_value_type(get_time(), key));
-			else
-				//если он есть в time_queue, меняем слева время на текущее
-				m_time_queue.right.replace_data(time_queue_iter_to_element, get_time());
-			//m_time_queue[get_time()] = key;
-			//m_time_queue
-		}
+		//находим самый старый элемент
+		time_queue_left_iterator time_queue_iter_to_old_element = m_time_queue.left.begin();
+		//берем его ключ
+		cache_key key_of_old_element = time_queue_iter_to_old_element->second;
+		//удаляем из таблицы и очереди элемент
+		m_hash_table.erase(key_of_old_element);
+		m_time_queue.left.erase(time_queue_iter_to_old_element);
+		//в итоге есть свободный элемент, его и займем
+		return put(key, value);
 	}
-	catch(...)
+	else
 	{
-		throw Exception(Exception::ERR_CODE_UNDEF);
-	}
-}
-
-/*
- * Exception::ERR_CODE_NULL_REF
- * Exception::ERR_CODE_LRU_CACHE_NE
- * Exception::ERR_CODE_UNDEF
- */
-
-template <class cache_key, class cache_element>
-void LRU_Cache<cache_key, cache_element>::get(cache_key key, cache_element * value)
-{
-	if (value == NULL || m_elements == NULL)
-		throw Exception(Exception::ERR_CODE_NULL_REF);
-	try
-	{
-		//cache_key key(torrent, block_id);
-		hash_table_iterator iter = m_hash_table.find(key);
-		if (iter == m_hash_table.end() && m_hash_table.count(key) == 0)
-			throw Exception(Exception::ERR_CODE_LRU_CACHE_NE);
-
-		cache_element * element = (*iter).second;
-		memcpy(value, element, sizeof(cache_element));
-		//ищем справа данный элемент(key)
-		typename time_queue::right_iterator it = m_time_queue.right.find(key);
+		m_hash_table[key] = value;
+		//ищем справа данный свободный элемент(key)
+		typename time_queue::right_iterator time_queue_iter_to_element = m_time_queue.right.find(key);
 		//если его нет, добавляем
-		if (it == m_time_queue.right.end() && m_time_queue.right.count(key) == 0)
+		if (time_queue_iter_to_element == m_time_queue.right.end())
 			m_time_queue.insert(time_queue_value_type(get_time(), key));
 		else
 			//если он есть в time_queue, меняем слева время на текущее
-			m_time_queue.right.replace_data(it, get_time());
+			m_time_queue.right.replace_data(time_queue_iter_to_element, get_time());
+	}
+}
 
-	}
-	catch(Exception & e)
-	{
-		throw Exception(e);
-	}
-	catch(...)
-	{
-		throw Exception(Exception::ERR_CODE_UNDEF);
-	}
+/*
+ * Exception::ERR_CODE_LRU_CACHE_NE
+ */
+
+template <class cache_key, class cache_element>
+void LRU_Cache<cache_key, cache_element>::get(const cache_key & key, cache_element & value)
+{
+	get_without_time_update(key, value);
+	update_element_time(key);
+}
+
+template <class cache_key, class cache_element>
+bool LRU_Cache<cache_key, cache_element>::exists(const cache_key & key)
+{
+	hash_table_iterator iter = m_hash_table.find(key);
+	return iter != m_hash_table.end();
+}
+
+/*
+ * Exception::ERR_CODE_LRU_CACHE_NE
+ */
+
+template <class cache_key, class cache_element>
+cache_element & LRU_Cache<cache_key, cache_element>::operator[](const cache_key & key)
+{
+	update_element_time(key);
+	return m_hash_table[key];
+}
+
+/*
+ * Exception::ERR_CODE_LRU_CACHE_NE
+ */
+
+template <class cache_key, class cache_element>
+void LRU_Cache<cache_key, cache_element>::get_without_time_update(const cache_key & key, cache_element & value)
+{
+	hash_table_iterator iter = m_hash_table.find(key);
+	if (iter == m_hash_table.end())
+		throw Exception(Exception::ERR_CODE_LRU_CACHE_NE);
+	value = iter->second;
+}
+
+/*
+ * Exception::ERR_CODE_LRU_CACHE_NE
+ */
+
+template <class cache_key, class cache_element>
+void LRU_Cache<cache_key, cache_element>::get_element_time(const cache_key & key, timeval & t)
+{
+	typename time_queue::right_iterator it = m_time_queue.right.find(key);
+	if (it == m_time_queue.right.end())
+		throw Exception(Exception::ERR_CODE_LRU_CACHE_NE);
+	uint64_t time = it->second;
+	t.tv_usec = time & (uint32_t)0xFFFFFFFF;
+	t.tv_sec = (time - t.tv_usec) >> 32;
+}
+
+/*
+ * Exception::ERR_CODE_LRU_CACHE_NE
+ */
+
+template <class cache_key, class cache_element>
+void LRU_Cache<cache_key, cache_element>::update_element_time(const cache_key & key)
+{
+	typename time_queue::right_iterator it = m_time_queue.right.find(key);
+	if (it == m_time_queue.right.end())
+		throw Exception(Exception::ERR_CODE_LRU_CACHE_NE);
+	m_time_queue.right.replace_data(it, get_time());
+}
+
+template <class cache_key, class cache_element>
+const cache_key & LRU_Cache<cache_key, cache_element>::get_old()
+{
+	time_queue_left_iterator time_queue_iter_to_old_element = m_time_queue.left.begin();
+	return time_queue_iter_to_old_element->second;
 }
 
 template <class cache_key, class cache_element>
@@ -202,35 +211,18 @@ bool LRU_Cache<cache_key, cache_element>::empty()
 	return m_hash_table.empty();
 }
 
-/*
- * Exception::ERR_CODE_UNDEF
- * Exception::ERR_CODE_LRU_CACHE_NE
- */
+template <class cache_key, class cache_element>
+size_t LRU_Cache<cache_key, cache_element>::size()
+{
+	return m_hash_table.size();
+}
 
 template <class cache_key, class cache_element>
-void LRU_Cache<cache_key, cache_element>::remove(cache_key key)
+void LRU_Cache<cache_key, cache_element>::remove(const cache_key & key)
 {
-	try
-	{
-		//cache_key key(torrent, block_id);
-		hash_table_iterator hash_table_iter_to_element = m_hash_table.find(key);
-		if (hash_table_iter_to_element == m_hash_table.end() && m_hash_table.count(key) == 0)
-			throw Exception(Exception::ERR_CODE_LRU_CACHE_NE);
-		typename time_queue::right_iterator time_queue_iter_to_element = m_time_queue.right.find(key);
-		m_free_elements.push_back((*hash_table_iter_to_element).second);
-		//удаляем из таблицы и очереди элемент
-		m_hash_table.erase(hash_table_iter_to_element);
-		m_time_queue.right.erase(time_queue_iter_to_element);
-	}
-	catch(Exception & e)
-	{
-		throw Exception(e);
-	}
-	catch(...)
-	{
-		throw Exception(Exception::ERR_CODE_UNDEF);
-	}
+	m_hash_table.erase(key);
+	m_time_queue.right.erase(key);
 }
 
 }
-} /* namespace Bittorrent */
+}

@@ -546,12 +546,12 @@ public:
 	void get_piece_offset(PIECE_INDEX piece_index, FILE_OFFSET & offset);
 	void get_block_info(PIECE_INDEX piece_index, BLOCK_INDEX block_index, FILE_INDEX & file_index, FILE_OFFSET & file_offset);
 	void get_file_index_by_piece(PIECE_INDEX piece_index, FILE_INDEX & index);
-	void copy_infohash_bin(SHA1_HASH dst);
-	int memcmp_infohash_bin(SHA1_HASH mem);
+	SHA1_HASH & get_infohash();
+	bool memcmp_infohash_bin(const SHA1_HASH & hash);
 	void copy_bitfield(BITFIELD dst);
 	void inc_uploaded(uint32_t bytes_num);
 	void inc_downloaded(uint32_t bytes_num);
-	void copy_piece_hash(SHA1_HASH dst, PIECE_INDEX piece_index);
+	SHA1_HASH & get_piece_hash(PIECE_INDEX piece_index);
 	int save_block(PIECE_INDEX piece, BLOCK_OFFSET block_offset, uint32_t block_length, char * block);
 	int read_block(PIECE_INDEX piece, BLOCK_INDEX block_index, char * block, uint32_t & block_length);
 	int read_piece(PIECE_INDEX piece, unsigned char * dst);
