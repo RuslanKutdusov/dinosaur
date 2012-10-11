@@ -550,7 +550,6 @@ int NetworkManager::clock()  throw (SyscallException)
 	for(int i = 0; i < nfds; i++)
 	{
 		Socket  sock = ((socket_ *)events[i].data.ptr)->shared_from_this();
-		int a = sock.use_count();
 		sock->m_timer = time(NULL);
 		try
 		{
@@ -660,12 +659,10 @@ size_t NetworkManager::Socket_recv(Socket & sock, char * data, size_t len, bool 
 		return ret;
 	}
 	size_t total_received = 0;
-	while(1)
+	while(len != total_received)
 	{
 		ssize_t received = recv(sock->m_socket, data + total_received, len - total_received, 0);
-		if (received == -1 && !(errno == EAGAIN || errno==EWOULDBLOCK))
-			throw SyscallException();
-		if (received == -1 && (errno == EAGAIN || errno==EWOULDBLOCK))
+		if (received == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
 			return total_received;
 		if (received == 0)
 		{
