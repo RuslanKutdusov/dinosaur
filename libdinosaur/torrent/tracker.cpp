@@ -179,6 +179,7 @@ int Tracker::process_response()
 	if (data == NULL)
 	{
 		m_status = TRACKER_STATUS_ERROR;
+		logger::LOGGER() << "Tracker invalid response(data == null)";
 		return ERR_INTERNAL;
 	}
 	len = m_buflen - (data - m_buf);
@@ -188,6 +189,7 @@ int Tracker::process_response()
 	if (response == NULL)
 	{
 		m_status = TRACKER_STATUS_ERROR;
+		logger::LOGGER() << "Tracker invalid response(not bencode)";
 		return ERR_INTERNAL;
 	}
 	//bencode::dump(response);
@@ -227,6 +229,7 @@ int Tracker::process_response()
 		{
 			bencode::_free(response);
 			m_status = TRACKER_STATUS_ERROR;
+			logger::LOGGER() << "Tracker invalid response(invalid peer list)";
 			return ERR_INTERNAL;
 		}
 		m_peers_count = len / 6;
@@ -251,89 +254,85 @@ int Tracker::process_response()
 	return 0;
 }
 
-int Tracker::event_sock_ready2read(network::Socket sock)
+void Tracker::event_sock_ready2read(network::Socket sock)
 {
 	//std::cout<<"TRACKER event_sock_ready2read "<<sock->get_fd()<<" "<<m_announce<<std::endl;
 	if (m_state == TRACKER_STATE_STOPPING || m_state == TRACKER_STATE_FAILURE)
-		return ERR_NO_ERROR;
+		return;
 	try
 	{
-		m_buflen += m_nm->Socket_recv(sock, m_buf + m_buflen, BUFFER_SIZE - m_buflen);
+		bool closed;
+		size_t received = m_nm->Socket_recv(sock, m_buf + m_buflen, BUFFER_SIZE - m_buflen, closed);
+		m_buflen += received;
 		process_response();
+		if (closed)
+		{
+			delete_socket();
+			if (m_status == TRACKER_STATUS_UPDATING)
+				m_status = TRACKER_STATUS_ERROR;
+			m_ready2release = (m_state == TRACKER_STATE_STOPPING);
+			return;
+		}
 	}
 	catch (Exception & e)
 	{
 		delete_socket();
 		m_status = TRACKER_STATUS_ERROR;
-		return ERR_INTERNAL;
+		logger::LOGGER() << "Tracker ready to read event failure";
 	}
-	return ERR_NO_ERROR;
 }
 
-int Tracker::event_sock_closed(network::Socket sock)
+void Tracker::event_sock_error(network::Socket sock, int errno_)
 {
 	//std::cout<<"TRACKER event_sock_closed "<<sock->get_fd()<<" "<<m_announce<<std::endl;
 	if (m_state == TRACKER_STATE_FAILURE)
-		return ERR_NO_ERROR;
-	try
-	{
-		if (m_nm->Socket_datalen(sock) > 0)
-			event_sock_ready2read(sock);
-		delete_socket();
-		if (m_status == TRACKER_STATUS_UPDATING)
-			m_status = TRACKER_STATUS_ERROR;
-		m_ready2release = (m_state == TRACKER_STATE_STOPPING);
-	}
-	catch (Exception & e)
-	{
-		delete_socket();
+		return;
+
+	delete_socket();
+	if (m_status == TRACKER_STATUS_UPDATING)
 		m_status = TRACKER_STATUS_ERROR;
-		return ERR_INTERNAL;
-	}
-	return ERR_NO_ERROR;
+	m_ready2release = (m_state == TRACKER_STATE_STOPPING);
 }
 
-int Tracker::event_sock_sended(network::Socket sock)
+void Tracker::event_sock_sended(network::Socket sock)
 {
 	//std::cout<<"TRACKER event_sock_sended "<<sock->get_fd()<<" "<<m_announce<<std::endl;
 	if (m_state == TRACKER_STATE_FAILURE)
-		return ERR_NO_ERROR;
+		return;
 	if (m_state == TRACKER_STATE_STOPPING && m_nm->Socket_sendbuf_remain(sock) == 0)
 	{
 		m_ready2release = true;
+		m_nm->Socket_delete(m_sock);
 #ifdef BITTORRENT_DEBUG
 		logger::LOGGER() << "Tracker " << m_announce.c_str() << " stop sended";
 #endif
 	}
-	return ERR_NO_ERROR;
 }
 
-int Tracker::event_sock_connected(network::Socket sock)
+void Tracker::event_sock_connected(network::Socket sock)
 {
 	try
 	{
 		if (m_state == TRACKER_STATE_FAILURE)
-			return ERR_NO_ERROR;
+			return;
 		if (m_addr == NULL)
 			m_addr = new sockaddr_in;
-		m_nm->Socket_get_addr(sock, m_addr);
+		m_nm->Socket_get_addr(sock, *m_addr);
 		send_request(m_event_after_connect);
 	}
 	catch (Exception & e)
 	{
 		delete_socket();
+		logger::LOGGER() << "Tracker " << m_announce.c_str() << "  error while sending request";
 		m_status = TRACKER_STATUS_ERROR;
-		return ERR_INTERNAL;
 	}
-	return ERR_NO_ERROR;
 }
 
-int Tracker::event_sock_accepted(network::Socket sock, network::Socket accepted_sock)
+void Tracker::event_sock_accepted(network::Socket sock, network::Socket accepted_sock)
 {
-	return ERR_NO_ERROR;
 }
 
-int Tracker::event_sock_timeout(network::Socket sock)
+void Tracker::event_sock_timeout(network::Socket sock)
 {
 #ifdef BITTORRENT_DEBUG
 	logger::LOGGER() << "Tracker " << m_announce.c_str() << " timeout";
@@ -341,10 +340,8 @@ int Tracker::event_sock_timeout(network::Socket sock)
 	try
 	{
 		if (m_state == TRACKER_STATE_FAILURE)
-			return ERR_NO_ERROR;
+			return;
 		m_status = TRACKER_STATUS_TIMEOUT;
-		if (m_nm->Socket_datalen(sock) > 0)
-			event_sock_ready2read(sock);
 		delete_socket();
 		m_ready2release = (m_state == TRACKER_STATE_STOPPING);
 	}
@@ -352,20 +349,17 @@ int Tracker::event_sock_timeout(network::Socket sock)
 	{
 		delete_socket();
 		m_status = TRACKER_STATUS_ERROR;
-		return ERR_INTERNAL;
 	}
-	return ERR_NO_ERROR;
 }
 
-int Tracker::event_sock_unresolved(network::Socket sock)
+void Tracker::event_sock_unresolved(network::Socket sock)
 {
 	//std::cout<<"TRACKER event_sock_unresolved "<<sock->get_fd()<<" "<<m_announce<<std::endl;
 	if (m_state == TRACKER_STATE_FAILURE)
-		return ERR_NO_ERROR;
+		return;
 	m_status = TRACKER_STATUS_UNRESOLVED;
 	delete_socket();
 	m_ready2release = (m_state == TRACKER_STATE_STOPPING);
-	return ERR_NO_ERROR;
 }
 
 int Tracker::get_peers_count()
@@ -395,7 +389,7 @@ int Tracker::restore_socket()
 			if (m_addr == NULL)
 				m_nm->Socket_add_domain(m_host, 80, shared_from_this(), m_sock);
 			else
-				m_nm->Socket_add(m_addr, shared_from_this(), m_sock);
+				m_nm->Socket_add((const sockaddr_in)*m_addr, shared_from_this(), m_sock);
 		}
 		catch (Exception  & e)
 		{
@@ -428,7 +422,11 @@ int Tracker::update()
 	if (m_state == TRACKER_STATE_FAILURE || m_state == TRACKER_STATE_STOPPING)
 		return ERR_NO_ERROR;
 	if (restore_socket() != ERR_NO_ERROR)
+	{
 		m_status = TRACKER_STATUS_ERROR;
+		logger::LOGGER() << "Tracker " << m_announce.c_str() << "  can not restore socket";
+	}
+
 	m_event_after_connect = TRACKER_EVENT_NONE;
 	m_state = TRACKER_STATE_WORK;
 	m_last_update = time(NULL);
@@ -468,7 +466,10 @@ int Tracker::send_completed()
 	if (m_state == TRACKER_STATE_FAILURE || m_state == TRACKER_STATE_STOPPING)
 		return ERR_NO_ERROR;
 	if (restore_socket() != ERR_NO_ERROR)
+	{
 		m_status = TRACKER_STATUS_ERROR;
+		logger::LOGGER() << "Tracker " << m_announce.c_str() << "  can not restore socket";
+	}
 	m_event_after_connect = TRACKER_EVENT_COMPLETED;
 	m_state = TRACKER_STATE_WORK;
 	m_last_update = time(NULL);
@@ -480,7 +481,10 @@ int Tracker::send_stopped()
 	if (m_state == TRACKER_STATE_FAILURE || m_state == TRACKER_STATE_STOPPING)
 		return ERR_NO_ERROR;
 	if (restore_socket() != ERR_NO_ERROR)
+	{
 		m_status = TRACKER_STATUS_ERROR;
+		logger::LOGGER() << "Tracker " << m_announce.c_str() << "  can not restore socket";
+	}
 	m_event_after_connect = TRACKER_EVENT_STOPPED;
 	m_state = TRACKER_STATE_WORK;
 	m_last_update = time(NULL);
@@ -492,7 +496,10 @@ int Tracker::send_started()
 	if (m_state == TRACKER_STATE_FAILURE || m_state == TRACKER_STATE_STOPPING)
 		return ERR_NO_ERROR;
 	if (restore_socket() != ERR_NO_ERROR)
+	{
 		m_status = TRACKER_STATUS_ERROR;
+		logger::LOGGER() << "Tracker " << m_announce.c_str() << "  can not restore socket";
+	}
 	m_event_after_connect = TRACKER_EVENT_STARTED;
 	m_state = TRACKER_STATE_WORK;
 	m_last_update = time(NULL);

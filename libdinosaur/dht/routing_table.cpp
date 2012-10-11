@@ -98,7 +98,7 @@ void routing_table::add_node_(const node_id & id, const sockaddr_in & addr)
 		m_pings[old].replacement_.id = id;
 		m_pings[old].replacement_.addr = addr;
 		m_pings[old].do_replace = true;
-		m_psi->send_ping(m_buckets[bucket][old]);
+		m_ms->send_ping(m_buckets[bucket][old]);
 #ifdef DHT_DEBUG
 		printf("	old node push to m_pings and we send ping to him\n");
 #endif
@@ -110,9 +110,9 @@ void routing_table::add_node_(const node_id & id, const sockaddr_in & addr)
 	m_queue4adding_nodes[id] = addr;
 }
 
-routing_table::routing_table(ping_sender_interface * psi, const std::string & work_dir)
+routing_table::routing_table(message_sender * psi, const std::string & work_dir)
 {
-	m_psi = psi;
+	m_ms = psi;
 	m_buckets_age.Init(BUCKETS_COUNT);
 	m_buckets = new bucket[BUCKETS_COUNT];
 	for(size_t i = 0; i < BUCKETS_COUNT; i++)
@@ -329,7 +329,7 @@ void routing_table::check_old_bucket(size_t old_bucket)
 		m_pings[current_node].ping_at = time(NULL);
 		m_pings[current_node].do_replace = false;
 
-		m_psi->send_ping(iter->second);
+		m_ms->send_ping(iter->second);
 #ifdef DHT_DEBUG
 		printf("	old node push to m_pings and we send ping to him\n");
 #endif

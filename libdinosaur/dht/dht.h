@@ -82,7 +82,7 @@ void generate_random_node_id(node_id & id);
 size_t get_bucket(const node_id & id1, const node_id & id2);
 void parse_compact_node_info(char * buf, node_id & id, sockaddr_in & addr);
 
-class ping_sender_interface;
+class message_sender;
 class routing_table;
 typedef boost::shared_ptr<routing_table> routing_tablePtr;
 
@@ -123,7 +123,7 @@ private:
 	queue					m_queue4adding_nodes;
 	pings					m_pings;
 	node_id					m_own_node_id;
-	ping_sender_interface*	m_psi;
+	message_sender*			m_ms;
 	map_serializable		m_map4serialize;
 	std::string				m_serialize_filepath;
 	friend class boost::serialization::access;
@@ -143,11 +143,11 @@ private:
 	routing_table(){}
 	routing_table(const routing_table & rt){}
 	routing_table & operator=(const routing_table & rt){ return *this;}
-	routing_table(ping_sender_interface * psi, const std::string & work_dir);
+	routing_table(message_sender * ms, const std::string & work_dir);
 public:
-	static void CreateRoutingTable(ping_sender_interface * psi, const std::string & work_dir, routing_tablePtr & ptr)
+	static void CreateRoutingTable(message_sender * ms, const std::string & work_dir, routing_tablePtr & ptr)
 	{
-		ptr.reset(new routing_table(psi, work_dir));
+		ptr.reset(new routing_table(ms, work_dir));
 		ptr->restore();
 	}
 	~routing_table();
@@ -161,8 +161,6 @@ public:
 	void get_closest_ids(const node_id & close2, node_list & nodes);
 };
 
-class message_sender;
-
 class searcher//SEARCHING!!! SEEK AND DESTROY!
 {
 private:
@@ -174,18 +172,8 @@ private:
 	searcher(const searcher & s){}
 	searcher & operator=(const searcher & s){return *this;}
 public:
-	searcher(SHA1_HASH infohash, routing_tablePtr & rt, message_sender * ms);
+	searcher(const SHA1_HASH & infohash, routing_tablePtr & rt, message_sender * ms);
 	virtual ~searcher();
-};
-
-class ping_sender_interface
-{
-public:
-	ping_sender_interface(){}
-	virtual ~ping_sender_interface(){}
-private:
-	virtual void send_ping(const sockaddr_in & addr) = 0;
-	friend class routing_table;
 };
 
 class message_sender
@@ -197,17 +185,18 @@ private:
 	virtual void send_ping(const sockaddr_in & addr) = 0;
 	virtual void find_node(const node_id & recipient, const node_id & target) = 0;
 	virtual void find_node(const sockaddr_in & recipient, const node_id & target) = 0;
-	virtual void get_peers(const node_id & recipient, const SHA1_HASH infohash) = 0;
-	virtual void get_peers(const sockaddr_in & recipient, const SHA1_HASH infohash) = 0;
-	virtual void announce_peer(const node_id & recipient, const SHA1_HASH infohash, uint16_t port, const TOKEN & token) = 0;
-	virtual void announce_peer(const sockaddr_in & recipient, const SHA1_HASH infohash, uint16_t port, const TOKEN & token) = 0;
+	virtual void get_peers(const node_id & recipient, const SHA1_HASH & infohash) = 0;
+	virtual void get_peers(const sockaddr_in & recipient, const SHA1_HASH & infohash) = 0;
+	virtual void announce_peer(const node_id & recipient, const SHA1_HASH & infohash, uint16_t port, const TOKEN & token) = 0;
+	virtual void announce_peer(const sockaddr_in & recipient, const SHA1_HASH & infohash, uint16_t port, const TOKEN & token) = 0;
 	friend class searcher;
+	friend class routing_table;
 };
 
 class dht;
 typedef boost::shared_ptr<dht> dhtPtr;
 
-class dht : public network::SocketAssociation, ping_sender_interface
+class dht : public network::SocketAssociation, message_sender
 {
 private:
 	enum REQUEST_TYPE
@@ -242,14 +231,21 @@ private:
 	void get_peers_handler();
 	void announce_peer_handler();
 	void error_handler(bencode::be_node * node);
+	void event_sock_ready2read(network::Socket sock);
+	void event_sock_error(network::Socket sock, int errno_);
+	void event_sock_sended(network::Socket sock);
+	void event_sock_connected(network::Socket sock);
+	void event_sock_accepted(network::Socket sock, network::Socket accepted_sock);
+	void event_sock_timeout(network::Socket sock);
+	void event_sock_unresolved(network::Socket sock);
 public:
 	void send_ping(const sockaddr_in & addr);
 	void find_node(const node_id & recipient, const node_id & target);
 	void find_node(const sockaddr_in & recipient, const node_id & target);
-	void get_peers(const node_id & recipient, const SHA1_HASH infohash);
-	void get_peers(const sockaddr_in & recipient, const SHA1_HASH infohash);
-	void announce_peer(const node_id & recipient, const SHA1_HASH infohash, uint16_t port, const TOKEN & token);
-	void announce_peer(const sockaddr_in & recipient, const SHA1_HASH infohash, uint16_t port, const TOKEN & token);
+	void get_peers(const node_id & recipient, const SHA1_HASH & infohash);
+	void get_peers(const sockaddr_in & recipient, const SHA1_HASH & infohash);
+	void announce_peer(const node_id & recipient, const SHA1_HASH & infohash, uint16_t port, const TOKEN & token);
+	void announce_peer(const sockaddr_in & recipient, const SHA1_HASH & infohash, uint16_t port, const TOKEN & token);
 	static void CreateDHT(const in_addr & listen_on, uint16_t port, network::NetworkManager* nm, const std::string & work_dir, dhtPtr & ptr)
 	{
 		if (nm == NULL)
@@ -266,13 +262,6 @@ public:
 	void prepare2release();
 	void add_node(const sockaddr_in & addr);
 	void clock();
-	int event_sock_ready2read(network::Socket sock);
-	int event_sock_closed(network::Socket sock);
-	int event_sock_sended(network::Socket sock);
-	int event_sock_connected(network::Socket sock);
-	int event_sock_accepted(network::Socket sock, network::Socket accepted_sock);
-	int event_sock_timeout(network::Socket sock);
-	int event_sock_unresolved(network::Socket sock);
 };
 
 }

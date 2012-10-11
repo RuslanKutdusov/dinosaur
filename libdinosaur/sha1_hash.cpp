@@ -116,7 +116,7 @@ void SHA1_HASH::print()  const
 
 void SHA1_HASH::to_hex(std::string & id) const
 {
-	id.resize(SHA1_HEX_LENGTH);
+	id.resize(SHA1_LENGTH * 2);
 	for(size_t i = 0; i < SHA1_LENGTH; i++)
 		sprintf(&id[i * 2], "%02x", m_data[i]);
 }

@@ -12,6 +12,7 @@
 #include "libdinosaur/network/network.h"
 #include "libdinosaur/log/log.h"
 #include <limits>
+#include <boost/shared_ptr.hpp>
 
 /*
 8F385C2AECB03BFB32AF3C54EC18DB5C021AFE43
@@ -35,28 +36,71 @@ static void * thread(void * arg)
 		try
 		{
 			nm.clock();
-			nm.notify();
 		}
 		catch(...)
 		{
 
 		}
-		dht->clock();
+		//dht->clock();
 	}
 	return arg;
 }
+
+class ClassA : public dinosaur::network::SocketAssociation
+{
+private:
+	void event_sock_ready2read(dinosaur::network::Socket sock)
+	{
+		printf("ready2read\n");
+		char b[1024];
+		memset(b, 0, 1024);
+		bool closed;
+		int r = nm.Socket_recv(sock, b, 1024, closed);
+		printf("%u %s closed=%d\n", r, b, closed);
+		if (closed)
+			nm.Socket_delete(sock);
+	}
+	void event_sock_error(dinosaur::network::Socket  sock, int errno_)
+	{
+		printf("closed\n");
+	}
+	void event_sock_sended(dinosaur::network::Socket  sock)
+	{
+		printf("sended\n");
+	}
+	void event_sock_connected(dinosaur::network::Socket  sock)
+	{
+		printf("connected\n");
+	}
+	void event_sock_accepted(dinosaur::network::Socket  sock, dinosaur::network::Socket accepted_sock)
+	{
+		printf("accepted\n");
+	}
+	void event_sock_timeout(dinosaur::network::Socket  sock)
+	{
+		printf("timeout\n");
+	}
+	void event_sock_unresolved(dinosaur::network::Socket  sock)
+	{
+		printf("unresolved\n");
+	}
+};
 
 int main(int argc,char* argv[])
 {
 	/*dinosaur::ERR_CODES_STR::save_defaults();
 	nm.Init();
-	uint32_t addr = 0;
-	dinosaur::dht::dht::CreateDHT((const in_addr &)addr, 1234, &nm, "/home/ruslan/", dht);
-	sockaddr_in saddr;
-	saddr.sin_family = AF_INET;
-	inet_aton("127.0.0.1", &saddr.sin_addr);
-	saddr.sin_port = htons(54723);
-	dht->add_node(saddr);
+	boost::shared_ptr<ClassA> ClassA_PTR(new ClassA());
+	dinosaur::network::Socket sock;
+	//nm.Socket_add("127.0.0.1", 1234, ClassA_PTR, sock);
+	nm.Socket_add_domain("vk.ru", 80, ClassA_PTR, sock);
+	//uint32_t addr = 0;
+	//dinosaur::dht::dht::CreateDHT((const in_addr &)addr, 1234, &nm, "/home/ruslan/", dht);
+	//sockaddr_in saddr;
+	//saddr.sin_family = AF_INET;
+	//inet_aton("127.0.0.1", &saddr.sin_addr);
+	//saddr.sin_port = htons(54723);
+	//dht->add_node(saddr);
 	pthread_t m_thread;
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
@@ -67,8 +111,8 @@ int main(int argc,char* argv[])
 	work = false;
 	void * status;
 	pthread_join(m_thread, &status);
-	dht->prepare2release();
-	dht.reset();
+	//dht->prepare2release();
+	//dht.reset();
 	return 0;*/
 
 

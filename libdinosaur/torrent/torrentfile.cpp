@@ -288,9 +288,9 @@ int TorrentFile::read_piece(PIECE_INDEX piece_index, unsigned char * dst)
 	return ERR_NO_ERROR;
 }
 
-int TorrentFile::event_file_write(const fs::write_event & eo)
+void TorrentFile::event_file_write(const fs::write_event & eo)
 {
-	return m_torrent->event_file_write(eo);
+	m_torrent->event_file_write(eo);
 }
 
 void TorrentFile::ReleaseFiles()

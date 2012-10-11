@@ -461,7 +461,7 @@ bool PieceManager::check_piece_hash(PIECE_INDEX piece_index)
 	}
 }
 
-int PieceManager::event_file_write(const fs::write_event & we, PIECE_STATE & piece_state)
+void PieceManager::event_file_write(const fs::write_event & we, PIECE_STATE & piece_state)
 {
 	uint32_t piece_index;
 	uint32_t block_index;
@@ -471,7 +471,8 @@ int PieceManager::event_file_write(const fs::write_event & we, PIECE_STATE & pie
 	if (we.writted < 0)
 	{
 		m_downloadable_blocks.erase(we.block_id);
-		return push_block2download(piece_index, block_index);
+		push_block2download(piece_index, block_index);
+		return;
 	}
 
 	m_downloadable_blocks[we.block_id] += we.writted;
@@ -481,7 +482,8 @@ int PieceManager::event_file_write(const fs::write_event & we, PIECE_STATE & pie
 	if (m_downloadable_blocks[we.block_id] > block_length)
 	{
 		m_downloadable_blocks.erase(we.block_id);
-		return push_block2download(piece_index, block_index);
+		push_block2download(piece_index, block_index);
+		return;
 	}
 
 	if (m_downloadable_blocks[we.block_id] == block_length)
@@ -504,7 +506,6 @@ int PieceManager::event_file_write(const fs::write_event & we, PIECE_STATE & pie
 #endif
 		}
 	}
-	return ERR_NO_ERROR;
 }
 
 }

@@ -142,12 +142,12 @@ void dht::find_node(const sockaddr_in & recipient, const node_id & target)
 	}
 }
 
-void dht::get_peers(const node_id & recipient, const SHA1_HASH infohash)
+void dht::get_peers(const node_id & recipient, const SHA1_HASH & infohash)
 {
 	get_peers((*m_rt)[recipient], infohash);
 }
 
-void dht::get_peers(const sockaddr_in & recipient, const SHA1_HASH infohash)
+void dht::get_peers(const sockaddr_in & recipient, const SHA1_HASH & infohash)
 {
 	TRANSACTION_ID transaction_id = rand() % 65536;
 	char buf[256] = "d1:ad2:id20:abcdefghij01234567899:info_hash20:mnopqrstuvwxyz123456e1:q9:get_peers1:t2:aa1:y1:qe";
@@ -180,12 +180,12 @@ void dht::get_peers(const sockaddr_in & recipient, const SHA1_HASH infohash)
 	}
 }
 
-void dht::announce_peer(const node_id & recipient, const SHA1_HASH infohash, uint16_t port, const TOKEN & token)
+void dht::announce_peer(const node_id & recipient, const SHA1_HASH & infohash, uint16_t port, const TOKEN & token)
 {
 	announce_peer((*m_rt)[recipient], infohash, port, token);
 }
 
-void dht::announce_peer(const sockaddr_in & recipient, const SHA1_HASH infohash, uint16_t port, const TOKEN & token)
+void dht::announce_peer(const sockaddr_in & recipient, const SHA1_HASH & infohash, uint16_t port, const TOKEN & token)
 {
 	TRANSACTION_ID transaction_id = rand() % 65536;
 	bencode::be_node * message_bencoded = bencode::create_dict();
@@ -328,11 +328,12 @@ void dht::error_handler(bencode::be_node * message_bencoded)
 	#endif
 }
 
-int dht::event_sock_ready2read(network::Socket sock)
+void dht::event_sock_ready2read(network::Socket sock)
 {
 	char buf[1024];
 	sockaddr_in addr;
-	size_t len = m_nm->Socket_recv(m_sock, buf, 1024, &addr);
+	bool closed;
+	size_t len = m_nm->Socket_recv(m_sock, buf, 1024, closed, &addr);
 	#ifdef DHT_DEBUG
 		printf("Incomming message from %s:%d\n", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
 	#endif
@@ -342,7 +343,7 @@ int dht::event_sock_ready2read(network::Socket sock)
 		#ifdef DHT_DEBUG
 			printf("	reject, invalid format\n");
 		#endif
-		return 0;
+		return;
 	}
 
 	bencode::be_str * str;
@@ -351,7 +352,7 @@ int dht::event_sock_ready2read(network::Socket sock)
 		#ifdef DHT_DEBUG
 			printf("	reject, invalid format\n");
 		#endif
-		return 0;
+		return;
 	}
 	TRANSACTION_ID transaction_id;
 	memcpy(&transaction_id, str->ptr, TRANSACTION_ID_LENGTH);
@@ -362,7 +363,7 @@ int dht::event_sock_ready2read(network::Socket sock)
 		#ifdef DHT_DEBUG
 			printf("	reject, invalid format\n");
 		#endif
-		return 0;
+		return;
 	}
 
 	if (*message_type->ptr == MESSAGE_TYPE_REPLY || *message_type->ptr == MESSAGE_TYPE_ERROR)
@@ -373,7 +374,7 @@ int dht::event_sock_ready2read(network::Socket sock)
 			#ifdef DHT_DEBUG
 				printf("	such query does not exists or invalid transaction id\n");
 			#endif
-			return 0;
+			return;
 		}
 		std::map<uint16_t, REQUEST_TYPE>::iterator iter = request_container_iter->second.find(transaction_id);
 		if (iter == request_container_iter->second.end())
@@ -381,7 +382,7 @@ int dht::event_sock_ready2read(network::Socket sock)
 			#ifdef DHT_DEBUG
 				printf("	invalid transaction id\n");
 			#endif
-			return 0;
+			return;
 		}
 		REQUEST_TYPE request_type = iter->second;
 		request_container_iter->second.erase(iter);
@@ -419,32 +420,32 @@ void dht::clock()
 	m_rt->clock();
 }
 
-int dht::event_sock_closed(network::Socket sock)
+void dht::event_sock_error(network::Socket sock, int errno_)
 {
 
 }
 
-int dht::event_sock_sended(network::Socket sock)
+void dht::event_sock_sended(network::Socket sock)
 {
 
 }
 
-int dht::event_sock_connected(network::Socket sock)
+void dht::event_sock_connected(network::Socket sock)
 {
 
 }
 
-int dht::event_sock_accepted(network::Socket sock, network::Socket accepted_sock)
+void dht::event_sock_accepted(network::Socket sock, network::Socket accepted_sock)
 {
 
 }
 
-int dht::event_sock_timeout(network::Socket sock)
+void dht::event_sock_timeout(network::Socket sock)
 {
 
 }
 
-int dht::event_sock_unresolved(network::Socket sock)
+void dht::event_sock_unresolved(network::Socket sock)
 {
 
 }

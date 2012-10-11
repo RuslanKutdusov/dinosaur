@@ -17,7 +17,6 @@
 namespace dinosaur
 {
 
-//typedef unsigned char 		SHA1_HASH[SHA1_LENGTH];
 typedef std::string			SHA1_HASH_HEX;
 typedef unsigned char * 	BITFIELD;
 typedef uint64_t			FILE_INDEX;

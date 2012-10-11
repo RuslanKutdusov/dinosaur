@@ -71,7 +71,7 @@ public:
 	{
 		return shared_from_this();
 	}
-	virtual int event_file_write(const write_event & eo) = 0;
+	virtual void event_file_write(const write_event & eo) = 0;
 };
 
 

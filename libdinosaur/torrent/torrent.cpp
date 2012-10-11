@@ -503,6 +503,7 @@ int TorrentBase::clock()
 			(*iter).second->clock(release_tracker_instance);
 			if (release_tracker_instance)
 				m_trackers.erase(iter);
+			printf("%d\n", m_trackers.size());
 		}
 
 
@@ -690,7 +691,7 @@ int TorrentBase::clock()
 	return 0;
 }
 
-int TorrentBase::event_file_write(const fs::write_event & we)
+void TorrentBase::event_file_write(const fs::write_event & we)
 {
 	PIECE_STATE piece_state;
 	uint32_t piece_index = we.block_id.first;
@@ -703,7 +704,7 @@ int TorrentBase::event_file_write(const fs::write_event & we)
 		tf.exception_errcode = we.exception_errcode;
 		tf.where = TORRENT_FAILURE_WRITE_FILE;
 		set_failure(tf);
-		return ERR_INTERNAL;
+		return;
 	}
 	if (piece_state == PIECE_STATE_FIN_HASH_OK)
 	{
@@ -723,7 +724,7 @@ int TorrentBase::event_file_write(const fs::write_event & we)
 
 		m_torrent_file->update_file_downloaded(piece_index);
 
-		return ERR_NO_ERROR;
+		return;
 	}
 	if (piece_state == PIECE_STATE_FIN_HASH_BAD)
 	{
@@ -734,7 +735,6 @@ int TorrentBase::event_file_write(const fs::write_event & we)
 			m_seeders[seed]->goto_sleep();
 		}
 	}
-	return ERR_NO_ERROR;
 }
 
 void TorrentBase::get_info_stat(info::torrent_stat & ref)
