@@ -243,6 +243,12 @@ void Dinosaur::load_our_torrents()
 				m_torrent_queue.in_queue.push_back(hash);
 			else
 				m_torrent_queue.active.push_back(hash);
+
+			sockaddr_in addr;
+			addr.sin_family = AF_INET;
+			addr.sin_port = htons(6881);
+			inet_aton("127.0.0.1", &addr.sin_addr);
+			torrent->add_seeder(&addr);
 		}
 		catch (Exception & e) {
 			torrent_failure tf;
@@ -331,6 +337,11 @@ void Dinosaur::AddTorrent(torrent::Metafile & metafile, const std::string & down
 		m_torrent_queue.in_queue.push_back(hash);
 		std::string fname =  m_directory + metafile.info_hash_hex + ".torrent";
 		metafile.save2file(fname);
+		sockaddr_in addr;
+		addr.sin_family = AF_INET;
+		addr.sin_port = htons(6881);
+		inet_aton("127.0.0.1", &addr.sin_addr);
+		torrent->add_seeder(&addr);
 	}
 	catch(Exception & e)
 	{

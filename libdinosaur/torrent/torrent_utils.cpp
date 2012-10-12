@@ -45,10 +45,10 @@ bool bit_in_bitfield(uint32_t piece, uint32_t piece_count, BITFIELD bitfield)
 	return (bitfield[byte_index] & bit) > 0;
 }
 
-void get_peer_key(sockaddr_in * addr, std::string & key)
+void get_peer_key(const sockaddr_in & addr, std::string & key)
 {
-	key = inet_ntoa(addr->sin_addr);
-	uint16_t port = ntohs(addr->sin_port);
+	key = inet_ntoa(addr.sin_addr);
+	uint16_t port = ntohs(addr.sin_port);
 	char port_c[256];
 	sprintf(port_c, "%u", port);
 	key.append(":");

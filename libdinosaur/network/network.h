@@ -210,52 +210,12 @@ public:
 	int Socket_get_rx_speed(Socket & sock) throw (Exception);
 	int Socket_get_tx_speed(Socket & sock) throw (Exception);
 	void Socket_get_addr(Socket & sock, sockaddr_in & addr) throw (Exception);
-	/*int get_sock_errno(Socket & sock)
-	{
-		if (sock == NULL)
-			return ERR_BAD_ARG;
-		return sock->m_errno;
-	}
-	const char * get_sock_errno_str(Socket & sock)
-	{
-		if (sock == NULL)
-			return NULL;
-		return sys_errlist[sock->m_errno];
-	}*/
 	ssize_t Socket_sendbuf_remain(Socket & sock)
 	{
 		if (sock == NULL)
 			return 0;
 		return sock->m_send_buffer.length - sock->m_send_buffer.pos;
 	}
-/*#ifdef BITTORRENT_DEBUG
-	int test_view_socks()
-	{
-		for(socket_set_iter iter = m_sockets.begin(); iter != m_sockets.end(); ++iter)
-		{
-			Socket sock= *iter;
-			std::cout<<"Socket fd = "<<sock->m_socket<<std::endl;
-			std::cout<<"       cl = "<<sock->m_closed<<std::endl;
-			std::cout<<"       cn = "<<sock->m_connected<<std::endl;
-			//std::cout<<"       er = "<<sock->m_errno<<" "<<get_sock_errno_str(sock)<<std::endl;
-			char * ip = inet_ntoa (sock->m_peer.sin_addr ) ;
-			std::cout<<"       IP:port ="<<ip<<":"<<ntohs(sock->m_peer.sin_port)<<std::endl;
-			std::cout<<"       Recvbuffer"<<std::endl;
-			std::cout<<"                   length = "<<sock->m_recv_buffer.length<<std::endl;
-			std::cout<<"                   pos    = "<<sock->m_recv_buffer.pos<<std::endl;
-			std::cout<<"       Sendbuffer"<<std::endl;
-			std::cout<<"                   length = "<<sock->m_send_buffer.length<<std::endl;
-			std::cout<<"                   pos    = "<<sock->m_send_buffer.pos<<std::endl;
-			std::cout<<"       Accepted socks: ";
-			for(socket_set_iter iter2 = sock->m_accepted_sockets.begin(); iter2 != sock->m_accepted_sockets.end(); ++iter2)
-			{
-				std::cout<<*iter2<<" ";
-			}
-			std::cout<<std::endl;
-		}
-		return 0;
-	}
-#endif*/
 	int clock()  throw (SyscallException);
 };
 

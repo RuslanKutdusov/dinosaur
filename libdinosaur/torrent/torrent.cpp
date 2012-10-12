@@ -246,12 +246,12 @@ void TorrentBase::add_seeders(uint32_t count, sockaddr_in * addrs)
 		try
 		{
 			std::string key;
-			get_peer_key(&addrs[i], key);
+			get_peer_key(addrs[i], key);
 			//если такого пира у нас нет, добавляем его
 			if (m_seeders.count(key) == 0)
 			{
 				PeerPtr peer(new Peer());
-				peer->Init(&addrs[i], boost::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()));
+				peer->Init(addrs[i], boost::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()));
 				m_seeders[key] = peer;
 				m_waiting_seeders.push_back(peer);
 			}
@@ -269,10 +269,8 @@ void TorrentBase::add_seeders(uint32_t count, sockaddr_in * addrs)
  * Exception::ERR_CODE_SEED_REJECTED
  */
 
-void TorrentBase::add_seeder(sockaddr_in * addr)
+void TorrentBase::add_seeder(const sockaddr_in & addr)
 {
-	if (addr == NULL)
-		throw Exception(Exception::ERR_CODE_NULL_REF);
 	if (m_state != TORRENT_STATE_STARTED)
 		throw Exception(Exception::ERR_CODE_LEECHER_REJECTED);
 	std::string key;
@@ -315,7 +313,7 @@ void TorrentBase::add_leecher(network::Socket & sock)
 	try
 	{
 		std::string key;
-		get_peer_key(&sock->m_peer, key);
+		get_peer_key(sock->m_peer, key);
 		//logger::LOGGER() << "add incoming peer %s\n", key.c_str());
 		if ((m_leechers.count(key) == 0 || m_leechers[key] == NULL) && m_leechers.size() < m_g_cfg->get_max_active_leechers())
 		{
@@ -456,7 +454,7 @@ void TorrentBase::check()
 	m_piece_manager->reset();
 	m_pieces2check.clear();
 	m_downloadable_pieces.clear();
-	m_torrent_file->clear_file_downloaded();
+	m_torrent_file->reset_file_downloaded();
 	for(uint32_t i = 0; i < m_metafile.piece_count; i++)
 	{
 		m_pieces2check.push_back(i);
@@ -495,8 +493,9 @@ int TorrentBase::clock()
 	}
 
 	if (m_state == TORRENT_STATE_RELEASING)
-		for(tracker_map_iter iter = m_trackers.begin(), iter2 = iter;
-				iter != m_trackers.end(); iter = iter2)
+		//for(tracker_map_iter iter = m_trackers.begin(), iter2 = iter;
+		//		iter != m_trackers.end(); iter = iter2)
+		ERASABLE_LOOP(m_trackers, tracker_map_iter, iter, iter2)
 		{
 			++iter2;
 			bool release_tracker_instance;
@@ -625,7 +624,8 @@ int TorrentBase::clock()
 			m_tx_speed += seed->get_tx_speed();
 		}
 
-		for(peer_map_iter leecher_iter = m_leechers.begin(), leecher_iter2 = leecher_iter; leecher_iter != m_leechers.end(); leecher_iter = leecher_iter2)
+		//for(peer_map_iter leecher_iter = m_leechers.begin(), leecher_iter2 = leecher_iter; leecher_iter != m_leechers.end(); leecher_iter = leecher_iter2)
+		ERASABLE_LOOP(m_leechers, peer_map_iter, leecher_iter, leecher_iter2)
 		{
 			++leecher_iter2;
 			PeerPtr leecher = leecher_iter->second;

@@ -189,7 +189,7 @@ private:
 public:
 	network::Socket 					m_sock;
 	Peer();
-	int Init(sockaddr_in * addr, const TorrentInterfaceInternalPtr & torrent);
+	int Init(const sockaddr_in & addr, const TorrentInterfaceInternalPtr & torrent);
 	int Init(network::Socket & sock, const TorrentInterfaceInternalPtr & torrent, PEER_ADD peer_add);
 	int send_have(PIECE_INDEX piece_index);
 	bool have_piece(PIECE_INDEX piece_index);
@@ -321,7 +321,7 @@ public:
 	void get_file_priority(FILE_INDEX file, DOWNLOAD_PRIORITY  & prio);
 	void update_file_downloaded(PIECE_INDEX piece);
 	void update_file_downloaded(FILE_INDEX file_index, uint64_t bytes);
-	void clear_file_downloaded();
+	void reset_file_downloaded();
 	void get_file_downloaded(FILE_INDEX file_index, uint64_t & bytes_count);
 	void ReleaseFiles();
 	~TorrentFile();
@@ -403,7 +403,7 @@ protected:
 	float							m_ratio;
 
 	virtual void add_seeders(uint32_t count, sockaddr_in * addrs);
-	virtual void add_seeder(sockaddr_in * addr) ;
+	virtual void add_seeder(const sockaddr_in & addr) ;
 	virtual void add_leecher(network::Socket & sock) ;
 	virtual void pause();
 	virtual void continue_();
@@ -564,7 +564,7 @@ public:
 void set_bitfield(uint32_t piece, uint32_t piece_count, BITFIELD bitfield);
 void reset_bitfield(uint32_t piece, uint32_t piece_count, BITFIELD bitfield);
 bool bit_in_bitfield(uint32_t piece, uint32_t piece_count, BITFIELD bitfield);
-void get_peer_key(sockaddr_in * addr, std::string & key);
+void get_peer_key(const sockaddr_in & addr, std::string & key);
 
 } /* namespace TorrentNamespace */
 }

@@ -563,7 +563,7 @@ int NetworkManager::clock()  throw (SyscallException)
 		}
 	}
 	//for(socket_set::iterator iter = m_connected_after_resolving_sockets.begin(); iter != m_connected_after_resolving_sockets.end(); ++iter)
-	/*ERASABLE_LOOP(m_connected_after_resolving_sockets, socket_set::iterator, iter, inc_iter)
+	ERASABLE_LOOP(m_connected_after_resolving_sockets, socket_set::iterator, iter, inc_iter)
 	{
 		++inc_iter;
 		(*iter)->m_assoc->event_sock_connected(*iter);
@@ -579,7 +579,7 @@ int NetworkManager::clock()  throw (SyscallException)
 	{
 		++inc_iter;
 		(*iter)->m_assoc->event_sock_timeout(*iter);
-	}*/
+	}
 	m_connected_after_resolving_sockets.clear();
 	m_unresolved_sockets.clear();
 	m_timeout_sockets.clear();

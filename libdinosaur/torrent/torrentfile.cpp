@@ -341,7 +341,7 @@ void TorrentFile::update_file_downloaded(FILE_INDEX file_index, uint64_t bytes)
 	m_files[file_index].downloaded += bytes;
 }
 
-void TorrentFile::clear_file_downloaded()
+void TorrentFile::reset_file_downloaded()
 {
 	for(FILE_INDEX i = 0; i < m_files.size(); i++)
 	{

@@ -30,7 +30,7 @@ Peer::Peer()
 	memset(&m_buf, 0, sizeof(network::buffer));
 }
 
-int Peer::Init(sockaddr_in * addr, const TorrentInterfaceInternalPtr & torrent)
+int Peer::Init(const sockaddr_in & addr, const TorrentInterfaceInternalPtr & torrent)
 {
 	memset(&m_buf, 0, sizeof(network::buffer));
 	m_torrent = torrent;
@@ -46,7 +46,7 @@ int Peer::Init(sockaddr_in * addr, const TorrentInterfaceInternalPtr & torrent)
 	m_downloaded = 0;
 	m_uploaded = 0;
 	m_sock.reset();
-	memcpy(&m_addr, addr, sizeof(sockaddr_in));
+	m_addr = addr;
 	m_state = PEER_STATE_SEND_HANDSHAKE;
 	get_peer_key(addr, m_ip);//inet_ntoa(m_sock->m_peer.sin_addr);
 	return ERR_NO_ERROR;
@@ -74,7 +74,7 @@ int Peer::Init(network::Socket & sock, const TorrentInterfaceInternalPtr & torre
 	m_uploaded = 0;
 	m_sock = sock;
 	memcpy(&m_addr, &m_sock->m_peer, sizeof(sockaddr_in));
-	get_peer_key(&m_sock->m_peer, m_ip);//inet_ntoa(m_sock->m_peer.sin_addr);
+	get_peer_key(m_sock->m_peer, m_ip);//inet_ntoa(m_sock->m_peer.sin_addr);
 	switch(peer_add)
 	{
 	case PEER_ADD_TRACKER:
