@@ -200,7 +200,7 @@ public:
 	void ListenSocket_add(uint16_t port, const char * ip, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException);
 	void ListenSocket_add(uint16_t port, const std::string & ip, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException);
 	size_t Socket_send(Socket & sock, const void * data, size_t len, bool full = true) throw (Exception);//full == 1 => надо отправить все сразу
-	size_t Socket_send(Socket & sock, const void * data, size_t len, const sockaddr_in & addr) throw (SyscallException, Exception);
+	ssize_t Socket_send(Socket & sock, const void * data, size_t len, const sockaddr_in & addr) throw (SyscallException, Exception);
 	size_t Socket_recv(Socket & sock, char * data, size_t len, bool & is_closed, sockaddr_in * from = NULL) throw (SyscallException, Exception);
 	bool Socket_closed(Socket & sock) throw (Exception);
 	void Socket_close(Socket & sock) throw (Exception);

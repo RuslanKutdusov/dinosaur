@@ -622,7 +622,7 @@ size_t NetworkManager::Socket_send(Socket & sock, const void * data, size_t len,
  * SyscallException
  */
 
-size_t NetworkManager::Socket_send(Socket & sock, const void * data, size_t len, const sockaddr_in & addr) throw (SyscallException, Exception)
+ssize_t NetworkManager::Socket_send(Socket & sock, const void * data, size_t len, const sockaddr_in & addr) throw (SyscallException, Exception)
 {
 	if (sock == NULL  || data == NULL)
 		throw Exception(Exception::ERR_CODE_NULL_REF);
@@ -632,7 +632,7 @@ size_t NetworkManager::Socket_send(Socket & sock, const void * data, size_t len,
 		throw Exception(Exception::ERR_CODE_SOCKET_CLOSED);
 	if (len == 0)
 		return 0;
-	int ret = sendto(sock->m_socket, data, len, 0, (const sockaddr*)&addr, sizeof(sockaddr_in));
+	ssize_t ret = sendto(sock->m_socket, data, len, 0, (const sockaddr*)&addr, sizeof(sockaddr_in));
 	if (ret == -1)
 		throw SyscallException(errno);
 	return ret;
@@ -653,7 +653,7 @@ size_t NetworkManager::Socket_recv(Socket & sock, char * data, size_t len, bool 
 	if (sock->m_udp)
 	{
 		socklen_t s = sizeof(sockaddr_in);
-		int ret = recvfrom(sock->m_socket, data, len, 0, (sockaddr*)from, &s);
+		ssize_t ret = recvfrom(sock->m_socket, data, len, 0, (sockaddr*)from, &s);
 		if (ret == -1)
 			throw SyscallException(errno);
 		return ret;
@@ -662,8 +662,18 @@ size_t NetworkManager::Socket_recv(Socket & sock, char * data, size_t len, bool 
 	while(len != total_received)
 	{
 		ssize_t received = recv(sock->m_socket, data + total_received, len - total_received, 0);
-		if (received == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
-			return total_received;
+		if (received == -1)
+		{
+			if (errno == EAGAIN || errno == EWOULDBLOCK)
+				return total_received;
+			if (errno == ECONNREFUSED)
+			{
+				is_closed = true;
+				return total_received;
+			}
+			else
+				throw SyscallException();
+		}
 		if (received == 0)
 		{
 			sock->close_();
