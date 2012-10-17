@@ -248,7 +248,7 @@ void Dinosaur::load_our_torrents()
 			addr.sin_family = AF_INET;
 			addr.sin_port = htons(6881);
 			inet_aton("127.0.0.1", &addr.sin_addr);
-			torrent->add_seeder(&addr);
+			//torrent->add_seeder(&addr);
 		}
 		catch (Exception & e) {
 			torrent_failure tf;
@@ -341,7 +341,7 @@ void Dinosaur::AddTorrent(torrent::Metafile & metafile, const std::string & down
 		addr.sin_family = AF_INET;
 		addr.sin_port = htons(6881);
 		inet_aton("127.0.0.1", &addr.sin_addr);
-		torrent->add_seeder(&addr);
+		torrent->add_seeder(addr);
 	}
 	catch(Exception & e)
 	{

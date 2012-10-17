@@ -24,7 +24,7 @@ typedef enum {
 	BE_STR,
 	BE_INT,
 	BE_LIST,
-	BE_DICT,
+	BE_DICT
 } be_type;
 
 struct be_dict;

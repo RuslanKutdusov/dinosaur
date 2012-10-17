@@ -10,6 +10,7 @@
 namespace dinosaur {
 namespace torrent {
 
+
 Tracker::Tracker()
 	:network::SocketAssociation()
 {
@@ -18,12 +19,9 @@ Tracker::Tracker()
 #endif
 	memset(m_buf, 0, 16384);
 	m_buflen = 0;
-	m_peers = NULL;
-	m_peers_count = 0;
 	m_state = TRACKER_STATE_NONE;
 	m_ready2release = false;
 	m_addr = NULL;
-	m_tracker_failure = "";
 }
 
 int Tracker::parse_announce()
@@ -62,19 +60,17 @@ Tracker::Tracker(const TorrentInterfaceInternalPtr & torrent, std::string & anno
 	m_nm = m_torrent->get_nm();
 	m_g_cfg = m_torrent->get_cfg();
 	m_announce = announce;
-	memset(m_buf, 0, 16384);
 	m_buflen = 0;
+
 	m_interval = m_g_cfg->get_tracker_default_interval();
 	m_min_interval = 0;
 	m_seeders = 0;
 	m_leechers = 0;
-	m_peers = NULL;
-	m_addr = NULL;
+
 	m_downloaded = torrent->get_downloaded();
 	m_uploaded = torrent->get_uploaded();
-	m_peers_count = 0;
 	m_ready2release = false;
-	m_tracker_failure = "";
+	m_addr = NULL;
 	m_state = TRACKER_STATE_NONE;
 	hash2urlencode();
 	if (parse_announce() != ERR_NO_ERROR)
@@ -108,8 +104,6 @@ void Tracker::send_request(TRACKER_EVENT event )
 		urn.append("&");
 	else
 		urn.append("?");
-	//if (urn[urn.length() - 1] != '&')
-	//	urn.append("&");
 
 	urn.append("info_hash=");
 	urn.append(m_infohash);
@@ -197,14 +191,14 @@ int Tracker::process_response()
 	char * c_str = NULL;
 	m_status = TRACKER_STATUS_OK;
 	m_tracker_failure = "";
-	if (bencode::get_str(response,"warning message",&b_str) == 0)
+	if (bencode::get_str(response, "warning message", &b_str) == 0)
 	{
 		c_str = bencode::str2c_str(b_str);
 		m_status = TRACKER_STATUS_SEE_FAILURE_MESSAGE;
 		m_tracker_failure = c_str;
 		delete[] c_str;
 	}
-	if (bencode::get_str(response,"failure reason",&b_str) == 0)
+	if (bencode::get_str(response, "failure reason", &b_str) == 0)
 	{
 		c_str = bencode::str2c_str(b_str);
 		m_status = TRACKER_STATUS_SEE_FAILURE_MESSAGE;
@@ -232,24 +226,24 @@ int Tracker::process_response()
 			logger::LOGGER() << "Tracker invalid response(invalid peer list)";
 			return ERR_INTERNAL;
 		}
-		m_peers_count = len / 6;
-		if (m_peers != NULL)
-			delete[] m_peers;
-		m_peers = new sockaddr_in[m_peers_count];
-		for(int i = 0; i < m_peers_count; i++)
+		int peers_count = len / 6;
+		m_peers.clear();
+		FILE * f = fopen("peers", "wb");
+		for(int i = 0; i < peers_count; i++)
 		{
-			memcpy((void*)&m_peers[i].sin_addr, (void*)&t_str[i * 6], 4);
-			memcpy(&m_peers[i].sin_port, &t_str[i * 6 + 4], 2);
-			m_peers[i].sin_family = AF_INET;
+			sockaddr_in addr;
+			memcpy((void*)&addr.sin_addr, (void*)&t_str[i * 6], 4);
+			memcpy(&addr.sin_port, &t_str[i * 6 + 4], 2);
+			addr.sin_family = AF_INET;
+			m_peers.push_back(addr);
+			fwrite((void*)&addr, 1, sizeof(sockaddr_in), f);
 		}
+		fclose(f);
 	}
 
 	bencode::_free(response);
 	m_buflen = 0;
-	if (m_peers_count > 0)
-	{
-		m_torrent->add_seeders(m_peers_count, m_peers);
-	}
+	m_torrent->add_seeders(m_peers);
 	delete_socket();
 	return 0;
 }
@@ -362,20 +356,9 @@ void Tracker::event_sock_unresolved(network::Socket sock)
 	m_ready2release = (m_state == TRACKER_STATE_STOPPING);
 }
 
-int Tracker::get_peers_count()
+const std::vector<sockaddr_in> & Tracker::get_peers()
 {
-	if (m_state == TRACKER_STATE_FAILURE)
-		return 0;
-	return m_peers_count;
-}
-
-const sockaddr_in * Tracker::get_peer(int i)
-{
-	if (m_state == TRACKER_STATE_FAILURE)
-		return NULL;
-	if (i < 0 || i >= m_peers_count)
-		return NULL;
-	return &m_peers[i];
+	return m_peers;
 }
 
 int Tracker::restore_socket()
@@ -510,7 +493,7 @@ int Tracker::get_info(info::tracker & ref)
 {
 	ref.announce = m_announce;
 	ref.leechers = m_leechers;
-	ref.seeders = m_seeders == 0 ? m_peers_count : m_seeders;
+	ref.seeders = m_seeders == 0 ? m_peers.size() : m_seeders;
 	ref.status = m_status;
 	if (m_state == TRACKER_STATE_WORK)
 		ref.update_in = (time_t)m_interval - time(NULL) + m_last_update;
@@ -525,8 +508,6 @@ Tracker::~Tracker()
 #ifdef BITTORRENT_DEBUG
 	logger::LOGGER() << "Tracker " << m_announce.c_str() << " destructor";
 #endif
-	if(m_peers != NULL)
-		delete[] m_peers;
 	if (m_addr != NULL)
 		delete m_addr;
 	delete_socket();
@@ -537,3 +518,4 @@ Tracker::~Tracker()
 
 }
 }
+

@@ -97,8 +97,7 @@ private:
 	std::string 					m_tracker_id;
 	uint64_t 						m_seeders;
 	uint64_t 						m_leechers;
-	sockaddr_in * 					m_peers;
-	int 							m_peers_count;
+	std::vector<sockaddr_in>		m_peers;
 	TRACKER_EVENT 					m_event_after_connect;
 	//берет хэш у Torrent и делает url encode
 	void hash2urlencode();
@@ -123,8 +122,7 @@ public:
 	Tracker();
 	Tracker(const TorrentInterfaceInternalPtr & torrent, std::string & announce);
 	virtual ~Tracker();
-	int get_peers_count();
-	const sockaddr_in * get_peer(int i);
+	const std::vector<sockaddr_in> & get_peers();
 	int update();
 	int prepare2release();
 	void forced_releasing();
@@ -402,7 +400,7 @@ protected:
 
 	float							m_ratio;
 
-	virtual void add_seeders(uint32_t count, sockaddr_in * addrs);
+	virtual void add_seeders(const std::vector<sockaddr_in> & addrs);
 	virtual void add_seeder(const sockaddr_in & addr) ;
 	virtual void add_leecher(network::Socket & sock) ;
 	virtual void pause();
@@ -471,7 +469,7 @@ public:
 	 * Exception::ERR_CODE_NULL_REF
 	 * Exception::ERR_CODE_SEED_REJECTED
 	 */
-	virtual void add_seeder(sockaddr_in * addr) throw (Exception) = 0;
+	virtual void add_seeder(const sockaddr_in & addr) throw (Exception) = 0;
 	/*
 	 * Exception::ERR_CODE_NULL_REF
 	 * Exception::ERR_CODE_LEECHER_REJECTED
@@ -558,7 +556,7 @@ public:
 	void update_file_downloaded(FILE_INDEX file_index, uint64_t bytes);
 	virtual void set_failure(const torrent_failure & tf) = 0;
 	virtual void event_file_write(const fs::write_event & we) = 0;
-	virtual void add_seeders(uint32_t count, sockaddr_in * addrs) = 0;
+	virtual void add_seeders(const std::vector<sockaddr_in> & peers) = 0;
 };
 
 void set_bitfield(uint32_t piece, uint32_t piece_count, BITFIELD bitfield);

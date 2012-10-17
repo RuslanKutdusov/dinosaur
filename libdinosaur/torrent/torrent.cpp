@@ -236,11 +236,9 @@ void TorrentBase::releasing()
 	m_piece_manager.reset();
 }
 
-void TorrentBase::add_seeders(uint32_t count, sockaddr_in * addrs)
+void TorrentBase::add_seeders(const std::vector<sockaddr_in> & addrs)
 {
-	if (addrs == NULL || count == 0)
-		return;
-	count = count > m_g_cfg->get_tracker_numwant() ? m_g_cfg->get_tracker_numwant() : count;
+	int count = addrs.size() > m_g_cfg->get_tracker_numwant() ? m_g_cfg->get_tracker_numwant() : addrs.size();
 	for(uint32_t i = 0;	i < count;	i++)
 	{
 		try
