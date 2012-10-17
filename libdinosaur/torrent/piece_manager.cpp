@@ -30,14 +30,6 @@ PieceManager::PieceManager(const TorrentInterfaceInternalPtr & torrent, unsigned
 	else
 		memcpy(m_bitfield, bitfield, m_bitfield_len);
 
-	m_piece_for_check_hash = new(std::nothrow) unsigned char[m_torrent->get_piece_length()];
-	if (m_piece_for_check_hash == NULL)
-	{
-		delete[] bitfield;
-		throw Exception(Exception::ERR_CODE_NO_MEMORY_AVAILABLE);
-	}
-
-
 	m_tag_list.push_back(1);
 	build_piece_info();
 }
@@ -46,8 +38,6 @@ PieceManager::~PieceManager()
 {
 	if (m_bitfield != NULL)
 		delete[] m_bitfield;
-	if (m_piece_for_check_hash != NULL)
-		delete[] m_piece_for_check_hash;
 }
 
 void PieceManager::reset()
@@ -436,10 +426,18 @@ int PieceManager::push_block2download(PIECE_INDEX piece_index, BLOCK_INDEX block
 
 bool PieceManager::check_piece_hash(PIECE_INDEX piece_index)
 {
-	if (m_torrent->read_piece(piece_index, m_piece_for_check_hash) != ERR_NO_ERROR)
-		return false;
 	SHA1_HASH sha1;
-	m_csha1.Update(m_piece_for_check_hash, m_piece_info[piece_index].length);
+	m_csha1.Reset();
+	char block[BLOCK_LENGTH];
+	uint32_t block_length = BLOCK_LENGTH;
+	for(BLOCK_INDEX bi = 0; bi < m_piece_info[piece_index].block_count; bi++)
+	{
+		if (bi == m_piece_info[piece_index].block_count - 1)
+			get_block_length_by_index(piece_index, bi, block_length);
+		if (m_torrent->read_block(piece_index, bi, block, block_length) != ERR_NO_ERROR)
+			return false;
+		m_csha1.Update((unsigned char*)block, block_length);
+	}
 	m_csha1.Final();
 	m_csha1.GetHash(sha1);
 	m_csha1.Reset();
