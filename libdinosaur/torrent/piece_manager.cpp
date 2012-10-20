@@ -440,7 +440,6 @@ bool PieceManager::check_piece_hash(PIECE_INDEX piece_index)
 	}
 	m_csha1.Final();
 	m_csha1.GetHash(sha1);
-	m_csha1.Reset();
 	if (sha1 == m_piece_info[piece_index].hash)
 	{
 		set_bitfield(piece_index, m_piece_info.size(), m_bitfield);

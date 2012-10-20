@@ -133,6 +133,8 @@ public:
 	 m_rx(0.0f), m_tx(0.0f), m_need2resolved(false), m_need2delete(false), m_udp(false)
 	{
 		memset(&m_peer, 0, sizeof(sockaddr_in));
+		m_send_buffer.length = 0;
+		m_send_buffer.pos = 0;
 #ifdef BITTORRENT_DEBUG
 	logger::LOGGER() << "Socket constructor " << this;
 #endif
