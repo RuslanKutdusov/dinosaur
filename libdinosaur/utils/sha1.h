@@ -19,6 +19,8 @@
 #ifndef ___SHA1_H___
 #define ___SHA1_H___
 
+#include "../types.h"
+
 //
 // SOLARIS USERS - IF YOUR SYSTEM IS LITTLE ENDIAN, REMOVE THE NEXT 3 LINES
 //  also see bnbt.h
@@ -83,13 +85,17 @@ public:
 
 	// Finalize hash and report
 	void Final();
-	void ReportHash(char *szReport, unsigned char uReportType = REPORT_HEX);
-	void GetHash(unsigned char *uDest);
+	//void ReportHash(char *szReport, unsigned char uReportType = REPORT_HEX);
+	//void GetHash(unsigned char *uDest);
+	void GetHEXHash(SHA1_HASH_HEX & hash);
+	void GetHash(SHA1_HASH & hash);
 
 private:
 	// Private SHA-1 transformation
 	void Transform(unsigned long state[5], unsigned char buffer[64]);
 };
+
+void sha1ToHex(const SHA1_HASH src, SHA1_HASH_HEX dst);
 
 }
 

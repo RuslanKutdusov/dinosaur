@@ -10,7 +10,7 @@
 namespace dinosaur {
 namespace network {
 
-DomainNameResolver::DomainNameResolver(std::string & domain, struct sockaddr_in * addr)
+DomainNameResolver::DomainNameResolver(const std::string & domain, sockaddr_in * addr)
 {
 #ifdef BITTORRENT_DEBUG
 	logger::LOGGER() << "DomainNameResolver constructor " << domain.c_str();
@@ -22,7 +22,7 @@ DomainNameResolver::DomainNameResolver(std::string & domain, struct sockaddr_in 
 	resolve();
 }
 
-DomainNameResolver::DomainNameResolver(const char * domain, struct sockaddr_in * addr)
+DomainNameResolver::DomainNameResolver(const char * domain, sockaddr_in * addr)
 {
 #ifdef BITTORRENT_DEBUG
 	logger::LOGGER() << "DomainNameResolver constructor " << domain;

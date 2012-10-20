@@ -104,7 +104,9 @@ public:
 		ERR_CODE_INVALID_MAX_ACTIVE_LEECHS,
 		ERR_CODE_INVALID_LISTEN_ON,
 		ERR_CODE_INVALID_MAX_ACTIVE_TORRENTS,
-		ERR_CODE_INVALID_FIN_RATIO
+		ERR_CODE_INVALID_FIN_RATIO,
+
+		ERR_CODE_NODE_NOT_EXISTS
 	};
 private:
 	ERR_CODES 	m_err_code;
@@ -171,6 +173,7 @@ struct ERR_CODES_STR
 		std::string ERR_CODE_INVALID_LISTEN_ON;
 		std::string ERR_CODE_INVALID_MAX_ACTIVE_TORRENTS;
 		std::string ERR_CODE_INVALID_FIN_RATIO;
+		std::string ERR_CODE_NODE_NOT_EXISTS;
 		friend class boost::serialization::access;
 private:
 		template<class Archive>
@@ -225,6 +228,7 @@ private:
 			ar & BOOST_SERIALIZATION_NVP(ERR_CODE_INVALID_LISTEN_ON);
 			ar & BOOST_SERIALIZATION_NVP(ERR_CODE_INVALID_MAX_ACTIVE_TORRENTS);
 			ar & BOOST_SERIALIZATION_NVP(ERR_CODE_INVALID_FIN_RATIO);
+			ar & BOOST_SERIALIZATION_NVP(ERR_CODE_NODE_NOT_EXISTS);
 		}
 public:
 		const std::string & str_code(Exception::ERR_CODES err_code)
@@ -284,6 +288,7 @@ public:
 				case(Exception::ERR_CODE_INVALID_LISTEN_ON): 			return ERR_CODE_INVALID_LISTEN_ON;
 				case(Exception::ERR_CODE_INVALID_MAX_ACTIVE_TORRENTS): 	return ERR_CODE_INVALID_MAX_ACTIVE_TORRENTS;
 				case(Exception::ERR_CODE_INVALID_FIN_RATIO): 			return ERR_CODE_INVALID_FIN_RATIO;
+				case(Exception::ERR_CODE_NODE_NOT_EXISTS): 				return ERR_CODE_NODE_NOT_EXISTS;
 		    }
 		}
 		static void save_defaults()
@@ -341,6 +346,7 @@ public:
 			ecs.ERR_CODE_INVALID_LISTEN_ON 						= "Invalid listen on IP";
 			ecs.ERR_CODE_INVALID_MAX_ACTIVE_TORRENTS 			= "Invalid max active torrents";
 			ecs.ERR_CODE_INVALID_FIN_RATIO						= "Invalid final ratio";
+			ecs.ERR_CODE_NODE_NOT_EXISTS						= "Such node does not exists";
 
 			oa << BOOST_SERIALIZATION_NVP(ecs);
 			ofs.close();

@@ -172,6 +172,11 @@ extern "C" void on_button_open_clicked (GtkWidget *object, gpointer user_data)
 			gtk_widget_destroy (dialog);
 			messagebox(exception_errcode2str(e));
 		}
+		catch(dinosaur::SyscallException & e)
+		{
+			gtk_widget_destroy (dialog);
+			messagebox(e.get_errno_str());
+		}
 		g_free (filename);
 	}
 	else
@@ -1209,7 +1214,7 @@ void show_open_dialog()
 
 	g_object_unref (builder);
 
-	gtk_label_set_text(label_hash, metafile->info_hash_hex);
+	gtk_label_set_text(label_hash, metafile->info_hash_hex.c_str());
 	char chars[100];
 	sprintf(chars, "%llu", metafile->length);
 	gtk_label_set_text(label_length, chars);

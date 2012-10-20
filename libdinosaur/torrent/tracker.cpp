@@ -10,6 +10,7 @@
 namespace dinosaur {
 namespace torrent {
 
+
 Tracker::Tracker()
 	:network::SocketAssociation()
 {
@@ -18,12 +19,9 @@ Tracker::Tracker()
 #endif
 	memset(m_buf, 0, 16384);
 	m_buflen = 0;
-	m_peers = NULL;
-	m_peers_count = 0;
 	m_state = TRACKER_STATE_NONE;
 	m_ready2release = false;
 	m_addr = NULL;
-	m_tracker_failure = "";
 }
 
 int Tracker::parse_announce()
@@ -52,7 +50,7 @@ int Tracker::parse_announce()
 	return ERR_NO_ERROR;
 }
 
-Tracker::Tracker(const TorrentInterfaceInternalPtr & torrent, std::string & announce)
+Tracker::Tracker(const TorrentInterfaceInternalPtr & torrent,const  std::string & announce)
 	:network::SocketAssociation()
 {
 #ifdef BITTORRENT_DEBUG
@@ -62,19 +60,17 @@ Tracker::Tracker(const TorrentInterfaceInternalPtr & torrent, std::string & anno
 	m_nm = m_torrent->get_nm();
 	m_g_cfg = m_torrent->get_cfg();
 	m_announce = announce;
-	memset(m_buf, 0, 16384);
 	m_buflen = 0;
+
 	m_interval = m_g_cfg->get_tracker_default_interval();
 	m_min_interval = 0;
 	m_seeders = 0;
 	m_leechers = 0;
-	m_peers = NULL;
-	m_addr = NULL;
+
 	m_downloaded = torrent->get_downloaded();
 	m_uploaded = torrent->get_uploaded();
-	m_peers_count = 0;
 	m_ready2release = false;
-	m_tracker_failure = "";
+	m_addr = NULL;
 	m_state = TRACKER_STATE_NONE;
 	hash2urlencode();
 	if (parse_announce() != ERR_NO_ERROR)
@@ -87,12 +83,10 @@ Tracker::Tracker(const TorrentInterfaceInternalPtr & torrent, std::string & anno
 void Tracker::hash2urlencode()
 {
 	memset(m_infohash, 0, SHA1_LENGTH * 3 + 1);
-	unsigned char infohash_bin[SHA1_LENGTH];
-	m_torrent->copy_infohash_bin(infohash_bin);
 	for(int i = 0; i < SHA1_LENGTH; i++)
 	{
 		m_infohash[i * 3] = '%';
-		sprintf(&m_infohash[i * 3 + 1], "%02x", infohash_bin[i]);
+		sprintf(&m_infohash[i * 3 + 1], "%02x", m_torrent->get_infohash()[i]);
 	}
 }
 
@@ -110,8 +104,6 @@ void Tracker::send_request(TRACKER_EVENT event )
 		urn.append("&");
 	else
 		urn.append("?");
-	//if (urn[urn.length() - 1] != '&')
-	//	urn.append("&");
 
 	urn.append("info_hash=");
 	urn.append(m_infohash);
@@ -181,6 +173,7 @@ int Tracker::process_response()
 	if (data == NULL)
 	{
 		m_status = TRACKER_STATUS_ERROR;
+		logger::LOGGER() << "Tracker invalid response(data == null)";
 		return ERR_INTERNAL;
 	}
 	len = m_buflen - (data - m_buf);
@@ -190,6 +183,7 @@ int Tracker::process_response()
 	if (response == NULL)
 	{
 		m_status = TRACKER_STATUS_ERROR;
+		logger::LOGGER() << "Tracker invalid response(not bencode)";
 		return ERR_INTERNAL;
 	}
 	//bencode::dump(response);
@@ -197,14 +191,14 @@ int Tracker::process_response()
 	char * c_str = NULL;
 	m_status = TRACKER_STATUS_OK;
 	m_tracker_failure = "";
-	if (bencode::get_str(response,"warning message",&b_str) == 0)
+	if (bencode::get_str(response, "warning message", &b_str) == 0)
 	{
 		c_str = bencode::str2c_str(b_str);
 		m_status = TRACKER_STATUS_SEE_FAILURE_MESSAGE;
 		m_tracker_failure = c_str;
 		delete[] c_str;
 	}
-	if (bencode::get_str(response,"failure reason",&b_str) == 0)
+	if (bencode::get_str(response, "failure reason", &b_str) == 0)
 	{
 		c_str = bencode::str2c_str(b_str);
 		m_status = TRACKER_STATUS_SEE_FAILURE_MESSAGE;
@@ -229,161 +223,162 @@ int Tracker::process_response()
 		{
 			bencode::_free(response);
 			m_status = TRACKER_STATUS_ERROR;
+			logger::LOGGER() << "Tracker invalid response(invalid peer list)";
 			return ERR_INTERNAL;
 		}
-		m_peers_count = len / 6;
-		if (m_peers != NULL)
-			delete[] m_peers;
-		m_peers = new sockaddr_in[m_peers_count];
-		for(int i = 0; i < m_peers_count; i++)
+		int peers_count = len / 6;
+		m_peers.clear();
+		FILE * f = fopen("peers", "wb");
+		for(int i = 0; i < peers_count; i++)
 		{
-			memcpy((void*)&m_peers[i].sin_addr, (void*)&t_str[i * 6], 4);
-			memcpy(&m_peers[i].sin_port, &t_str[i * 6 + 4], 2);
-			m_peers[i].sin_family = AF_INET;
+			sockaddr_in addr;
+			memcpy((void*)&addr.sin_addr, (void*)&t_str[i * 6], 4);
+			memcpy(&addr.sin_port, &t_str[i * 6 + 4], 2);
+			addr.sin_family = AF_INET;
+			m_peers.push_back(addr);
+			fwrite((void*)&addr, 1, sizeof(sockaddr_in), f);
 		}
+		fclose(f);
 	}
 
 	bencode::_free(response);
 	m_buflen = 0;
-	if (m_peers_count > 0)
-	{
-		m_torrent->add_seeders(m_peers_count, m_peers);
-	}
+	m_torrent->add_seeders(m_peers);
 	delete_socket();
 	return 0;
 }
 
-int Tracker::event_sock_ready2read(network::Socket sock)
+void Tracker::event_sock_ready2read(network::Socket sock)
 {
-	//std::cout<<"TRACKER event_sock_ready2read "<<sock->get_fd()<<" "<<m_announce<<std::endl;
-	if (m_state == TRACKER_STATE_STOPPING || m_state == TRACKER_STATE_FAILURE)
-		return ERR_NO_ERROR;
+	if (m_state == TRACKER_STATE_RELEASING)
+		return;
 	try
 	{
-		m_buflen += m_nm->Socket_recv(sock, m_buf + m_buflen, BUFFER_SIZE - m_buflen);
+		bool closed;
+		size_t received = m_nm->Socket_recv(sock, m_buf + m_buflen, BUFFER_SIZE - m_buflen, closed);
+		m_buflen += received;
 		process_response();
+		if (closed)
+		{
+			delete_socket();
+			if (m_status == TRACKER_STATUS_UPDATING)
+				m_status = TRACKER_STATUS_ERROR;
+			return;
+		}
 	}
 	catch (Exception & e)
 	{
 		delete_socket();
 		m_status = TRACKER_STATUS_ERROR;
-		return ERR_INTERNAL;
+		logger::LOGGER() << "Tracker ready to read event failure";
 	}
-	return ERR_NO_ERROR;
 }
 
-int Tracker::event_sock_closed(network::Socket sock)
+void Tracker::event_sock_error(network::Socket sock, int errno_)
 {
-	//std::cout<<"TRACKER event_sock_closed "<<sock->get_fd()<<" "<<m_announce<<std::endl;
-	if (m_state == TRACKER_STATE_FAILURE)
-		return ERR_NO_ERROR;
-	try
-	{
-		if (m_nm->Socket_datalen(sock) > 0)
-			event_sock_ready2read(sock);
-		delete_socket();
-		if (m_status == TRACKER_STATUS_UPDATING)
-			m_status = TRACKER_STATUS_ERROR;
-		m_ready2release = (m_state == TRACKER_STATE_STOPPING);
-	}
-	catch (Exception & e)
-	{
-		delete_socket();
+	delete_socket();
+	if (m_status == TRACKER_STATUS_UPDATING)
 		m_status = TRACKER_STATUS_ERROR;
-		return ERR_INTERNAL;
-	}
-	return ERR_NO_ERROR;
+	m_ready2release = (m_state == TRACKER_STATE_RELEASING);
 }
 
-int Tracker::event_sock_sended(network::Socket sock)
+void Tracker::event_sock_sended(network::Socket sock)
 {
-	//std::cout<<"TRACKER event_sock_sended "<<sock->get_fd()<<" "<<m_announce<<std::endl;
-	if (m_state == TRACKER_STATE_FAILURE)
-		return ERR_NO_ERROR;
-	if (m_state == TRACKER_STATE_STOPPING && m_nm->Socket_sendbuf_remain(sock) == 0)
+	if (m_state == TRACKER_STATE_RELEASING && m_nm->Socket_sendbuf_remain(sock) == 0)
 	{
 		m_ready2release = true;
+		m_nm->Socket_delete(m_sock);
 #ifdef BITTORRENT_DEBUG
 		logger::LOGGER() << "Tracker " << m_announce.c_str() << " stop sended";
 #endif
 	}
-	return ERR_NO_ERROR;
 }
 
-int Tracker::event_sock_connected(network::Socket sock)
+void Tracker::event_sock_connected(network::Socket sock)
 {
 	try
 	{
-		if (m_state == TRACKER_STATE_FAILURE)
-			return ERR_NO_ERROR;
 		if (m_addr == NULL)
 			m_addr = new sockaddr_in;
-		m_nm->Socket_get_addr(sock, m_addr);
+		m_nm->Socket_get_addr(sock, *m_addr);
 		send_request(m_event_after_connect);
 	}
 	catch (Exception & e)
 	{
+		logger::LOGGER() << "Tracker " << m_announce.c_str() << "  error while sending request";
 		delete_socket();
 		m_status = TRACKER_STATUS_ERROR;
-		return ERR_INTERNAL;
+		m_ready2release = (m_state == TRACKER_STATE_RELEASING);
 	}
-	return ERR_NO_ERROR;
 }
 
-int Tracker::event_sock_accepted(network::Socket sock, network::Socket accepted_sock)
+void Tracker::event_sock_accepted(network::Socket sock, network::Socket accepted_sock)
 {
-	return ERR_NO_ERROR;
 }
 
-int Tracker::event_sock_timeout(network::Socket sock)
+void Tracker::event_sock_timeout(network::Socket sock)
 {
 #ifdef BITTORRENT_DEBUG
 	logger::LOGGER() << "Tracker " << m_announce.c_str() << " timeout";
 #endif
-	try
-	{
-		if (m_state == TRACKER_STATE_FAILURE)
-			return ERR_NO_ERROR;
-		m_status = TRACKER_STATUS_TIMEOUT;
-		if (m_nm->Socket_datalen(sock) > 0)
-			event_sock_ready2read(sock);
-		delete_socket();
-		m_ready2release = (m_state == TRACKER_STATE_STOPPING);
-	}
-	catch (Exception & e)
-	{
-		delete_socket();
-		m_status = TRACKER_STATUS_ERROR;
-		return ERR_INTERNAL;
-	}
-	return ERR_NO_ERROR;
+	if (m_state == TRACKER_STATE_FAILURE)
+		return;
+	m_status = TRACKER_STATUS_TIMEOUT;
+	delete_socket();
+	m_ready2release = (m_state == TRACKER_STATE_RELEASING);
 }
 
-int Tracker::event_sock_unresolved(network::Socket sock)
+void Tracker::event_sock_unresolved(network::Socket sock)
 {
-	//std::cout<<"TRACKER event_sock_unresolved "<<sock->get_fd()<<" "<<m_announce<<std::endl;
 	if (m_state == TRACKER_STATE_FAILURE)
-		return ERR_NO_ERROR;
+		return;
 	m_status = TRACKER_STATUS_UNRESOLVED;
 	delete_socket();
-	m_ready2release = (m_state == TRACKER_STATE_STOPPING);
-	return ERR_NO_ERROR;
+	m_ready2release = (m_state == TRACKER_STATE_RELEASING);
 }
 
-int Tracker::get_peers_count()
+const std::vector<sockaddr_in> & Tracker::get_peers()
 {
-	if (m_state == TRACKER_STATE_FAILURE)
-		return 0;
-	return m_peers_count;
+	return m_peers;
 }
 
-const sockaddr_in * Tracker::get_peer(int i)
+void Tracker::clock(bool & release_me)
+{
+	release_me = false;
+	if (m_state == TRACKER_STATE_FAILURE)
+		release_me = true;
+	if (m_state == TRACKER_STATE_WORK && (uint32_t)(time(NULL) - m_last_update) >= m_interval)
+		update();
+	release_me = m_ready2release;
+}
+
+void Tracker::prepare2release()
+{
+#ifdef BITTORRENT_DEBUG
+	logger::LOGGER() << "Tracker " << m_announce.c_str() << " prepare2release";
+#endif
+	if (m_state == TRACKER_STATE_FAILURE)
+	{
+		#ifdef BITTORRENT_DEBUG
+			logger::LOGGER() << "Tracker is fail " << m_announce.c_str() << " prepare2release";
+		#endif
+		m_ready2release = true;
+		return;
+	}
+	if (send_stopped() != ERR_NO_ERROR)
+	{
+		delete_socket();
+		m_ready2release = true;
+	}
+	m_state = TRACKER_STATE_RELEASING;
+}
+
+void Tracker::forced_releasing()
 {
 	if (m_state == TRACKER_STATE_FAILURE)
-		return NULL;
-	if (i < 0 || i >= m_peers_count)
-		return NULL;
-	return &m_peers[i];
+		return;
+	m_ready2release = true;
+	delete_socket();
 }
 
 int Tracker::restore_socket()
@@ -391,13 +386,12 @@ int Tracker::restore_socket()
 	if (m_sock == NULL)
 	{
 		m_status = TRACKER_STATUS_CONNECTING;
-		m_sock.reset();
 		try
 		{
 			if (m_addr == NULL)
 				m_nm->Socket_add_domain(m_host, 80, shared_from_this(), m_sock);
 			else
-				m_nm->Socket_add(m_addr, shared_from_this(), m_sock);
+				m_nm->Socket_add((const sockaddr_in)*m_addr, shared_from_this(), m_sock);
 		}
 		catch (Exception  & e)
 		{
@@ -411,101 +405,52 @@ int Tracker::restore_socket()
 	return ERR_NO_ERROR;
 }
 
-int Tracker::clock(bool & release_me)
+void Tracker::delete_socket()
 {
-	release_me = false;
-	if (m_state == TRACKER_STATE_FAILURE)
-		release_me = true;
-	if (m_state == TRACKER_STATE_WORK && (uint32_t)(time(NULL) - m_last_update) >= m_interval)
-	{
-		update();
-	}
-	if (m_state == TRACKER_STATE_STOPPING)
-		release_me = m_ready2release;
-	return ERR_NO_ERROR;
+	m_nm->Socket_delete(m_sock);
 }
 
-int Tracker::update()
+int Tracker::send_message(TRACKER_EVENT event2send)
 {
-	if (m_state == TRACKER_STATE_FAILURE || m_state == TRACKER_STATE_STOPPING)
-		return ERR_NO_ERROR;
+	if (m_state == TRACKER_STATE_FAILURE || m_state == TRACKER_STATE_RELEASING)
+		return ERR_INTERNAL;
 	if (restore_socket() != ERR_NO_ERROR)
+	{
 		m_status = TRACKER_STATUS_ERROR;
-	m_event_after_connect = TRACKER_EVENT_NONE;
+		logger::LOGGER() << "Tracker " << m_announce.c_str() << "  can not restore socket";
+		return ERR_INTERNAL;
+	}
+	m_event_after_connect = event2send;
 	m_state = TRACKER_STATE_WORK;
 	m_last_update = time(NULL);
 	return ERR_NO_ERROR;
-}
-
-int Tracker::prepare2release()
-{
-#ifdef BITTORRENT_DEBUG
-	logger::LOGGER() << "Tracker " << m_announce.c_str() << " prepare2release";
-#endif
-	if (m_state == TRACKER_STATE_FAILURE)
-	{
-		#ifdef BITTORRENT_DEBUG
-			logger::LOGGER() << "Tracker is fail " << m_announce.c_str() << " prepare2release";
-		#endif
-		return ERR_INTERNAL;
-	}
-	if (send_stopped() != ERR_NO_ERROR)
-	{
-		delete_socket();
-		return ERR_INTERNAL;
-	}
-	m_state = TRACKER_STATE_STOPPING;
-	return ERR_NO_ERROR;
-}
-
-void Tracker::forced_releasing()
-{
-	if (m_state == TRACKER_STATE_FAILURE)
-		return;
-	delete_socket();
 }
 
 int Tracker::send_completed()
 {
-	if (m_state == TRACKER_STATE_FAILURE || m_state == TRACKER_STATE_STOPPING)
-		return ERR_NO_ERROR;
-	if (restore_socket() != ERR_NO_ERROR)
-		m_status = TRACKER_STATUS_ERROR;
-	m_event_after_connect = TRACKER_EVENT_COMPLETED;
-	m_state = TRACKER_STATE_WORK;
-	m_last_update = time(NULL);
-	return ERR_NO_ERROR;
+	return send_message(TRACKER_EVENT_COMPLETED);
 }
 
 int Tracker::send_stopped()
 {
-	if (m_state == TRACKER_STATE_FAILURE || m_state == TRACKER_STATE_STOPPING)
-		return ERR_NO_ERROR;
-	if (restore_socket() != ERR_NO_ERROR)
-		m_status = TRACKER_STATUS_ERROR;
-	m_event_after_connect = TRACKER_EVENT_STOPPED;
-	m_state = TRACKER_STATE_WORK;
-	m_last_update = time(NULL);
-	return ERR_NO_ERROR;
+	return send_message(TRACKER_EVENT_STOPPED);
 }
 
 int Tracker::send_started()
 {
-	if (m_state == TRACKER_STATE_FAILURE || m_state == TRACKER_STATE_STOPPING)
-		return ERR_NO_ERROR;
-	if (restore_socket() != ERR_NO_ERROR)
-		m_status = TRACKER_STATUS_ERROR;
-	m_event_after_connect = TRACKER_EVENT_STARTED;
-	m_state = TRACKER_STATE_WORK;
-	m_last_update = time(NULL);
-	return ERR_NO_ERROR;
+	return send_message(TRACKER_EVENT_STARTED);
+}
+
+int Tracker::update()
+{
+	return send_message(TRACKER_EVENT_NONE);
 }
 
 int Tracker::get_info(info::tracker & ref)
 {
 	ref.announce = m_announce;
 	ref.leechers = m_leechers;
-	ref.seeders = m_seeders == 0 ? m_peers_count : m_seeders;
+	ref.seeders = m_seeders == 0 ? m_peers.size() : m_seeders;
 	ref.status = m_status;
 	if (m_state == TRACKER_STATE_WORK)
 		ref.update_in = (time_t)m_interval - time(NULL) + m_last_update;
@@ -520,8 +465,6 @@ Tracker::~Tracker()
 #ifdef BITTORRENT_DEBUG
 	logger::LOGGER() << "Tracker " << m_announce.c_str() << " destructor";
 #endif
-	if(m_peers != NULL)
-		delete[] m_peers;
 	if (m_addr != NULL)
 		delete m_addr;
 	delete_socket();
@@ -532,3 +475,4 @@ Tracker::~Tracker()
 
 }
 }
+

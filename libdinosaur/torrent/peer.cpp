@@ -30,7 +30,7 @@ Peer::Peer()
 	memset(&m_buf, 0, sizeof(network::buffer));
 }
 
-int Peer::Init(sockaddr_in * addr, const TorrentInterfaceInternalPtr & torrent)
+int Peer::Init(const sockaddr_in & addr, const TorrentInterfaceInternalPtr & torrent)
 {
 	memset(&m_buf, 0, sizeof(network::buffer));
 	m_torrent = torrent;
@@ -46,7 +46,7 @@ int Peer::Init(sockaddr_in * addr, const TorrentInterfaceInternalPtr & torrent)
 	m_downloaded = 0;
 	m_uploaded = 0;
 	m_sock.reset();
-	memcpy(&m_addr, addr, sizeof(sockaddr_in));
+	m_addr = addr;
 	m_state = PEER_STATE_SEND_HANDSHAKE;
 	get_peer_key(addr, m_ip);//inet_ntoa(m_sock->m_peer.sin_addr);
 	return ERR_NO_ERROR;
@@ -74,7 +74,7 @@ int Peer::Init(network::Socket & sock, const TorrentInterfaceInternalPtr & torre
 	m_uploaded = 0;
 	m_sock = sock;
 	memcpy(&m_addr, &m_sock->m_peer, sizeof(sockaddr_in));
-	get_peer_key(&m_sock->m_peer, m_ip);//inet_ntoa(m_sock->m_peer.sin_addr);
+	get_peer_key(m_sock->m_peer, m_ip);//inet_ntoa(m_sock->m_peer.sin_addr);
 	switch(peer_add)
 	{
 	case PEER_ADD_TRACKER:
@@ -101,7 +101,7 @@ int Peer::send_handshake()
 	memset(handshake, 0, HANDSHAKE_LENGHT);
 	handshake[0] = '\x13';
 	strncpy((char*)&handshake[1], "BitTorrent protocol", 19);
-	m_torrent->copy_infohash_bin(&handshake[28]);
+	m_torrent->get_infohash().copy2(&handshake[28]);
 	m_g_cfg->get_peer_id((char*)&handshake[48]);
 	try
 	{
@@ -326,7 +326,7 @@ int Peer::process_messages()
 	if (m_buf.length - m_buf.pos >= HANDSHAKE_LENGHT &&
 		m_buf.data[m_buf.pos] == '\x13' &&
 		memcmp(&m_buf.data[m_buf.pos + 1], "BitTorrent protocol", 19) == 0 &&
-		m_torrent->memcmp_infohash_bin((unsigned char*)&m_buf.data[m_buf.pos + 28]) == 0)
+		m_torrent->memcmp_infohash_bin((unsigned char*)&m_buf.data[m_buf.pos + 28]))
 	{
 		if (m_state != PEER_STATE_WAIT_HANDSHAKE)
 			return ERR_INTERNAL;
@@ -537,82 +537,71 @@ end:
 	return ERR_NO_ERROR;
 }
 
-int Peer::event_sock_ready2read(network::Socket sock)
+void Peer::event_sock_ready2read(network::Socket sock)
 {
-	int ret;
 	try
 	{
-		ret = m_nm->Socket_recv(sock, m_buf.data + m_buf.length, BUFFER_SIZE - m_buf.length);
+		bool closed;
+		size_t ret;
+		ret = m_nm->Socket_recv(sock, m_buf.data + m_buf.length, BUFFER_SIZE - m_buf.length, closed);
+		m_buf.length += ret;
+		if (process_messages() != ERR_NO_ERROR)
+		{
+			goto_sleep();
+			return;
+		}
+		if (closed)
+			goto_sleep();
 	}
 	catch (Exception & e) {
-		return ERR_INTERNAL;
-	}
-	m_buf.length += ret;
-	if (process_messages() != ERR_NO_ERROR)
-	{
 		goto_sleep();
 	}
-	return ERR_NO_ERROR;
 }
 
-int Peer::event_sock_closed(network::Socket sock)
+void Peer::event_sock_error(network::Socket sock, int errno_)
 {
 #ifdef PEER_DEBUG
 	logger::LOGGER() << "Peer " << m_ip.c_str() << ": close connection";
 #endif
-	try
-	{
-		if (m_nm->Socket_datalen(sock) > 0)
-			event_sock_ready2read(sock);
-		goto_sleep();
-		return ERR_NO_ERROR;
-	}
-	catch (Exception & e) {
-		return ERR_INTERNAL;
-	}
+	goto_sleep();
 
 }
 
-int Peer::event_sock_sended(network::Socket sock)
+void Peer::event_sock_sended(network::Socket sock)
 {
-	return 0;
 
 }
 
-int Peer::event_sock_connected(network::Socket sock)
+void Peer::event_sock_connected(network::Socket sock)
 {
 #ifdef PEER_DEBUG
 	logger::LOGGER() << "Peer " << m_ip.c_str() << ": connected";
 #endif
-	return 0;
 
 }
 
-int Peer::event_sock_accepted(network::Socket sock, network::Socket accepted_sock)
+void Peer::event_sock_accepted(network::Socket sock, network::Socket accepted_sock)
 {
-	return 0;
 }
 
-int Peer::event_sock_timeout(network::Socket sock)
+void Peer::event_sock_timeout(network::Socket sock)
 {
 #ifdef PEER_DEBUG
 	logger::LOGGER() << "Peer " << m_ip.c_str() << ": timeout";
 #endif
 	try
 	{
-		if (m_nm->Socket_datalen(sock) > 0)
-			event_sock_ready2read(sock);
 		goto_sleep();
-		return ERR_NO_ERROR;
+		return;
 	}
 	catch (Exception & e) {
-		return ERR_INTERNAL;
+		return;
 	}
 }
 
-int Peer::event_sock_unresolved(network::Socket sock)
+void Peer::event_sock_unresolved(network::Socket sock)
 {
-	return ERR_NO_ERROR;
+	return;
 }
 
 bool Peer::have_piece(PIECE_INDEX piece_index)
@@ -638,7 +627,7 @@ int Peer::clock()
 		{
 			try
 			{
-				m_nm->Socket_add(&m_addr, shared_from_this(), m_sock);
+				m_nm->Socket_add(m_addr, shared_from_this(), m_sock);
 			}
 			catch (...)
 			{

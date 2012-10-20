@@ -157,7 +157,7 @@ int TorrentFile::read_block(PIECE_INDEX piece, BLOCK_INDEX block_index, char * b
 	block_cache::cache_key key(m_torrent.get(), block_id);
 	try
 	{
-		m_torrent->get_bc()->get(key, (block_cache::cache_element *)block);
+		m_torrent->get_bc()->get(key, block);
 		return ERR_NO_ERROR;
 	}
 	catch (Exception & e) {
@@ -218,7 +218,7 @@ int TorrentFile::read_block(PIECE_INDEX piece, BLOCK_INDEX block_index, char * b
 	}
 	try
 	{
-		m_torrent->get_bc()->put(key, (block_cache::cache_element*)block);
+		m_torrent->get_bc()->put(key, block);
 	}
 	catch(Exception & e)
 	{
@@ -288,9 +288,9 @@ int TorrentFile::read_piece(PIECE_INDEX piece_index, unsigned char * dst)
 	return ERR_NO_ERROR;
 }
 
-int TorrentFile::event_file_write(const fs::write_event & eo)
+void TorrentFile::event_file_write(const fs::write_event & eo)
 {
-	return m_torrent->event_file_write(eo);
+	m_torrent->event_file_write(eo);
 }
 
 void TorrentFile::ReleaseFiles()
@@ -341,7 +341,7 @@ void TorrentFile::update_file_downloaded(FILE_INDEX file_index, uint64_t bytes)
 	m_files[file_index].downloaded += bytes;
 }
 
-void TorrentFile::clear_file_downloaded()
+void TorrentFile::reset_file_downloaded()
 {
 	for(FILE_INDEX i = 0; i < m_files.size(); i++)
 	{

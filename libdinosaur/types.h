@@ -17,8 +17,7 @@
 namespace dinosaur
 {
 
-typedef unsigned char 		SHA1_HASH[SHA1_LENGTH];
-typedef char 				SHA1_HASH_HEX[SHA1_HEX_LENGTH];
+typedef std::string			SHA1_HASH_HEX;
 typedef unsigned char * 	BITFIELD;
 typedef uint64_t			FILE_INDEX;
 typedef uint32_t 			BLOCK_INDEX;
@@ -27,6 +26,31 @@ typedef uint32_t 			BLOCK_OFFSET;
 typedef uint64_t			FILE_OFFSET;
 typedef char				IP_CHAR[IP_CHAR_LENGHT];
 typedef char				PEER_ID[PEER_ID_LENGTH];
+
+class SHA1_HASH
+{
+protected:
+	unsigned char m_data[SHA1_LENGTH];
+	void clear();
+public:
+	SHA1_HASH();
+	SHA1_HASH(const SHA1_HASH & hash);
+	SHA1_HASH(const char * hash);
+	SHA1_HASH(const unsigned char * hash);
+	virtual ~SHA1_HASH();
+	SHA1_HASH & operator=(const SHA1_HASH & hash);
+	SHA1_HASH & operator=(const char * hash);
+	SHA1_HASH & operator=(const unsigned char * hash);
+	unsigned char & operator[](size_t i);
+	const unsigned char & operator[](size_t i) const;
+	bool operator<(const SHA1_HASH & hash) const;
+	bool operator==(const SHA1_HASH & hash) const;
+	bool operator!=(const SHA1_HASH & hash) const;
+	void copy2(char * dst) const;
+	void copy2(unsigned char * dst) const;
+	void print() const;
+	void to_hex(SHA1_HASH_HEX & hash) const ;
+};
 
 enum DOWNLOAD_PRIORITY
 {

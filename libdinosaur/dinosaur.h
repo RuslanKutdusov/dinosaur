@@ -91,6 +91,13 @@ private:
 	friend class boost::serialization::access;
 	template<class Archive>
 	void serialize(Archive & ar, const unsigned int version);
+	void event_sock_ready2read(network::Socket sock);
+	void event_sock_error(network::Socket sock, int errno_);
+	void event_sock_sended(network::Socket sock);
+	void event_sock_connected(network::Socket sock);
+	void event_sock_accepted(network::Socket sock, network::Socket accepted_sock);
+	void event_sock_timeout(network::Socket sock);
+	void event_sock_unresolved(network::Socket sock);
 public:
 	cfg::Glob_cfg Config;
 	void AddTorrent(torrent::Metafile & metafile, const std::string & download_directory, std::string & hash);
@@ -112,13 +119,6 @@ public:
 	void get_active_torrents(std::list<std::string>  & ref);
 	void get_torrents_in_queue(std::list<std::string>  & ref);
 	void UpdateConfigs();
-	int event_sock_ready2read(network::Socket sock);
-	int event_sock_closed(network::Socket sock);
-	int event_sock_sended(network::Socket sock);
-	int event_sock_connected(network::Socket sock);
-	int event_sock_accepted(network::Socket sock, network::Socket accepted_sock);
-	int event_sock_timeout(network::Socket sock);
-	int event_sock_unresolved(network::Socket sock);
 	const socket_status & get_socket_status()
 	{
 		return m_sock_status;

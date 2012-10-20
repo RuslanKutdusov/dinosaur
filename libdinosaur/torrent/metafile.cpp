@@ -17,12 +17,9 @@ Metafile::Metafile()
   private_(0),
   length(0),
   piece_length(0),
-  piece_count(0),
-  pieces(NULL)
+  piece_count(0)
 {
-	memset(info_hash_bin, 0, SHA1_LENGTH);
-	memset(info_hash_hex, '0', SHA1_HEX_LENGTH);
-	info_hash_hex[SHA1_HEX_LENGTH - 1] = '\0';
+
 }
 
 /*
@@ -43,27 +40,11 @@ Metafile::Metafile(const Metafile & metafile)
   name(metafile.name),
   piece_length(metafile.piece_length),
   piece_count(metafile.piece_count),
-  pieces(NULL)
+  pieces(metafile.pieces),
+  info_hash_bin(metafile.info_hash_bin),
+  info_hash_hex(metafile.info_hash_hex)
 {
-	if (m_metafile != NULL)
-	{
-		bencode::be_node * info;// = bencode::get_info_dict(m_metafile);
-		bencode::be_str * str;
-		if (bencode::get_node(m_metafile, "info", &info) == -1)
-		{
-			bencode::_free(m_metafile);
-			throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
-		}
 
-		if (bencode::get_str(info,"pieces",&str) == -1 || str->len % 20 != 0)
-		{
-			bencode::_free(m_metafile);
-			throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
-		}
-		pieces	 = str->ptr;
-	}
-	memcpy(info_hash_bin, metafile.info_hash_bin, SHA1_LENGTH);
-	memcpy(info_hash_hex, metafile.info_hash_hex, SHA1_HEX_LENGTH);
 }
 
 /*
@@ -89,26 +70,10 @@ Metafile & Metafile::operator = (const Metafile & metafile)
 		name = 				metafile.name;
 		piece_length = 		metafile.piece_length;
 		piece_count = 		metafile.piece_count;
-		pieces = 			NULL;
-		if (m_metafile != NULL)
-		{
-			bencode::be_node * info;
-			bencode::be_str * str;
-			if (bencode::get_node(m_metafile, "info", &info) == -1)
-			{
-				bencode::_free(m_metafile);
-				throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
-			}
-
-			if (bencode::get_str(info,"pieces",&str) == -1 || str->len % 20 != 0)
-			{
-				bencode::_free(m_metafile);
-				throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
-			}
-			pieces	 = str->ptr;
-		}
-		memcpy(info_hash_bin, metafile.info_hash_bin, SHA1_LENGTH);
-		memcpy(info_hash_hex, metafile.info_hash_hex, SHA1_HEX_LENGTH);
+		pieces = 			metafile.pieces;
+		info_hash_bin =		metafile.info_hash_bin;
+		info_hash_hex = 	metafile.info_hash_hex;
+		pieces =			metafile.pieces;
 	}
 	return *this;
 }
@@ -336,8 +301,13 @@ void Metafile::get_main_info( uint64_t metafile_len)
 	if (bencode::get_str(info,"pieces",&str) == -1 || str->len % 20 != 0)
 		throw Exception(Exception::ERR_CODE_INVALID_METAFILE);
 
-	pieces	 = str->ptr;
 	piece_count = str->len / 20;
+
+	for(uint32_t i = 0; i < piece_count; i++)
+	{
+		SHA1_HASH piece_hash(&str->ptr[i * SHA1_LENGTH]);
+		pieces.push_back(piece_hash);
+	}
 
 	if (bencode::get_int(m_metafile,"private",&private_) == -1)
 		bencode::get_int(info,"private",&private_);
@@ -351,8 +321,6 @@ void Metafile::get_main_info( uint64_t metafile_len)
 
 void Metafile::calculate_info_hash(bencode::be_node * info, uint64_t metafile_len)
 {
-	memset(info_hash_bin,0,20);
-	memset(info_hash_hex,0,41);
 	char * bencoded_info = new char[metafile_len];
 	uint32_t bencoded_info_len = 0;
 	if (bencode::encode(info, &bencoded_info, metafile_len, &bencoded_info_len) != ERR_NO_ERROR)
@@ -363,7 +331,7 @@ void Metafile::calculate_info_hash(bencode::be_node * info, uint64_t metafile_le
 	CSHA1 csha1;
 	csha1.Update((unsigned char*)bencoded_info, bencoded_info_len);
 	csha1.Final();
-	csha1.ReportHash(info_hash_hex,CSHA1::REPORT_HEX);
+	csha1.GetHEXHash(info_hash_hex);
 	csha1.GetHash(info_hash_bin);
 	delete[] bencoded_info;
 }
