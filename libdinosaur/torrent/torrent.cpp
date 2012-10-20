@@ -213,9 +213,7 @@ void TorrentBase::releasing()
 			(*iter).second->forced_releasing();
 			m_trackers.erase(iter);
 		}
-		else
-			if ((*iter).second->prepare2release() != ERR_NO_ERROR)
-				m_trackers.erase(iter);
+		(*iter).second->prepare2release();
 	}
 	for(peer_map_iter iter = m_seeders.begin(); iter != m_seeders.end(); ++iter)
 	{
@@ -239,7 +237,7 @@ void TorrentBase::releasing()
 void TorrentBase::add_seeders(const std::vector<sockaddr_in> & addrs)
 {
 	int count = addrs.size() > m_g_cfg->get_tracker_numwant() ? m_g_cfg->get_tracker_numwant() : addrs.size();
-	for(uint32_t i = 0;	i < count;	i++)
+	for(int i = 0;	i < count;	i++)
 	{
 		try
 		{
@@ -491,18 +489,20 @@ int TorrentBase::clock()
 	}
 
 	if (m_state == TORRENT_STATE_RELEASING)
-		//for(tracker_map_iter iter = m_trackers.begin(), iter2 = iter;
-		//		iter != m_trackers.end(); iter = iter2)
+	{
 		ERASABLE_LOOP(m_trackers, tracker_map_iter, iter, iter2)
 		{
 			++iter2;
+			info::tracker ti;
+			(*iter).second->get_info(ti);
 			bool release_tracker_instance;
 			(*iter).second->clock(release_tracker_instance);
 			if (release_tracker_instance)
 				m_trackers.erase(iter);
-			printf("%d\n", m_trackers.size());
+			printf("%s\n", ti.announce.c_str());
 		}
-
+		printf("%d\n", m_trackers.size());
+	}
 
 	if (m_state == TORRENT_STATE_SET_FAILURE)
 	{
@@ -880,7 +880,7 @@ void TorrentBase::speed_ctrl()
 			PeerPtr seed = *seed_iter;
 			if (seed->is_sleep())
 				continue;
-			int fd = seed->m_sock->get_fd();
+			int fd = 0;//seed->m_sock->get_fd();
 			int rcvbuf;
 			int new_rcvbuf;
 			socklen_t size;

@@ -60,7 +60,7 @@ private:
 	{
 		TRACKER_STATE_NONE,
 		TRACKER_STATE_WORK,
-		TRACKER_STATE_STOPPING,
+		TRACKER_STATE_RELEASING,
 		TRACKER_STATE_FAILURE
 	};
 
@@ -106,11 +106,8 @@ private:
 	//формирует и отправляет запрос
 	void send_request(TRACKER_EVENT event );
 	int restore_socket();
+	void delete_socket();
 	int parse_announce();
-	void delete_socket()
-	{
-		m_nm->Socket_delete(m_sock);
-	}
 	void event_sock_ready2read(network::Socket sock);
 	void event_sock_error(network::Socket sock, int errno_);
 	void event_sock_sended(network::Socket sock);
@@ -118,18 +115,19 @@ private:
 	void event_sock_accepted(network::Socket sock, network::Socket accepted_sock);
 	void event_sock_timeout(network::Socket sock);
 	void event_sock_unresolved(network::Socket sock);
+	int send_message(TRACKER_EVENT event2send);
 public:
 	Tracker();
-	Tracker(const TorrentInterfaceInternalPtr & torrent, std::string & announce);
+	Tracker(const TorrentInterfaceInternalPtr & torrent,const std::string & announce);
 	virtual ~Tracker();
 	const std::vector<sockaddr_in> & get_peers();
-	int update();
-	int prepare2release();
+	void prepare2release();
 	void forced_releasing();
-	int clock(bool & release_me);
+	void clock(bool & release_me);
 	int send_stopped();
 	int send_started();
 	int send_completed();
+	int update();
 	int get_info(info::tracker & ref);
 };
 
