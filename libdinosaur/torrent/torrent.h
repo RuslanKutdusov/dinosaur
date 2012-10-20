@@ -255,7 +255,6 @@ private:
 	download_queue									m_download_queue;
 	uint32_list										m_tag_list;//хранит один элемент, на который будут ссылатся prio_iter у загруженных кусков
 	std::map<BLOCK_ID, uint32_t>					m_downloadable_blocks;
-	unsigned char *									m_piece_for_check_hash;
 	std::deque<std::set<PIECE_INDEX> >  			m_file_contains_pieces;
 	void build_piece_info();
 	int push_piece2download(uint32_t piece_index);
