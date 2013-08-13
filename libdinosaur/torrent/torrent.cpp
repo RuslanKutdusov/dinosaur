@@ -70,9 +70,9 @@ void TorrentBase::init(const Metafile & metafile, const std::string & work_direc
 
 
 		uint32_t files_exists;
-		TorrentFile::CreateTorrentFile(boost::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()), m_download_directory, file_should_exists, files_exists, m_torrent_file);
+        TorrentFile::CreateTorrentFile(std::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()), m_download_directory, file_should_exists, files_exists, m_torrent_file);
 
-		m_piece_manager.reset(new PieceManager(boost::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()), bitfield));
+        m_piece_manager.reset(new PieceManager(std::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()), bitfield));
 
 		if (bitfield != NULL)
 			delete[] bitfield;
@@ -81,7 +81,7 @@ void TorrentBase::init(const Metafile & metafile, const std::string & work_direc
 		for (std::vector<std::string>::iterator iter = m_metafile.announces.begin(); iter != m_metafile.announces.end(); ++iter)
 		{
 			TrackerPtr temp;
-			temp.reset(new Tracker(boost::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()), *iter));
+            temp.reset(new Tracker(std::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()), *iter));
 			m_trackers[*iter] = temp;
 			if (m_state == TORRENT_STATE_STARTED)
 				temp->send_started();
@@ -170,9 +170,6 @@ void TorrentBase::save_state()
 		case TORRENT_STATE_DONE:
 			state = TORRENT_STATE_DONE;
 			break;
-
-		default:
-			break;
 	}
 	s.serialize(m_uploaded, m_download_directory, bitfield,m_piece_manager->get_bitfield_length(), m_start_time, state);
 	delete[] bitfield;
@@ -247,7 +244,7 @@ void TorrentBase::add_seeders(const std::vector<sockaddr_in> & addrs)
 			if (m_seeders.count(key) == 0)
 			{
 				PeerPtr peer(new Peer());
-				peer->Init(addrs[i], boost::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()));
+                peer->Init(addrs[i], std::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()));
 				m_seeders[key] = peer;
 				m_waiting_seeders.push_back(peer);
 			}
@@ -276,7 +273,7 @@ void TorrentBase::add_seeder(const sockaddr_in & addr)
 		if (m_seeders.count(key) == 0)
 		{
 			PeerPtr peer(new Peer());
-			peer->Init(addr, boost::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()));
+            peer->Init(addr, std::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()));
 			m_seeders[key] = peer;
 			m_waiting_seeders.push_back(peer);
 		}
@@ -309,12 +306,12 @@ void TorrentBase::add_leecher(network::Socket & sock)
 	try
 	{
 		std::string key;
-		get_peer_key(sock->m_peer, key);
+		get_peer_key(sock->get_addr(), key);
 		//logger::LOGGER() << "add incoming peer %s\n", key.c_str());
 		if ((m_leechers.count(key) == 0 || m_leechers[key] == NULL) && m_leechers.size() < m_g_cfg->get_max_active_leechers())
 		{
 			PeerPtr peer(new Peer());
-			peer->Init(sock, boost::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()), PEER_ADD_INCOMING);
+            peer->Init(sock, std::static_pointer_cast<TorrentInterfaceInternal>(shared_from_this()), PEER_ADD_INCOMING);
 			m_leechers[key] = peer;
 		}
 		else
@@ -490,7 +487,7 @@ int TorrentBase::clock()
 
 	if (m_state == TORRENT_STATE_RELEASING)
 	{
-		ERASABLE_LOOP(m_trackers, tracker_map_iter, iter, iter2)
+		ERASABLE_LOOP(m_trackers, iter, iter2)
 		{
 			++iter2;
 			info::tracker ti;
@@ -499,9 +496,7 @@ int TorrentBase::clock()
 			(*iter).second->clock(release_tracker_instance);
 			if (release_tracker_instance)
 				m_trackers.erase(iter);
-			printf("%s\n", ti.announce.c_str());
 		}
-		printf("%d\n", m_trackers.size());
 	}
 
 	if (m_state == TORRENT_STATE_SET_FAILURE)
@@ -623,7 +618,7 @@ int TorrentBase::clock()
 		}
 
 		//for(peer_map_iter leecher_iter = m_leechers.begin(), leecher_iter2 = leecher_iter; leecher_iter != m_leechers.end(); leecher_iter = leecher_iter2)
-		ERASABLE_LOOP(m_leechers, peer_map_iter, leecher_iter, leecher_iter2)
+		ERASABLE_LOOP(m_leechers, leecher_iter, leecher_iter2)
 		{
 			++leecher_iter2;
 			PeerPtr leecher = leecher_iter->second;

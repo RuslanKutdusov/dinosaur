@@ -12,7 +12,7 @@ namespace dinosaur {
 namespace torrent {
 
 Peer::Peer()
-:network::SocketAssociation()
+    : network::SocketEventInterface()
 {
 #ifdef BITTORRENT_DEBUG
 	logger::LOGGER() << "Peer default constructor";
@@ -58,7 +58,7 @@ int Peer::Init(const sockaddr_in & addr, const TorrentInterfaceInternalPtr & tor
 
 int Peer::Init(network::Socket & sock, const TorrentInterfaceInternalPtr & torrent, PEER_ADD peer_add)
 {
-	m_nm->Socket_set_assoc(sock, shared_from_this());
+	m_nm->Socket_set_event_interface(sock, shared_from_this());
 	memset(&m_buf, 0, sizeof(network::buffer));
 	m_torrent = torrent;
 	m_nm = torrent->get_nm();
@@ -73,8 +73,8 @@ int Peer::Init(network::Socket & sock, const TorrentInterfaceInternalPtr & torre
 	m_downloaded = 0;
 	m_uploaded = 0;
 	m_sock = sock;
-	memcpy(&m_addr, &m_sock->m_peer, sizeof(sockaddr_in));
-	get_peer_key(m_sock->m_peer, m_ip);//inet_ntoa(m_sock->m_peer.sin_addr);
+	memcpy(&m_addr, &m_sock->get_addr(), sizeof(sockaddr_in));
+	get_peer_key(m_sock->get_addr(), m_ip);//inet_ntoa(m_sock->m_peer.sin_addr);
 	switch(peer_add)
 	{
 	case PEER_ADD_TRACKER:
@@ -338,7 +338,7 @@ int Peer::process_messages()
 	}
 	char ip[16];
 	memset(ip, 0, 16);
-	strcpy(ip,  inet_ntoa(m_sock->m_peer.sin_addr));
+	strcpy(ip,  inet_ntoa(m_sock->get_addr().sin_addr));
 	uint32_t piece_count = m_torrent->get_piece_count();
 	BLOCK_ID block_id;
 	while((int)m_buf.length - (int)m_buf.pos > 4)

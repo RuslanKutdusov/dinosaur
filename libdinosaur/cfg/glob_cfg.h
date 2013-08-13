@@ -226,16 +226,14 @@ public:
 	{
 		return cfg.fin_ratio;
 	}
-
-
 	/*
 	 * Exception::ERR_CODE_DIR_NOT_EXISTS
 	 * SyscallException
 	 */
-	void set_download_directory(const char * dir)
+	void set_download_directory(const std::string & dir)
 	{
 		struct stat st;
-		if(stat(dir, &st) == 0)
+		if(stat(dir.c_str(), &st) == 0)
 		{
 			if (S_ISDIR(st.st_mode))
 				cfg.download_directory = dir;
@@ -244,14 +242,6 @@ public:
 		}
 		else
 			throw SyscallException();
-	}
-	/*
-	 * Exception::ERR_CODE_DIR_NOT_EXISTS
-	 * SyscallException
-	 */
-	void set_download_directory(const std::string & dir)
-	{
-		set_download_directory(dir.c_str());
 	}
 	void set_port(uint16_t port)
 	{

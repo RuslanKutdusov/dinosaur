@@ -23,37 +23,23 @@ double get_time()
 }
 
 NetworkManager::NetworkManager()
+	: m_thread_stop(false), m_thread(&NetworkManager::timeout_thread, this)
 {
 #ifdef BITTORRENT_DEBUG
 	logger::LOGGER() << "NetworkManager default constructor";
 #endif
-	m_thread = 0;
-	m_thread_stop = false;
+	m_epoll_fd = epoll_create(10);
+	if (m_epoll_fd == -1)
+		throw SyscallException();
 }
 
 /*
  * SyscallException
  */
 
-void NetworkManager::Init() throw (SyscallException)
+void NetworkManager::Init()
 {
-	m_epoll_fd = epoll_create(10);
-	if (m_epoll_fd == -1)
-		throw SyscallException();
-	m_thread_stop = false;
-	pthread_attr_t attr;
-	pthread_attr_init(&attr);
-	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
-	pthread_mutexattr_t   mta;
-	pthread_mutexattr_init(&mta);
-	pthread_mutexattr_settype(&mta, PTHREAD_MUTEX_RECURSIVE);
-	pthread_mutex_init(&m_mutex_sockets, &mta);
-	pthread_mutex_unlock(&m_mutex_sockets);
-	int ret = pthread_create(&m_thread, &attr, NetworkManager::timeout_thread, (void *)this);
-	if (ret)
-		throw Exception(Exception::ERR_CODE_CAN_NOT_CREATE_THREAD);
-	pthread_attr_destroy(&attr);
 }
 
 NetworkManager::~NetworkManager()
@@ -61,13 +47,8 @@ NetworkManager::~NetworkManager()
 #ifdef BITTORRENT_DEBUG
 	logger::LOGGER() << "NetworkManager destructor";
 #endif
-	if (m_thread != 0)
-	{
-		m_thread_stop = true;
-		void * status;
-		pthread_join(m_thread, &status);
-		pthread_mutex_destroy(&m_mutex_sockets);
-	}
+	m_thread_stop = true;
+	m_thread.join();
 	socket_set temp_sockets = m_sockets;
 	for(socket_set_iter iter = temp_sockets.begin(); iter != temp_sockets.end(); ++iter)
 	{
@@ -89,26 +70,12 @@ NetworkManager::~NetworkManager()
  * Exception::ERR_CODE_NULL_REF
  */
 
-void NetworkManager::Socket_add(const std::string & ip, uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException)
+void NetworkManager::Socket_add(const std::string & ip, uint16_t port, const SocketEventInterfacePtr & assoc, Socket & sock)
 {
-	Socket_add(ip.c_str(), port, assoc, sock);
-}
-
-/*
- * SyscallException
- * Exception::ERR_CODE_INVALID_FORMAT
- * Exception::ERR_CODE_UNDEF
- * Exception::ERR_CODE_NULL_REF
- */
-
-void NetworkManager::Socket_add(const char * ip, uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException)
-{
-	if(ip == NULL)
-		throw Exception(Exception::ERR_CODE_NULL_REF);
 	sockaddr_in sockaddr;
 	sockaddr.sin_family = AF_INET;
 	sockaddr.sin_port = htons (port);
-	int ret = inet_pton(AF_INET, ip, &sockaddr.sin_addr);
+	int ret = inet_pton(AF_INET, ip.c_str(), &sockaddr.sin_addr);
 	if (ret == 0)
 		throw Exception(Exception::ERR_CODE_INVALID_FORMAT);
 	if (ret == -1)
@@ -120,36 +87,24 @@ void NetworkManager::Socket_add(const char * ip, uint16_t port, const SocketAsso
  * Exception::ERR_CODE_NULL_REF
  */
 
-void NetworkManager::Socket_add_domain(const char *domain_name, uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception)
+void NetworkManager::Socket_add_domain(const std::string & domain_name, uint16_t port, const SocketEventInterfacePtr & assoc, Socket & sock)
 {
-#ifdef BITTORRENT_DEBUG
+	#ifdef BITTORRENT_DEBUG
 	logger::LOGGER() << "Adding socket " << domain_name;
 #endif
 	sock.reset(new socket_());
 	if (sock == NULL)
 		throw Exception(Exception::ERR_CODE_UNDEF);
-	if(domain_name == NULL)
-		throw Exception(Exception::ERR_CODE_NULL_REF);
 	sock->m_assoc = assoc;
 	sock->m_peer.sin_port = htons (port);
 	sock->m_need2resolved = true;
 	sock->m_domain = domain_name;
 	sock->m_timer = 0;
-	pthread_mutex_lock(&m_mutex_sockets);
+	std::lock_guard<std::recursive_mutex> lock(m_mutex_sockets);
 	m_sockets.insert(sock);
-	pthread_mutex_unlock(&m_mutex_sockets);
 #ifdef BITTORRENT_DEBUG
 	logger::LOGGER() << "Socket is added " << domain_name;
 #endif
-}
-
-/*
- * Exception::ERR_CODE_NULL_REF
- */
-
-void NetworkManager::Socket_add_domain(const std::string & domain_name, uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception)
-{
-	Socket_add_domain(domain_name.c_str(), port, assoc, sock);
 }
 
 /*
@@ -158,7 +113,7 @@ void NetworkManager::Socket_add_domain(const std::string & domain_name, uint16_t
  * SyscallException
  */
 
-void NetworkManager::Socket_add(const sockaddr_in & addr, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException)
+void NetworkManager::Socket_add(const sockaddr_in & addr, const SocketEventInterfacePtr & assoc, Socket & sock)
 {
 #ifdef BITTORRENT_DEBUG
 	logger::LOGGER() << "Adding socket " <<  inet_ntoa(addr.sin_addr);
@@ -199,12 +154,11 @@ void NetworkManager::Socket_add(const sockaddr_in & addr, const SocketAssociatio
 	sock->m_state = SOCKET_STATE_TRANSMISSION;
 	epollout(sock.get(), false);
 	epollin(sock.get(), true);
-	sock->m_assoc->event_sock_connected(sock);
+	sock->event_sock_connected();
 end:
 	sock->m_timer = time(NULL);
-	pthread_mutex_lock(&m_mutex_sockets);
+	std::lock_guard<std::recursive_mutex> lock(m_mutex_sockets);
 	m_sockets.insert(sock);
-	pthread_mutex_unlock(&m_mutex_sockets);
 #ifdef BITTORRENT_DEBUG
 	logger::LOGGER() << "Socket is added " <<  sock->m_socket << " " << inet_ntoa(sock->m_peer.sin_addr);
 #endif
@@ -216,7 +170,7 @@ end:
  * SyscallException
  */
 
-void NetworkManager::Socket_add(int sock_fd, const sockaddr_in & addr, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException)
+void NetworkManager::Socket_add(int sock_fd, const sockaddr_in & addr, const SocketEventInterfacePtr & assoc, Socket & sock)
 {
 	sock.reset(new socket_());
 	if (sock == NULL)
@@ -238,9 +192,8 @@ void NetworkManager::Socket_add(int sock_fd, const sockaddr_in & addr, const Soc
 	sock->m_state = SOCKET_STATE_TRANSMISSION;
 
 	sock->m_timer = time(NULL);
-	pthread_mutex_lock(&m_mutex_sockets);
+	std::lock_guard<std::recursive_mutex> lock(m_mutex_sockets);
 	m_sockets.insert(sock);
-	pthread_mutex_unlock(&m_mutex_sockets);
 }
 
 /*
@@ -248,7 +201,7 @@ void NetworkManager::Socket_add(int sock_fd, const sockaddr_in & addr, const Soc
  * SyscallException
  */
 
-void NetworkManager::Socket_add_UDP(const SocketAssociation::ptr & assoc, Socket & sock, const sockaddr_in * bind_) throw (Exception, SyscallException)
+void NetworkManager::Socket_add_UDP(const SocketEventInterfacePtr & assoc, Socket & sock, const sockaddr_in * bind_)
 {
 #ifdef BITTORRENT_DEBUG
 	logger::LOGGER() << "Adding UDP socket ";
@@ -283,9 +236,8 @@ void NetworkManager::Socket_add_UDP(const SocketAssociation::ptr & assoc, Socket
 	memset((void *)&sock->m_peer, 0, sizeof(struct sockaddr_in));
 	sock->m_state = SOCKET_STATE_TRANSMISSION;
 	sock->m_timer = time(NULL);
-	pthread_mutex_lock(&m_mutex_sockets);
+	std::lock_guard<std::recursive_mutex> lock(m_mutex_sockets);
 	m_sockets.insert(sock);
-	pthread_mutex_unlock(&m_mutex_sockets);
 #ifdef BITTORRENT_DEBUG
 	logger::LOGGER() << "UDP Socket is added " <<  sock->m_socket;
 #endif
@@ -297,7 +249,7 @@ void NetworkManager::Socket_add_UDP(const SocketAssociation::ptr & assoc, Socket
  * Exception::ERR_CODE_NULL_REF
  */
 
-void NetworkManager::ListenSocket_add(const sockaddr_in & addr, const SocketAssociation::ptr & assoc, Socket & sock)  throw (Exception, SyscallException)
+void NetworkManager::ListenSocket_add(const sockaddr_in & addr, const SocketEventInterfacePtr & assoc, Socket & sock)
 {
 	struct epoll_event event;
 	const unsigned int yes = 1;
@@ -352,9 +304,8 @@ void NetworkManager::ListenSocket_add(const sockaddr_in & addr, const SocketAsso
 
 	sock->m_state = SOCKET_STATE_LISTEN;
 	sock->m_timer = time(NULL);
-	pthread_mutex_lock(&m_mutex_sockets);
+	std::lock_guard<std::recursive_mutex> lock(m_mutex_sockets);
 	m_sockets.insert(sock);
-	pthread_mutex_unlock(&m_mutex_sockets);
 }
 
 /*
@@ -363,7 +314,7 @@ void NetworkManager::ListenSocket_add(const sockaddr_in & addr, const SocketAsso
  * Exception::ERR_CODE_NULL_REF
  */
 
-void NetworkManager::ListenSocket_add(uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock)  throw (Exception, SyscallException)
+void NetworkManager::ListenSocket_add(uint16_t port, const SocketEventInterfacePtr & assoc, Socket & sock)
 {
 	sockaddr_in addr;
 	addr.sin_family = AF_INET;
@@ -378,7 +329,7 @@ void NetworkManager::ListenSocket_add(uint16_t port, const SocketAssociation::pt
  * Exception::ERR_CODE_UNDEF
  */
 
-void NetworkManager::ListenSocket_add(uint16_t port, const in_addr & addr, const SocketAssociation::ptr & assoc, Socket & sock)  throw (Exception, SyscallException)
+void NetworkManager::ListenSocket_add(uint16_t port, const in_addr & addr, const SocketEventInterfacePtr & assoc, Socket & sock)
 {
 	sockaddr_in sockaddr;
 	sockaddr.sin_family = AF_INET;
@@ -395,29 +346,7 @@ void NetworkManager::ListenSocket_add(uint16_t port, const in_addr & addr, const
  * Exception::ERR_CODE_NULL_REF
  */
 
-void NetworkManager::ListenSocket_add(uint16_t port, const char * ip, const SocketAssociation::ptr & assoc, Socket & sock)  throw (Exception, SyscallException)
-{
-	if (ip == NULL)
-		throw Exception(Exception::ERR_CODE_NULL_REF);
-	sockaddr_in addr;
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons (port);
-	int ret = inet_pton(AF_INET, ip, &addr.sin_addr);
-	if (ret == 0)
-		throw Exception(Exception::ERR_CODE_INVALID_FORMAT);
-	if (ret == -1)
-		throw Exception(Exception::ERR_CODE_UNDEF);
-	ListenSocket_add(addr, assoc, sock);
-}
-
-/*
- * SyscallException
- * Exception::ERR_CODE_UNDEF
- * Exception::ERR_CODE_INVALID_FORMAT
- * Exception::ERR_CODE_NULL_REF
- */
-
-void NetworkManager::ListenSocket_add(uint16_t port, const std::string & ip, const SocketAssociation::ptr & assoc, Socket & sock)  throw (Exception, SyscallException)
+void NetworkManager::ListenSocket_add(uint16_t port, const std::string & ip, const SocketEventInterfacePtr & assoc, Socket & sock)
 {
 	ListenSocket_add(port, ip.c_str(), assoc, sock);
 }
@@ -426,7 +355,7 @@ void NetworkManager::ListenSocket_add(uint16_t port, const std::string & ip, con
  * SyscallException
  */
 
-void NetworkManager::handler_connection(Socket & sock) throw (SyscallException)
+void NetworkManager::handler_connection(Socket & sock)
 {
 	int connect_result;
 	socklen_t opt_len = sizeof(int);
@@ -442,7 +371,7 @@ void NetworkManager::handler_connection(Socket & sock) throw (SyscallException)
 	epollin(sock.get(), true);
 	epollout(sock.get(), buffer_remain(sock->m_send_buffer) != 0);
 
-	sock->m_assoc->event_sock_connected(sock);
+	sock->event_sock_connected();
 }
 
 /*
@@ -461,7 +390,7 @@ void NetworkManager::socket_state_transmission_out_handler(Socket & sock)
 			sock->m_send_buffer.length = 0;
 			sock->m_send_buffer.pos = 0;
 			epollout(sock.get(), false);
-			sock->m_assoc->event_sock_sended(sock);
+			sock->event_sock_sended();
 			return;
 		}
 		ssize_t sended = send(sock->m_socket, sock->m_send_buffer.data + sock->m_send_buffer.pos, ret, MSG_NOSIGNAL);
@@ -479,14 +408,14 @@ void NetworkManager::socket_state_transmission_out_handler(Socket & sock)
 
 void NetworkManager::socket_state_transmission_in_handler(Socket & sock)
 {
-	sock->m_assoc->event_sock_ready2read(sock);
+	sock->event_sock_ready2read();
 }
 
 /*
  * SyscallException
  */
 
-void NetworkManager::handle_event(Socket & sock, uint32_t events) throw (SyscallException)
+void NetworkManager::handle_event(Socket & sock, uint32_t events)
 {
 	if ((events & EPOLLOUT) != 0)
 	{
@@ -519,12 +448,12 @@ void NetworkManager::handle_event(Socket & sock, uint32_t events) throw (Syscall
 					throw SyscallException();
 				throw SyscallException();
 			}
-			SocketAssociation::ptr assoc;
+			SocketEventInterfacePtr assoc;
 			Socket new_sock;
 			try
 			{
 				Socket_add(client_sock, client_addr, assoc, new_sock);
-				sock->m_assoc->event_sock_accepted(sock, new_sock);
+				sock->event_sock_accepted(new_sock);
 			}
 			catch (...) {
 
@@ -538,7 +467,7 @@ void NetworkManager::handle_event(Socket & sock, uint32_t events) throw (Syscall
  */
 
 
-int NetworkManager::clock()  throw (SyscallException)
+int NetworkManager::clock()
 {
 	struct epoll_event events[MAX_EPOLL_EVENT];
 	int nfds = epoll_wait(m_epoll_fd, events, MAX_EPOLL_EVENT, 10);
@@ -546,7 +475,7 @@ int NetworkManager::clock()  throw (SyscallException)
 	{
 		throw SyscallException();
 	}
-	pthread_mutex_lock(&m_mutex_sockets);
+	std::lock_guard<std::recursive_mutex> lock(m_mutex_sockets);
 	for(int i = 0; i < nfds; i++)
 	{
 		Socket  sock = ((socket_ *)events[i].data.ptr)->shared_from_this();
@@ -558,32 +487,31 @@ int NetworkManager::clock()  throw (SyscallException)
 		catch(SyscallException & e)
 		{
 			sock->close_();
-			sock->m_assoc->event_sock_error(sock, e.get_errno());
+			sock->event_sock_error(e.get_errno());
 			sock->m_errno = e.get_errno();
 		}
 	}
 	//for(socket_set::iterator iter = m_connected_after_resolving_sockets.begin(); iter != m_connected_after_resolving_sockets.end(); ++iter)
-	ERASABLE_LOOP(m_connected_after_resolving_sockets, socket_set::iterator, iter, inc_iter)
+	ERASABLE_LOOP(m_connected_after_resolving_sockets, iter, inc_iter)
 	{
 		++inc_iter;
-		(*iter)->m_assoc->event_sock_connected(*iter);
+		(*iter)->event_sock_connected();
 	}
 	//for(socket_set::iterator iter = m_unresolved_sockets.begin(); iter != m_unresolved_sockets.end(); ++iter)
-	ERASABLE_LOOP(m_unresolved_sockets, socket_set::iterator, iter, inc_iter)
+	ERASABLE_LOOP(m_unresolved_sockets, iter, inc_iter)
 	{
 		++inc_iter;
-		(*iter)->m_assoc->event_sock_unresolved(*iter);
+		(*iter)->event_sock_unresolved();
 	}
 	//for(socket_set::iterator iter = m_timeout_sockets.begin(); iter != m_timeout_sockets.end(); ++iter)
-	ERASABLE_LOOP(m_timeout_sockets, socket_set::iterator, iter, inc_iter)
+	ERASABLE_LOOP(m_timeout_sockets, iter, inc_iter)
 	{
 		++inc_iter;
-		(*iter)->m_assoc->event_sock_timeout(*iter);
+		(*iter)->event_sock_timeout();
 	}
 	m_connected_after_resolving_sockets.clear();
 	m_unresolved_sockets.clear();
 	m_timeout_sockets.clear();
-	pthread_mutex_unlock(&m_mutex_sockets);
 	return ERR_NO_ERROR;
 }
 
@@ -595,7 +523,7 @@ int NetworkManager::clock()  throw (SyscallException)
  * Exception::ERR_CODE_INVALID_OPERATION
  */
 
-size_t NetworkManager::Socket_send(Socket & sock, const void * data, size_t len, bool full)  throw (Exception)
+size_t NetworkManager::Socket_send(Socket & sock, const void * data, size_t len, bool full)
 {
 	if (sock == NULL  || data == NULL)
 		throw Exception(Exception::ERR_CODE_NULL_REF);
@@ -622,7 +550,7 @@ size_t NetworkManager::Socket_send(Socket & sock, const void * data, size_t len,
  * SyscallException
  */
 
-ssize_t NetworkManager::Socket_send(Socket & sock, const void * data, size_t len, const sockaddr_in & addr) throw (SyscallException, Exception)
+ssize_t NetworkManager::Socket_send(Socket & sock, const void * data, size_t len, const sockaddr_in & addr)
 {
 	if (sock == NULL  || data == NULL)
 		throw Exception(Exception::ERR_CODE_NULL_REF);
@@ -643,7 +571,7 @@ ssize_t NetworkManager::Socket_send(Socket & sock, const void * data, size_t len
  * SyscallException
  */
 
-size_t NetworkManager::Socket_recv(Socket & sock, char * data, size_t len, bool & is_closed, sockaddr_in * from) throw (SyscallException, Exception)
+size_t NetworkManager::Socket_recv(Socket & sock, char * data, size_t len, bool & is_closed, sockaddr_in * from)
 {
 	if (sock == NULL || data == NULL)
 		throw Exception(Exception::ERR_CODE_NULL_REF);
@@ -690,7 +618,7 @@ size_t NetworkManager::Socket_recv(Socket & sock, char * data, size_t len, bool 
  * Exception::ERR_CODE_NULL_REF
  */
 
-bool NetworkManager::Socket_closed(Socket & sock) throw (Exception)
+bool NetworkManager::Socket_closed(Socket & sock)
 {
 	if (sock == NULL)
 		throw Exception(Exception::ERR_CODE_NULL_REF);
@@ -701,7 +629,7 @@ bool NetworkManager::Socket_closed(Socket & sock) throw (Exception)
  * Exception::ERR_CODE_NULL_REF
  */
 
-void NetworkManager::Socket_close(Socket & sock) throw (Exception)
+void NetworkManager::Socket_close(Socket & sock)
 {
 	if (sock == NULL)
 		throw Exception(Exception::ERR_CODE_NULL_REF);
@@ -712,7 +640,7 @@ void NetworkManager::Socket_delete(Socket & sock)
 {
 	if (sock == NULL)
 		return;
-	pthread_mutex_lock(&m_mutex_sockets);
+	std::lock_guard<std::recursive_mutex> lock(m_mutex_sockets);
 	m_sockets.erase(sock);
 	m_timeout_sockets.erase(sock);
 	m_connected_after_resolving_sockets.erase(sock);
@@ -720,7 +648,6 @@ void NetworkManager::Socket_delete(Socket & sock)
 	sock->close_();
 	sock->m_need2delete = true;
 	sock.reset();
-	pthread_mutex_unlock(&m_mutex_sockets);
 	return;
 }
 
@@ -728,7 +655,7 @@ void NetworkManager::Socket_delete(Socket & sock)
  * Exception::ERR_CODE_NULL_REF
  */
 
-void NetworkManager::Socket_set_assoc(Socket & sock, const SocketAssociation::ptr & assoc) throw (Exception)
+void NetworkManager::Socket_set_event_interface(Socket & sock, const SocketEventInterfacePtr & assoc)
 {
 	if (sock == NULL)
 		throw Exception(Exception::ERR_CODE_NULL_REF);
@@ -739,7 +666,7 @@ void NetworkManager::Socket_set_assoc(Socket & sock, const SocketAssociation::pt
  * Exception::ERR_CODE_NULL_REF
  */
 
-void NetworkManager::Socket_get_assoc(Socket & sock, SocketAssociation::ptr & assoc) throw (Exception)
+void NetworkManager::Socket_get_event_interface(Socket & sock, SocketEventInterfacePtr & assoc)
 {
 	if (sock == NULL)
 		throw Exception(Exception::ERR_CODE_NULL_REF);
@@ -750,7 +677,7 @@ void NetworkManager::Socket_get_assoc(Socket & sock, SocketAssociation::ptr & as
  * Exception::ERR_CODE_NULL_REF
  */
 
-int NetworkManager::Socket_get_rx_speed(Socket & sock) throw (Exception)
+int NetworkManager::Socket_get_rx_speed(Socket & sock)
 {
 	if (sock == NULL)
 		throw Exception(Exception::ERR_CODE_NULL_REF);
@@ -761,7 +688,7 @@ int NetworkManager::Socket_get_rx_speed(Socket & sock) throw (Exception)
  * Exception::ERR_CODE_NULL_REF
  */
 
-int NetworkManager::Socket_get_tx_speed(Socket & sock) throw (Exception)
+int NetworkManager::Socket_get_tx_speed(Socket & sock)
 {
 	if (sock == NULL)
 		throw Exception(Exception::ERR_CODE_NULL_REF);
@@ -772,7 +699,7 @@ int NetworkManager::Socket_get_tx_speed(Socket & sock) throw (Exception)
  * Exception::ERR_CODE_NULL_REF
  */
 
-void NetworkManager::Socket_get_addr(Socket & sock, sockaddr_in & addr)  throw (Exception)
+void NetworkManager::Socket_get_addr(Socket & sock, sockaddr_in & addr)
 {
 	if (sock == NULL)
 		throw Exception(Exception::ERR_CODE_NULL_REF);
@@ -783,7 +710,7 @@ void NetworkManager::Socket_get_addr(Socket & sock, sockaddr_in & addr)  throw (
  * SyscallException
  */
 
-void NetworkManager::epoll_mod(socket_ * sock) throw (SyscallException)
+void NetworkManager::epoll_mod(socket_ * sock)
 {
 	struct epoll_event event;
 	event.data.ptr = (void*)sock;
@@ -796,7 +723,7 @@ void NetworkManager::epoll_mod(socket_ * sock) throw (SyscallException)
  * SyscallException
  */
 
-void NetworkManager::epoll_mod(socket_ * sock, uint32_t events) throw (SyscallException)
+void NetworkManager::epoll_mod(socket_ * sock, uint32_t events)
 {
 	sock->m_epoll_events = events;
 	epoll_mod(sock);
@@ -806,7 +733,7 @@ void NetworkManager::epoll_mod(socket_ * sock, uint32_t events) throw (SyscallEx
  * SyscallException
  */
 
-void NetworkManager::epollin(socket_ * sock, bool on) throw (SyscallException)
+void NetworkManager::epollin(socket_ * sock, bool on)
 {
 	if (on == true)
 	{
@@ -828,7 +755,7 @@ void NetworkManager::epollin(socket_ * sock, bool on) throw (SyscallException)
  * SyscallException
  */
 
-void NetworkManager::epollout(socket_ * sock, bool on) throw (SyscallException)
+void NetworkManager::epollout(socket_ * sock, bool on)
 {
 	if (on == true)
 	{
@@ -850,7 +777,7 @@ void NetworkManager::epollout(socket_ * sock, bool on) throw (SyscallException)
  * SyscallException
  */
 
-void NetworkManager::ConnectResolvedSocket(Socket & sock) throw (SyscallException)
+void NetworkManager::ConnectResolvedSocket(Socket & sock)
 {
 	struct epoll_event event;
 	if ((sock->m_socket = socket (AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0)) == -1)
@@ -888,82 +815,77 @@ end:
  * SyscallException
  */
 
-void * NetworkManager::timeout_thread(void * arg)
+void NetworkManager::timeout_thread()
 {
-	int ret = 1;
-	NetworkManager * nm = (NetworkManager*)arg;
 	std::list<Socket> sock2resolve;
-	while(!nm->m_thread_stop)
+	while(!m_thread_stop)
 	{
 		//logger::LOGGER() << "timeout_thread loop";
-		pthread_mutex_lock(&nm->m_mutex_sockets);
-		for(socket_set_iter iter = nm->m_sockets.begin(); iter != nm->m_sockets.end(); ++iter)
 		{
-			Socket sock = *iter;
-
-			if (sock->m_timer != 0 &&
-				time(NULL) - sock->m_timer >= TIMEOUT &&
-				(sock->m_state == SOCKET_STATE_CONNECTION || (sock->m_epoll_events & EPOLLIN) != 0) &&
-				!sock->closed())
+			std::lock_guard<std::recursive_mutex> lock(m_mutex_sockets);
+			for(socket_set_iter iter = m_sockets.begin(); iter != m_sockets.end(); ++iter)
 			{
-				nm->m_timeout_sockets.insert(sock);
-				sock->m_timer = time(NULL);
+				Socket sock = *iter;
+
+				if (sock->m_timer != 0 &&
+					time(NULL) - sock->m_timer >= TIMEOUT &&
+					(sock->m_state == SOCKET_STATE_CONNECTION || (sock->m_epoll_events & EPOLLIN) != 0) &&
+					!sock->closed())
+				{
+					m_timeout_sockets.insert(sock);
+					sock->m_timer = time(NULL);
+				}
+				if (sock->m_need2resolved)
+					sock2resolve.push_back(sock);
 			}
-			if (sock->m_need2resolved)
-				sock2resolve.push_back(sock);
 		}
-		pthread_mutex_unlock(&nm->m_mutex_sockets);
 
 		//for(std::list<Socket>::iterator iter = sock2resolve.begin(); iter != sock2resolve.end(); ++iter)
 		while(!sock2resolve.empty())
 		{
 			std::string domain_name;
 			sockaddr_in addr;
+			Socket sock;
 
-			pthread_mutex_lock(&nm->m_mutex_sockets);
-			Socket sock = sock2resolve.front();
-			sock2resolve.pop_front();
-			sock->m_need2resolved = false;
-			domain_name = sock->m_domain;
-			addr = sock->m_peer;
-			pthread_mutex_unlock(&nm->m_mutex_sockets);
+			{
+				std::lock_guard<std::recursive_mutex> lock(m_mutex_sockets);
+				sock = sock2resolve.front();
+				sock2resolve.pop_front();
+				sock->m_need2resolved = false;
+				domain_name = sock->m_domain;
+				addr = sock->m_peer;
+			}
+
 
 			try
 			{
 				DomainNameResolver dnr(sock->m_domain, &addr);
-				pthread_mutex_lock(&nm->m_mutex_sockets);
+				std::lock_guard<std::recursive_mutex> lock(m_mutex_sockets);
 				sock->m_peer = addr;
 				if (sock->m_need2delete)
-				{
-					pthread_mutex_unlock(&nm->m_mutex_sockets);
 					continue;
-				}
 				try
 				{
-					nm->ConnectResolvedSocket(sock);
+					ConnectResolvedSocket(sock);
 				}
 				catch(SyscallException & e)
 				{
-					pthread_mutex_unlock(&nm->m_mutex_sockets);
 					throw SyscallException(e);
 				}
-				pthread_mutex_unlock(&nm->m_mutex_sockets);
 			}
 			catch (...)
 			{
 #ifdef BITTORRENT_DEBUG
 	logger::LOGGER() << "DomainNameResolver is can not resolve "<< sock->m_domain.c_str();
 #endif
-				pthread_mutex_lock(&nm->m_mutex_sockets);
+				std::lock_guard<std::recursive_mutex> lock(m_mutex_sockets);
 				if (!sock->m_need2delete)
-					nm->m_unresolved_sockets.insert(sock);
-				pthread_mutex_unlock(&nm->m_mutex_sockets);
+					m_unresolved_sockets.insert(sock);
 			}
 		}
 
 		usleep(5000);
 	}
-	return (void*)ret;
 }
 
 }

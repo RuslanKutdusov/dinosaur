@@ -30,8 +30,10 @@ typedef char				PEER_ID[PEER_ID_LENGTH];
 class SHA1_HASH
 {
 protected:
-	unsigned char m_data[SHA1_LENGTH];
+	unsigned char 	m_data[SHA1_LENGTH];
+	char			m_hex[SHA1_LENGTH * 2 + 1];
 	void clear();
+	void to_hex();
 public:
 	SHA1_HASH();
 	SHA1_HASH(const SHA1_HASH & hash);
@@ -49,7 +51,7 @@ public:
 	void copy2(char * dst) const;
 	void copy2(unsigned char * dst) const;
 	void print() const;
-	void to_hex(SHA1_HASH_HEX & hash) const ;
+	const char * hex() const;
 };
 
 enum DOWNLOAD_PRIORITY

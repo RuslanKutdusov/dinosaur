@@ -68,8 +68,7 @@ FileManager::~FileManager() {
 	if (m_write_thread != 0)
 	{
 		m_thread_stop = true;
-		void * status;
-		pthread_join(m_write_thread, &status);
+		pthread_join(m_write_thread, NULL);
 		pthread_mutex_destroy(&m_mutex);
 	}
 	for(std::set<File>::iterator iter = m_files.begin(); iter != m_files.end(); ++iter)
@@ -85,7 +84,7 @@ FileManager::~FileManager() {
  * Exception::ERR_CODE_NULL_REF
  */
 
-int FileManager::File_add(const char * fn, uint64_t length, bool should_exists, const FileAssociation::ptr & assoc, File & file_) throw (Exception)
+int FileManager::File_add(const char * fn, uint64_t length, bool should_exists, const FileEventInterface::ptr & assoc, File & file_) throw (Exception)
 {
 	if (fn == NULL)
 		throw Exception(Exception::ERR_CODE_NULL_REF);
@@ -101,7 +100,7 @@ int FileManager::File_add(const char * fn, uint64_t length, bool should_exists, 
  * Exception::ERR_CODE_NULL_REF
  */
 
-int FileManager::File_add(const std::string & fn, uint64_t length, bool should_exists, const FileAssociation::ptr & assoc, File & file) throw (Exception)
+int FileManager::File_add(const std::string & fn, uint64_t length, bool should_exists, const FileEventInterface::ptr & assoc, File & file) throw (Exception)
 {
 	return File_add(fn.c_str(), length, should_exists, assoc, file);
 }
@@ -268,14 +267,14 @@ int FileManager::File_read_immediately(File & file, char * buf, uint64_t offset,
  * описание ошибки +
  */
 
-void FileManager::notify()
-{
+void FileManager::notify(
+){
 	pthread_mutex_lock(&m_mutex);
 	while(!m_write_event.empty())
 	{
 		write_event & we =  m_write_event.front();
 		if (!we.file->m_instance2delete)
-			we.file->m_assoc->event_file_write(we);
+			we.file->event_file_write(we);
 		m_write_event.pop_front();
 	}
 	pthread_mutex_unlock(&m_mutex);
@@ -365,50 +364,49 @@ bool FileManager::File_exists(const std::string & fn, uint64_t length) const
 }
 
 void * FileManager::cache_thread(void * arg)
+{
+	FileManager * fm = (FileManager*)arg;
+	while(!fm->m_thread_stop)
 	{
-		int ret = 1;
-		FileManager * fm = (FileManager*)arg;
-		while(!fm->m_thread_stop)
+		//logger::LOGGER() << "cache_thread loop";
+		pthread_mutex_lock(&fm->m_mutex);
+		if (!fm->m_write_cache.empty())
 		{
-			//logger::LOGGER() << "cache_thread loop";
-			pthread_mutex_lock(&fm->m_mutex);
-			if (!fm->m_write_cache.empty())
+			const write_cache_element * ce = fm->m_write_cache.front();
+			if (ce->file->m_instance2delete)
 			{
-				const write_cache_element * ce = fm->m_write_cache.front();
-				if (ce->file->m_instance2delete)
-				{
-					fm->m_write_cache.pop();
-					pthread_mutex_unlock(&fm->m_mutex);
-					continue;
-				}
-				write_event we;
-				we.block_id = ce->block_id;
-				we.file = ce->file;
-				we.errno_ = 0;
-				we.exception_errcode = Exception::NO_ERROR;
-				try
-				{
-					fm->prepare_file(we.file);
-					we.writted = we.file->_write(ce->block, ce->offset, ce->length);
-				}
-				catch (Exception & e) {
-					we.writted = -1;
-					we.exception_errcode = e.get_errcode();
-				}
-				catch (SyscallException & e)
-				{
-					we.writted = -1;
-					we.errno_ = e.get_errno();
-				}
 				fm->m_write_cache.pop();
-				fm->m_write_event.push_back(we);
-				we.file.reset();
+				pthread_mutex_unlock(&fm->m_mutex);
+				continue;
 			}
-			pthread_mutex_unlock(&fm->m_mutex);
-			usleep(1000);
+			write_event we;
+			we.block_id = ce->block_id;
+			we.file = ce->file;
+			we.errno_ = 0;
+			we.exception_errcode = Exception::NO_ERROR;
+			try
+			{
+				fm->prepare_file(we.file);
+				we.writted = we.file->_write(ce->block, ce->offset, ce->length);
+			}
+			catch (Exception & e) {
+				we.writted = -1;
+				we.exception_errcode = e.get_errcode();
+			}
+			catch (SyscallException & e)
+			{
+				we.writted = -1;
+				we.errno_ = e.get_errno();
+			}
+			fm->m_write_cache.pop();
+			fm->m_write_event.push_back(we);
+			we.file.reset();
 		}
-		return (void*)ret;
+		pthread_mutex_unlock(&fm->m_mutex);
+		usleep(1000);
 	}
+	return NULL;
+}
 
 }
 } /* namespace file */

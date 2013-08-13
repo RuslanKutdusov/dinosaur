@@ -9,17 +9,15 @@
 #include <signal.h>
 #include <sys/epoll.h>
 #include <errno.h>
-#include <netdb.h>
 #include <map>
 #include <list>
 #include <string>
 #include <set>
 #include <time.h>
 #include <sys/time.h>
-#include <pthread.h>
-#include <pcre.h>
-#include <boost/shared_ptr.hpp>
-#include <boost/enable_shared_from_this.hpp>
+#include <thread>
+#include <mutex>
+#include <memory>
 #include "../exceptions/exceptions.h"
 #include "../err/err_code.h"
 #include "../log/log.h"
@@ -59,7 +57,7 @@ struct buffer
 
 class NetworkManager;
 class socket_;
-typedef boost::shared_ptr<socket_> Socket;
+typedef std::shared_ptr<socket_> Socket;
 typedef std::set<Socket> 		 socket_set;
 typedef socket_set::iterator socket_set_iter;
 
@@ -77,16 +75,11 @@ public:
 	~DomainNameResolver();
 };
 
-class SocketAssociation : public boost::enable_shared_from_this<SocketAssociation>
+class SocketEventInterface : public std::enable_shared_from_this<SocketEventInterface>
 {
 public:
-	typedef boost::shared_ptr<SocketAssociation> ptr;
-	SocketAssociation()	{}
-	virtual ~SocketAssociation(){}
-	ptr get_ptr()
-	{
-		return shared_from_this();
-	}
+	SocketEventInterface()	{}
+	virtual ~SocketEventInterface(){}
 private:
 	virtual void event_sock_ready2read(Socket sock) = 0;
 	virtual void event_sock_error(Socket  sock, int errno_) = 0;
@@ -95,28 +88,30 @@ private:
 	virtual void event_sock_accepted(Socket  sock, Socket accepted_sock) = 0;
 	virtual void event_sock_timeout(Socket  sock) = 0;
 	virtual void event_sock_unresolved(Socket  sock) = 0;
-	friend class NetworkManager;
 	friend class socket_;
 };
 
-class socket_ : public boost::enable_shared_from_this<socket_>
+typedef std::weak_ptr<SocketEventInterface> SocketEventInterfacePtr;
+
+class socket_ : public std::enable_shared_from_this<socket_>
 {
 private:
-	struct buffer m_send_buffer;
-	uint32_t m_epoll_events;
-	SOCKET_STATE m_state;
-	int m_socket;
-	SocketAssociation::ptr m_assoc;
-	int m_errno;
-	time_t m_timer;
-	double m_rx_last_time;
-	double m_tx_last_time;
-	uint32_t m_rx;
-	uint32_t m_tx;
-	bool m_need2resolved;
-	bool m_need2delete;
-	std::string m_domain;
-	bool m_udp;
+	buffer 						m_send_buffer;
+	uint32_t 					m_epoll_events;
+	SOCKET_STATE 				m_state;
+	int 						m_socket;
+	SocketEventInterfacePtr 	m_assoc;
+	int 						m_errno;
+	time_t 						m_timer;
+	double 						m_rx_last_time;
+	double 						m_tx_last_time;
+	uint64_t 					m_rx;
+	uint64_t 					m_tx;
+	bool 						m_need2resolved;
+	bool 						m_need2delete;
+	std::string 				m_domain;
+	bool 						m_udp;
+	sockaddr_in 				m_peer;
 	void close_()
 	{
 		close(m_socket);
@@ -126,25 +121,52 @@ private:
 	{
 		return m_socket == -1;
 	}
+	void event_sock_ready2read(){
+		if (!m_assoc.expired())
+			m_assoc.lock()->event_sock_ready2read(shared_from_this());
+	}
+	void event_sock_error(int errno_){
+		if (!m_assoc.expired())
+			m_assoc.lock()->event_sock_error(shared_from_this(), errno_);
+	}
+	void event_sock_sended(){
+		if (!m_assoc.expired())
+			m_assoc.lock()->event_sock_sended(shared_from_this());
+	}
+	void event_sock_connected(){
+		if (!m_assoc.expired())
+			m_assoc.lock()->event_sock_connected(shared_from_this());
+	}
+	void event_sock_accepted(Socket accepted_sock){
+		if (!m_assoc.expired())
+			m_assoc.lock()->event_sock_accepted(shared_from_this(), accepted_sock);
+	}
+	void event_sock_timeout(){
+		if (!m_assoc.expired())
+			m_assoc.lock()->event_sock_timeout(shared_from_this());
+	}
+	void event_sock_unresolved(){
+		if (!m_assoc.expired())
+			m_assoc.lock()->event_sock_unresolved(shared_from_this());
+	}
 public:
-	struct sockaddr_in m_peer;
 	socket_()
-	:m_epoll_events(0), m_socket(-1),  m_errno(0), m_timer(0), m_rx_last_time(get_time()),m_tx_last_time(get_time()),
-	 m_rx(0.0f), m_tx(0.0f), m_need2resolved(false), m_need2delete(false), m_udp(false)
+		: m_epoll_events(0), m_socket(-1),  m_errno(0), m_timer(0), m_rx_last_time(get_time()),m_tx_last_time(get_time()),
+		 m_rx(0.0f), m_tx(0.0f), m_need2resolved(false), m_need2delete(false), m_udp(false)
 	{
 		memset(&m_peer, 0, sizeof(sockaddr_in));
 		m_send_buffer.length = 0;
 		m_send_buffer.pos = 0;
+	}
+	virtual ~socket_()
+	{
+		close(m_socket);
 #ifdef BITTORRENT_DEBUG
-	logger::LOGGER() << "Socket constructor " << this;
+		logger::LOGGER() << "socket " << m_socket << " destroyed";
 #endif
 	}
-	~socket_()
-	{
-#ifdef BITTORRENT_DEBUG
-		logger::LOGGER() << "Socket destructed "<< this << " " << m_socket << " " << m_domain.c_str() << " " << inet_ntoa(m_peer.sin_addr);
-#endif
-		close(m_socket);
+	const sockaddr_in & get_addr(){
+		return m_peer;
 	}
 #ifdef BITTORRENT_DEBUG
 	int get_fd()
@@ -166,59 +188,56 @@ public:
 class NetworkManager
 {
 private:
-	socket_set m_timeout_sockets;
-	socket_set m_unresolved_sockets;
-	socket_set m_connected_after_resolving_sockets;
-	socket_set m_sockets;
-	int m_epoll_fd;
-	void handle_event(Socket & sock, uint32_t events) throw (SyscallException);
-	void handler_connection(Socket & sock) throw (SyscallException);
+	socket_set 	m_timeout_sockets;
+	socket_set 	m_unresolved_sockets;
+	socket_set 	m_connected_after_resolving_sockets;
+	socket_set 	m_sockets;
+	int 		m_epoll_fd;
+	void handle_event(Socket & sock, uint32_t events);
+	void handler_connection(Socket & sock);
 	void socket_state_transmission_out_handler(Socket & sock);
 	void socket_state_transmission_in_handler(Socket & sock);
-	void epoll_mod(socket_ * sock) throw (SyscallException);
-	void epoll_mod(socket_ * sock, uint32_t events) throw (SyscallException);
-	void epollin(socket_ * sock, bool on_off) throw (SyscallException);
-	void epollout(socket_ * sock, bool on_off) throw (SyscallException);
+	void epoll_mod(socket_ * sock);
+	void epoll_mod(socket_ * sock, uint32_t events);
+	void epollin(socket_ * sock, bool on_off);
+	void epollout(socket_ * sock, bool on_off);
 private:
-	pthread_t m_thread;
-	pthread_mutex_t m_mutex_sockets;
-	bool m_thread_stop;
-	static void * timeout_thread(void * arg);
-	void ConnectResolvedSocket(Socket & sock) throw (SyscallException);
+	std::recursive_mutex 	m_mutex_sockets;
+	bool 		m_thread_stop;
+	std::thread m_thread;
+	void timeout_thread();
+	void ConnectResolvedSocket(Socket & sock);
 public:
 	NetworkManager();
-	void Init() throw (SyscallException);
+	void Init();
 	~NetworkManager();
-	void Socket_add(const std::string & ip, uint16_t port, const SocketAssociation::ptr & assoc, Socket & socket) throw (Exception, SyscallException);
-	void Socket_add(const char * ip, uint16_t port, const SocketAssociation::ptr & assoc, Socket & socket) throw (Exception, SyscallException);
-	void Socket_add(const sockaddr_in & addr, const SocketAssociation::ptr & assoc, Socket & socket) throw (Exception, SyscallException);
-	void Socket_add(int sock_fd, const sockaddr_in & addr, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException);
-	void Socket_add_domain(const char *domain_name, uint16_t port, const SocketAssociation::ptr & assoc, Socket & socket) throw (Exception);
-	void Socket_add_domain(const std::string & domain_name, uint16_t port, const SocketAssociation::ptr & assoc, Socket & socket) throw (Exception);
-	void Socket_add_UDP(const SocketAssociation::ptr & assoc, Socket & socket, const sockaddr_in * bind_ = NULL) throw (Exception, SyscallException);
-	void ListenSocket_add(const sockaddr_in & addr, const SocketAssociation::ptr & assoc, Socket & sock)  throw (Exception, SyscallException);
-	void ListenSocket_add(uint16_t port, const SocketAssociation::ptr & assoc, Socket & sock)  throw (Exception, SyscallException);
-	void ListenSocket_add(uint16_t port, const in_addr & addr, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException);
-	void ListenSocket_add(uint16_t port, const char * ip, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException);
-	void ListenSocket_add(uint16_t port, const std::string & ip, const SocketAssociation::ptr & assoc, Socket & sock) throw (Exception, SyscallException);
-	size_t Socket_send(Socket & sock, const void * data, size_t len, bool full = true) throw (Exception);//full == 1 => надо отправить все сразу
-	ssize_t Socket_send(Socket & sock, const void * data, size_t len, const sockaddr_in & addr) throw (SyscallException, Exception);
-	size_t Socket_recv(Socket & sock, char * data, size_t len, bool & is_closed, sockaddr_in * from = NULL) throw (SyscallException, Exception);
-	bool Socket_closed(Socket & sock) throw (Exception);
-	void Socket_close(Socket & sock) throw (Exception);
+	void Socket_add(const std::string & ip, uint16_t port, const SocketEventInterfacePtr & assoc, Socket & socket);
+	void Socket_add(const sockaddr_in & addr, const SocketEventInterfacePtr & assoc, Socket & socket);
+	void Socket_add(int sock_fd, const sockaddr_in & addr, const SocketEventInterfacePtr & assoc, Socket & sock);
+	void Socket_add_domain(const std::string & domain_name, uint16_t port, const SocketEventInterfacePtr & assoc, Socket & socket);
+	void Socket_add_UDP(const SocketEventInterfacePtr & assoc, Socket & socket, const sockaddr_in * bind_ = nullptr);
+	void ListenSocket_add(const sockaddr_in & addr, const SocketEventInterfacePtr & assoc, Socket & sock) ;
+	void ListenSocket_add(uint16_t port, const SocketEventInterfacePtr & assoc, Socket & sock) ;
+	void ListenSocket_add(uint16_t port, const in_addr & addr, const SocketEventInterfacePtr & assoc, Socket & sock);
+	void ListenSocket_add(uint16_t port, const std::string & ip, const SocketEventInterfacePtr & assoc, Socket & sock);
+	size_t Socket_send(Socket & sock, const void * data, size_t len, bool full = true);//full == 1 => надо отправить все сразу
+	ssize_t Socket_send(Socket & sock, const void * data, size_t len, const sockaddr_in & addr);
+	size_t Socket_recv(Socket & sock, char * data, size_t len, bool & is_closed, sockaddr_in * from = nullptr);
+	bool Socket_closed(Socket & sock);
+	void Socket_close(Socket & sock);
 	void Socket_delete(Socket & sock);
-	void Socket_set_assoc(Socket & sock, const SocketAssociation::ptr & assoc) throw (Exception);
-	void Socket_get_assoc(Socket & sock, SocketAssociation::ptr & assoc) throw (Exception);
-	int Socket_get_rx_speed(Socket & sock) throw (Exception);
-	int Socket_get_tx_speed(Socket & sock) throw (Exception);
-	void Socket_get_addr(Socket & sock, sockaddr_in & addr) throw (Exception);
+	void Socket_set_event_interface(Socket & sock, const SocketEventInterfacePtr & assoc);
+	void Socket_get_event_interface(Socket & sock, SocketEventInterfacePtr & assoc);
+	int Socket_get_rx_speed(Socket & sock);
+	int Socket_get_tx_speed(Socket & sock);
+	void Socket_get_addr(Socket & sock, sockaddr_in & addr);
 	ssize_t Socket_sendbuf_remain(Socket & sock)
 	{
 		if (sock == NULL)
 			return 0;
 		return sock->m_send_buffer.length - sock->m_send_buffer.pos;
 	}
-	int clock()  throw (SyscallException);
+	int clock() ;
 };
 
 }

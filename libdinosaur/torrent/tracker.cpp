@@ -12,7 +12,7 @@ namespace torrent {
 
 
 Tracker::Tracker()
-	:network::SocketAssociation()
+    :network::SocketEventInterface()
 {
 #ifdef BITTORRENT_DEBUG
 	logger::LOGGER() << "Tracker default constructor";
@@ -51,7 +51,7 @@ int Tracker::parse_announce()
 }
 
 Tracker::Tracker(const TorrentInterfaceInternalPtr & torrent,const  std::string & announce)
-	:network::SocketAssociation()
+    :network::SocketEventInterface()
 {
 #ifdef BITTORRENT_DEBUG
 	logger::LOGGER() << "Tracker constructor " << announce.c_str();

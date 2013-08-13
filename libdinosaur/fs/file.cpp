@@ -26,7 +26,7 @@ file::file()
  * Exception::ERR_CODE_NULL_REF;
  */
 
-file::file(const char * fn, uint64_t length, bool should_exists, const FileAssociation::ptr & assoc) throw (Exception)
+file::file(const char * fn, uint64_t length, bool should_exists, const FileEventInterface::ptr & assoc) throw (Exception)
 {
 #ifdef BITTORRENT_DEBUG
 	logger::LOGGER() << "file constructor fn=" << fn

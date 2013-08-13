@@ -16,6 +16,7 @@ using namespace boost::posix_time;
 using namespace boost::gregorian;
 using namespace std;
 ofstream ofs;
+ostream  * log_stream = &cout;
 
 void InitLogger(const std::string & log_dir)
 {
@@ -24,12 +25,13 @@ void InitLogger(const std::string & log_dir)
 	fname +=  to_simple_string(microsec_clock::local_time());
 	ofs.open(fname.c_str());
 	ofs << "Log created at: " << to_simple_string(microsec_clock::local_time());
+	log_stream = &ofs;
 }
 
 ostream & LOGGER()
 {
-    ofs << endl << "[ PID=" << getpid() << " " << to_simple_string(microsec_clock::local_time()) <<" ] ";
-    return ofs;
+    *log_stream << endl << "[ PID=" << getpid() << " " << to_simple_string(microsec_clock::local_time()) <<" ] ";
+    return *log_stream;
 }
 
 }

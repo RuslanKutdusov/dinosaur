@@ -13,6 +13,7 @@
  */
 
 #include "types.h"
+#include <stdio.h>
 
 namespace dinosaur
 {
@@ -25,16 +26,19 @@ SHA1_HASH::SHA1_HASH()
 SHA1_HASH::SHA1_HASH(const SHA1_HASH & hash)
 {
 	memcpy(this->m_data, hash.m_data, SHA1_LENGTH);
+	to_hex();
 }
 
 SHA1_HASH::SHA1_HASH(const char * hash)
 {
 	memcpy(this->m_data, hash, SHA1_LENGTH);
+	to_hex();
 }
 
 SHA1_HASH::SHA1_HASH(const unsigned char * hash)
 {
 	memcpy(this->m_data, hash, SHA1_LENGTH);
+	to_hex();
 }
 
 SHA1_HASH::~SHA1_HASH()
@@ -47,6 +51,7 @@ SHA1_HASH & SHA1_HASH::operator=(const SHA1_HASH & hash)
 	if (this != &hash)
 	{
 		memcpy(this->m_data, hash.m_data, SHA1_LENGTH);
+		to_hex();
 	}
 	return *this;
 }
@@ -54,12 +59,14 @@ SHA1_HASH & SHA1_HASH::operator=(const SHA1_HASH & hash)
 SHA1_HASH & SHA1_HASH::operator=(const char * hash)
 {
 	memcpy(this->m_data, hash, SHA1_LENGTH);
+	to_hex();
 	return *this;
 }
 
 SHA1_HASH & SHA1_HASH::operator=(const unsigned char * hash)
 {
 	memcpy(this->m_data, hash, SHA1_LENGTH);
+	to_hex();
 	return *this;
 }
 
@@ -107,23 +114,22 @@ void SHA1_HASH::copy2(unsigned char * dst) const
 	memcpy(dst, m_data, SHA1_LENGTH);
 }
 
-void SHA1_HASH::print()  const
+void SHA1_HASH::to_hex()
 {
 	for(size_t i = 0; i < SHA1_LENGTH; i++)
-		printf("%02X", m_data[i]);
-	printf("\n");
-}
-
-void SHA1_HASH::to_hex(std::string & id) const
-{
-	id.resize(SHA1_LENGTH * 2);
-	for(size_t i = 0; i < SHA1_LENGTH; i++)
-		sprintf(&id[i * 2], "%02x", m_data[i]);
+		sprintf(&m_hex[i * 2], "%02x", m_data[i]);
+	m_hex[SHA1_LENGTH * 2] = 0;
 }
 
 void SHA1_HASH::clear()
 {
 	memset(m_data, 0, SHA1_LENGTH);
+	memset(m_hex, 0, SHA1_LENGTH * 2 + 1);
+}
+
+const char * SHA1_HASH::hex() const
+{
+	return m_hex;
 }
 
 }

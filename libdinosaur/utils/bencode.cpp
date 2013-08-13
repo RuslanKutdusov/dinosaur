@@ -26,7 +26,7 @@ int decode_str(const char ** data, uint64_t * len, be_str * s)
 	if (str_len == 0)
 	{
 		s->ptr = new char[1];
-		s->ptr = '\0';
+		*s->ptr = '\0';
 		str_len = 1;
 	}
 	else
@@ -379,7 +379,7 @@ int get_str(be_node * node, const char * key, be_str ** val)
 	return -1;
 }
 
-int get_list(be_node * node, const char * key, be_list ** val)
+int get_list(be_node * node, const char * key, be_list ** val, int * size)
 {
 	if (node == NULL || key == NULL || val == NULL)
 		return -1;
@@ -391,6 +391,8 @@ int get_list(be_node * node, const char * key, be_list ** val)
 			if (node->val.d.keys[i].len == l && strncmp(node->val.d.keys[i].ptr, key, l) == 0 && node->val.d.vals[i].type == BE_LIST)
 			{
 				*val = &node->val.d.vals[i].val.l;
+				if (size)
+					*size = node->val.d.vals[i].val.l.count;
 				return 0;
 			}
 		}

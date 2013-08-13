@@ -36,9 +36,9 @@
 namespace dinosaur {
 
 class Dinosaur;
-typedef boost::shared_ptr<Dinosaur> DinosaurPtr;
+typedef std::shared_ptr<Dinosaur> DinosaurPtr;
 
-class Dinosaur : public network::SocketAssociation {
+class Dinosaur : public network::SocketEventInterface {
 private:
 	struct torrent_info
 	{

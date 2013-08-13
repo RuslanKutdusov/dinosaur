@@ -155,7 +155,7 @@ void CSHA1::Final()
 void CSHA1::GetHEXHash(SHA1_HASH_HEX & hash)
 {
 	SHA1_HASH h = m_digest;
-	h.to_hex(hash);
+	hash = h.hex();
 
 }
 

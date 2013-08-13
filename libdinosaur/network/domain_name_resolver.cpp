@@ -6,6 +6,8 @@
  */
 
 #include "network.h"
+#include <pcre.h>
+#include <netdb.h>
 
 namespace dinosaur {
 namespace network {

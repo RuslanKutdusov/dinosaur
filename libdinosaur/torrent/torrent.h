@@ -42,18 +42,18 @@ namespace torrent {
 
 
 class TorrentBase;
-typedef boost::shared_ptr<TorrentBase> 					TorrentBasePtr;
+typedef std::shared_ptr<TorrentBase> 					TorrentBasePtr;
 
 class TorrentInterfaceBase;
-typedef boost::shared_ptr<TorrentInterfaceBase> 		TorrentInterfaceBasePtr;
+typedef std::shared_ptr<TorrentInterfaceBase> 		TorrentInterfaceBasePtr;
 
 class TorrentInterfaceInternal;
-typedef boost::shared_ptr<TorrentInterfaceInternal> 	TorrentInterfaceInternalPtr;
+typedef std::shared_ptr<TorrentInterfaceInternal> 	TorrentInterfaceInternalPtr;
 
 class TorrentFile;
-typedef boost::shared_ptr<TorrentFile> TorrentFilePtr;
+typedef std::shared_ptr<TorrentFile> TorrentFilePtr;
 
-class Tracker : public network::SocketAssociation
+class Tracker : public network::SocketEventInterface
 {
 private:
 	enum TRACKER_STATE
@@ -131,7 +131,7 @@ public:
 	int get_info(info::tracker & ref);
 };
 
-class Peer : public network::SocketAssociation
+class Peer : public network::SocketEventInterface
 {
 private:
 	//состояния автомата в классе Peer
@@ -207,8 +207,8 @@ public:
 	~Peer();
 };
 
-typedef boost::shared_ptr<Peer> PeerPtr;
-typedef boost::shared_ptr<Tracker> TrackerPtr;
+typedef std::shared_ptr<Peer> PeerPtr;
+typedef std::shared_ptr<Tracker> TrackerPtr;
 
 typedef std::map<std::string, TrackerPtr> tracker_map;
 typedef tracker_map::iterator tracker_map_iter;
@@ -286,10 +286,10 @@ public:
 	void event_file_write(const fs::write_event & we, PIECE_STATE & piece_state);
 
 };
-typedef boost::shared_ptr<PieceManager> PieceManagerPtr;
+typedef std::shared_ptr<PieceManager> PieceManagerPtr;
 
 
-class TorrentFile : public fs::FileAssociation
+class TorrentFile : public fs::FileEventInterface
 {
 public:
 	struct file
@@ -346,7 +346,7 @@ public:
 };
 
 
-class TorrentBase : public boost::enable_shared_from_this<TorrentBase>
+class TorrentBase : public std::enable_shared_from_this<TorrentBase>
 {
 protected:
 	enum TORRENT_STATE
@@ -459,7 +459,7 @@ public:
 		ptr.reset();
 		TorrentBasePtr base_ptr;
 		TorrentBase::CreateTorrent(nm, g_cfg, fm, bc, metafile, work_directory, download_directory, base_ptr);
-		ptr = boost::static_pointer_cast<TorrentInterfaceBase>(base_ptr);
+        ptr = std::static_pointer_cast<TorrentInterfaceBase>(base_ptr);
 	}
 	virtual ~TorrentInterfaceBase() {}
 	/*

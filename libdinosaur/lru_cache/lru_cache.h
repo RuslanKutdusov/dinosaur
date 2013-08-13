@@ -50,10 +50,10 @@ public:
 	cache_element & operator[](const cache_key & key);
 	void get_without_time_update(const cache_key & key, cache_element & value);
 	const cache_key & get_old();
-	void get_element_time(const cache_key & key, timeval & t);
+	void get_element_time(const cache_key & key, timeval & t) const;
 	void update_element_time(const cache_key & key);
 	bool empty();
-	size_t size();
+	size_t size() const;
 	void remove(const cache_key & key);
 	typedef hash_table_iterator iterator;
 	iterator begin()
@@ -175,9 +175,10 @@ void LRU_Cache<cache_key, cache_element>::get_without_time_update(const cache_ke
  */
 
 template <class cache_key, class cache_element>
-void LRU_Cache<cache_key, cache_element>::get_element_time(const cache_key & key, timeval & t)
+void LRU_Cache<cache_key, cache_element>::get_element_time(const cache_key & key, timeval & t) const
 {
-	typename time_queue::right_iterator it = m_time_queue.right.find(key);
+	// typename time_queue::right_iterator
+	auto it = m_time_queue.right.find(key);
 	if (it == m_time_queue.right.end())
 		throw Exception(Exception::ERR_CODE_LRU_CACHE_NE);
 	uint64_t time = it->second;
@@ -212,7 +213,7 @@ bool LRU_Cache<cache_key, cache_element>::empty()
 }
 
 template <class cache_key, class cache_element>
-size_t LRU_Cache<cache_key, cache_element>::size()
+size_t LRU_Cache<cache_key, cache_element>::size() const
 {
 	return m_hash_table.size();
 }

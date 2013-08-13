@@ -73,11 +73,11 @@ int get_dict(be_node * node, const char * key, be_dict ** val);
 int get_node(be_node * node, int index, be_node ** val);
 int get_int(be_node * node, int index, uint64_t * val);
 int get_str(be_node * node, int index, be_str ** val);
-int get_list(be_node * node, int index, be_list ** val);
+int get_list(be_node * node, int index, be_list ** val, int * size = NULL);
 int get_list_size(be_node * node, int index, int * val);
 int get_dict(be_node * node, int index, be_dict ** val);
 int get_list_size(be_node * node);
-char * str2c_str(be_str * str);
+char * str2c_str(be_str * str);//check memory leaks
 bool is_int(be_node * node);
 bool is_str(be_node * node);
 bool is_list(be_node * node);
