@@ -264,8 +264,8 @@ void dht::response_handler(bencode::be_node * message_bencoded, REQUEST_TYPE req
 		get_peers_handler(reply_bencoded);
 }
 
-void dht::ping_handler(const node_id & id, const sockaddr_in & addr
-){
+void dht::ping_handler(const node_id & id, const sockaddr_in & addr)
+{
 	#ifdef DHT_DEBUG
 		printf("	it`s 'ping' response\n");
 	#endif

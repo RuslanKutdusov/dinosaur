@@ -356,9 +356,7 @@ void routing_table::dump_bucket(const size_t & bucket) const
 {
 	printf("	nodes in the bucket:\n");
 	for(bucket::iterator iter = m_buckets[bucket].begin(); iter != m_buckets[bucket].end(); ++iter)
-	{
-		printf("	%s\n", iter->first.hex());
-	}
+		printf( "	%s\n", iter->first.hex() );
 }
 
 }

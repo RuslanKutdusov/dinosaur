@@ -37,8 +37,6 @@ void thread_()
 
 int main(int argc,char* argv[])
 {
-	network_test::network_test();
-	return 0;
 	std::thread t = std::thread(thread_);
 
 	dinosaur::network::NetworkManager nm;

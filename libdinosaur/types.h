@@ -18,40 +18,40 @@ namespace dinosaur
 {
 
 typedef std::string			SHA1_HASH_HEX;
-typedef unsigned char * 	BITFIELD;
+typedef unsigned char*	 	BITFIELD;
 typedef uint64_t			FILE_INDEX;
 typedef uint32_t 			BLOCK_INDEX;
 typedef uint32_t 			PIECE_INDEX;
 typedef uint32_t 			BLOCK_OFFSET;
 typedef uint64_t			FILE_OFFSET;
-typedef char				IP_CHAR[IP_CHAR_LENGHT];
-typedef char				PEER_ID[PEER_ID_LENGTH];
+typedef char				IP_CHAR[ IP_CHAR_LENGHT ];
+typedef char				PEER_ID[ PEER_ID_LENGTH ];
 
 class SHA1_HASH
 {
 protected:
-	unsigned char 	m_data[SHA1_LENGTH];
-	char			m_hex[SHA1_LENGTH * 2 + 1];
-	void clear();
-	void to_hex();
+	unsigned char 	m_data[ SHA1_LENGTH ];
+	char			m_hex[ SHA1_LENGTH * 2 + 1 ];
+	void 			clear();
+	void 			to_hex();
 public:
-	SHA1_HASH();
-	SHA1_HASH(const SHA1_HASH & hash);
-	SHA1_HASH(const char * hash);
-	SHA1_HASH(const unsigned char * hash);
-	virtual ~SHA1_HASH();
-	SHA1_HASH & operator=(const SHA1_HASH & hash);
-	SHA1_HASH & operator=(const char * hash);
-	SHA1_HASH & operator=(const unsigned char * hash);
-	unsigned char & operator[](size_t i);
-	const unsigned char & operator[](size_t i) const;
-	bool operator<(const SHA1_HASH & hash) const;
-	bool operator==(const SHA1_HASH & hash) const;
-	bool operator!=(const SHA1_HASH & hash) const;
-	void copy2(char * dst) const;
-	void copy2(unsigned char * dst) const;
-	void print() const;
-	const char * hex() const;
+					SHA1_HASH();
+					SHA1_HASH( const SHA1_HASH& hash );
+					SHA1_HASH( const char* hash );
+					SHA1_HASH( const unsigned char* hash );
+	virtual 		~SHA1_HASH();
+	SHA1_HASH& 		operator=( const SHA1_HASH& hash );
+	SHA1_HASH& 		operator=( const char* hash );
+	SHA1_HASH& 		operator=( const unsigned char* hash );
+	unsigned char& 	operator[]( size_t i );
+	const unsigned char& operator[]( size_t i ) const;
+	bool 			operator<( const SHA1_HASH & hash ) const;
+	bool 			operator==( const SHA1_HASH & hash ) const;
+	bool 			operator!=( const SHA1_HASH & hash ) const;
+	void 			copy2( char* dst ) const;
+	void 			copy2( unsigned char* dst ) const;
+	void 			print() const;
+	const char* 	hex() const;
 };
 
 enum DOWNLOAD_PRIORITY
@@ -110,7 +110,7 @@ struct torrent_failure
 	std::string				description;
 };
 
-typedef std::list<torrent_failure> torrent_failures;
+typedef std::list< torrent_failure > torrent_failures;
 
 namespace info
 {
@@ -156,7 +156,7 @@ namespace info
 		time_t 				update_in;
 	};
 
-	typedef std::list<tracker> trackers;
+	typedef std::list< tracker > trackers;
 
 	struct file_stat
 	{
@@ -171,7 +171,7 @@ namespace info
 		uint64_t			downloaded;
 	};
 
-	typedef std::vector<file_stat> files_stat;
+	typedef std::vector< file_stat > files_stat;
 
 	struct peer
 	{
@@ -185,7 +185,7 @@ namespace info
 		uint32_t	requested_blocks;
 		bool 		may_request;
 	};
-	typedef std::list<peer> peers;
+	typedef std::list< peer > peers;
 
 	struct downloadable_piece
 	{
@@ -194,7 +194,7 @@ namespace info
 		uint32_t			downloaded_blocks;
 		DOWNLOAD_PRIORITY 	priority;
 	};
-	typedef std::list<downloadable_piece> downloadable_pieces;
+	typedef std::list< downloadable_piece > downloadable_pieces;
 }
 
 }

@@ -116,9 +116,9 @@ void SHA1_HASH::copy2(unsigned char * dst) const
 
 void SHA1_HASH::to_hex()
 {
-	for(size_t i = 0; i < SHA1_LENGTH; i++)
-		sprintf(&m_hex[i * 2], "%02x", m_data[i]);
-	m_hex[SHA1_LENGTH * 2] = 0;
+	for( size_t i = 0; i < SHA1_LENGTH; i++ )
+		sprintf( &m_hex[ i * 2 ], "%02x", m_data[ i ] );
+	m_hex[ SHA1_LENGTH * 2 ] = 0;
 }
 
 void SHA1_HASH::clear()
